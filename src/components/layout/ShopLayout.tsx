@@ -29,7 +29,7 @@ export function ShopLayout({ children }: ShopLayoutProps) {
                 className="h-10 w-10 rounded-lg shadow-sm group-hover:shadow-md transition"
               />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Nhạn Lâm SmartCare</h1>
+                <h1 className="text-xl font-bold text-gray-900">Sơn Nam</h1>
                 <p className="text-xs text-gray-500">Phụ tùng & Sửa chữa xe máy</p>
               </div>
             </Link>
@@ -104,7 +104,7 @@ export function ShopLayout({ children }: ShopLayoutProps) {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <img src="/logo-smartcare.png" alt="Logo" className="h-10 w-10 rounded-lg" />
-                <h3 className="text-lg font-bold text-white">Nhạn Lâm SmartCare</h3>
+                <h3 className="text-lg font-bold text-white">Sơn Nam</h3>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
                 Chuyên cung cấp phụ tùng chính hãng và dịch vụ sửa chữa, bảo dưỡng xe máy 
@@ -179,7 +179,7 @@ export function ShopLayout({ children }: ShopLayoutProps) {
 
           {/* Bottom Bar */}
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-500">
-            <p>© {new Date().getFullYear()} Nhạn Lâm SmartCare. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Sơn Nam. All rights reserved.</p>
           </div>
         </div>
       </footer>

@@ -91,18 +91,16 @@ export function Nav() {
               >
                 <img
                   src="/logo-smartcare.png"
-                  alt="SmartCare Logo"
+                  alt="Sơn Nam"
                   className="w-8 h-8 md:w-10 md:h-10 rounded-lg shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 group-hover:shadow-md group-hover:ring-emerald-400/60 dark:group-hover:ring-emerald-500/60 transition"
                 />
                 {/* Mobile: Shorter name */}
                 <span className="font-bold text-xs tracking-tight text-white lg:hidden">
-                  Nhạn Lâm
-                  <br />
-                  SmartCare
+                  Sơn Nam
                 </span>
                 {/* Desktop: Full name */}
                 <span className="font-bold text-sm tracking-tight text-white hidden lg:inline whitespace-nowrap">
-                  Nhạn Lâm SmartCare
+                  Sơn Nam
                 </span>
               </button>
 

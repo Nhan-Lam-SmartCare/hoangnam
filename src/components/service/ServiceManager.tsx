@@ -2677,7 +2677,7 @@ export default function ServiceManager() {
                             color: "#1e40af",
                           }}
                         >
-                          {storeSettings?.store_name || "Nhạn Lâm SmartCare"}
+                          {storeSettings?.store_name || "Sơn Nam"}
                         </div>
                         <div
                           style={{
@@ -3583,7 +3583,7 @@ export default function ServiceManager() {
                     color: "#1e40af",
                   }}
                 >
-                  {storeSettings?.store_name || "Nhạn Lâm SmartCare"}
+                  {storeSettings?.store_name || "Sơn Nam"}
                 </div>
                 <div
                   style={{

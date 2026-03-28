@@ -1262,7 +1262,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                   color: "#1e40af",
                 }}
               >
-                {storeSettings?.store_name || "Nhạn Lâm SmartCare"}
+                {storeSettings?.store_name || "Sơn Nam"}
               </div>
               <div
                 style={{

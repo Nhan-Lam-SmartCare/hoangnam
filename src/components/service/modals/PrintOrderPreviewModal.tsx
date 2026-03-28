@@ -234,7 +234,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                             color: "#1e40af",
                                         }}
                                     >
-                                        {storeSettings?.store_name || "Nhạn Lâm SmartCare"}
+                                        {storeSettings?.store_name || "Sơn Nam"}
                                     </div>
                                     <div
                                         style={{

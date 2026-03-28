@@ -146,7 +146,7 @@ export const LoginPage = () => {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-white dark:bg-slate-800 rounded-2xl mb-4 shadow-lg ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden">
             <img
               src="/logo-smartcare.png"
-              alt="Nhạn-Lâm SmartCare"
+              alt="Sơn Nam"
               className="w-full h-full object-contain p-1.5"
               onError={(e) => {
                 // Fallback to icon if logo not found yet
@@ -163,10 +163,10 @@ export const LoginPage = () => {
             />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            MotoCare
+            Sơn Nam
           </h1>
           <p className="text-slate-600 dark:text-slate-400">
-            Hệ thống quản lý cửa hàng xe máy
+            Phần mềm quản lý bán hàng
           </p>
         </div>
 
@@ -272,7 +272,7 @@ export const LoginPage = () => {
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            © 2025 MotoCare. Phiên bản 1.0.0
+            © {new Date().getFullYear()} Sơn Nam. Phiên bản 1.0.0
           </p>
         </div>
       </div>
