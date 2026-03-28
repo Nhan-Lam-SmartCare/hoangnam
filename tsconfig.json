@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node", "@types/react", "@types/react-dom"]
+  },
+  "include": ["src", "vite-env.d.ts"],
+  "exclude": [
+    "src/components/__DEPRECATED_backups/**",
+    "**/*.backup.ts",
+    "**/*.backup.tsx",
+    "**/*.old.ts",
+    "**/*.old.tsx",
+    "**/*.legacy.ts",
+    "**/*.legacy.tsx"
+  ]
+}

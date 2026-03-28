@@ -1,0 +1,23 @@
+<svg width="800" height="800" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="800" fill="#f1f5f9"/>
+  
+  <!-- Icon -->
+  <g transform="translate(400, 350)">
+    <!-- Package box icon -->
+    <path d="M-80,-60 L0,-100 L80,-60 L80,60 L0,100 L-80,60 Z" 
+          fill="#cbd5e1" stroke="#94a3b8" stroke-width="4"/>
+    <path d="M0,-100 L0,100" stroke="#94a3b8" stroke-width="4"/>
+    <path d="M-80,-60 L80,-60" stroke="#94a3b8" stroke-width="4"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="400" y="520" font-family="Arial, sans-serif" font-size="32" 
+        fill="#64748b" text-anchor="middle" font-weight="bold">
+    No Image Available
+  </text>
+  <text x="400" y="560" font-family="Arial, sans-serif" font-size="20" 
+        fill="#94a3b8" text-anchor="middle">
+    Vui lòng thêm hình ảnh sản phẩm
+  </text>
+</svg>
