@@ -7,6 +7,7 @@ import {
   Boxes,
   Users,
   Shield,
+  FileText,
   Menu,
   X,
   LogOut,
@@ -372,6 +373,13 @@ export const BottomNav: React.FC = () => {
                     icon={<Shield className="w-5 h-5" />}
                     label="Tra cứu bảo hành"
                     color="emerald"
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <MobileDrawerLink
+                    to="/reports"
+                    icon={<FileText className="w-5 h-5" />}
+                    label="Báo cáo tổng quan"
+                    color="fuchsia"
                     onClick={() => setShowMenu(false)}
                   />
                 </div>

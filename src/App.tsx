@@ -53,6 +53,7 @@ const CategoriesManager = lazyImport(
 );
 const LookupManager = lazyImport(() => import("./components/lookup/LookupManager"));
 const MigrationTool = lazyImport(() => import("./components/admin/MigrationTool"));
+const ReportsOverview = lazyImport(() => import("./components/reports/ReportsOverview"));
 const SettingsManager = lazyImport(() =>
   import("./components/settings/SettingsManager").then((m) => ({
     default: m.SettingsManager,
@@ -135,6 +136,11 @@ const StaffDashboardPage = () => (
     <StaffDashboard />
   </Suspense>
 );
+const ReportsPage = () => (
+  <Suspense fallback={<PageLoader />}>
+    <ReportsOverview />
+  </Suspense>
+);
 const EmployeesPage = () => (
   <Suspense fallback={<PageLoader />}>
     <EmployeesManager />
@@ -184,6 +190,14 @@ const MainLayout: React.FC = () => {
             element={
               <ProtectedRoute requiredRoles={["owner", "manager"]}>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <ReportsPage />
               </ProtectedRoute>
             }
           />

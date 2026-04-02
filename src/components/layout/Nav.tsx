@@ -71,7 +71,7 @@ export function Nav() {
     viewSettings: isOwnerOrManager,
     viewInventory: isOwnerOrManager,
     viewDashboard: isOwnerOrManager,
-    viewReports: false,
+    viewReports: true,
   } as const;
 
   useEffect(() => {
@@ -346,7 +346,15 @@ export function Nav() {
                 label="Nhân viên"
               />
             )}
-            {/* Removed unrelated links: Employees, Finance, Debt, Analytics, Reports, Promotions */}
+            {can.viewReports && (
+              <NavLink
+                to="/reports"
+                colorKey="fuchsia"
+                icon={<FileText className="w-4 h-4" />}
+                label="Báo cáo"
+              />
+            )}
+            {/* Removed unrelated links: Finance, Debt, Analytics, Promotions */}
           </div>
 
           {/* Right: Notifications and Home Icon (mobile only) */}
