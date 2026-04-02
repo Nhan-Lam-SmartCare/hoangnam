@@ -227,6 +227,10 @@ export const SettingsManager = ({
     }
   }, [activeTab]);
 
+  async function refreshStaffScreen() {
+    await Promise.allSettled([loadStaff(), loadBranches()]);
+  }
+
   const loadBranches = async () => {
     try {
       // Try to get branches from database first
@@ -325,6 +329,8 @@ export const SettingsManager = ({
           ? "Đã thêm chi nhánh trên giao diện (local fallback)."
           : "Đã thêm chi nhánh mới thành công"
       );
+
+      await refreshStaffScreen();
     } catch (error: any) {
       console.error("Error adding branch:", error);
       showToast.error(error.message || "Không thể thêm chi nhánh");
@@ -583,6 +589,7 @@ export const SettingsManager = ({
 
       showToast.success("Đã cập nhật thông tin nhân viên");
       setEditingStaff(null);
+      await refreshStaffScreen();
     } catch (error: any) {
       console.error("Error updating staff:", error);
       showToast.error(error.message || "Không thể cập nhật nhân viên");
@@ -632,7 +639,7 @@ export const SettingsManager = ({
       if (editingStaff?.id === staff.id) {
         setEditingStaff(null);
       }
-      await loadStaff();
+      await refreshStaffScreen();
     } catch (error: any) {
       console.error("Error deleting staff:", error);
       showToast.error(error.message || "Không thể xóa nhân viên");
@@ -719,7 +726,7 @@ export const SettingsManager = ({
       }
       setShowAddStaff(false);
       resetNewStaffForm();
-      await loadStaff();
+      await refreshStaffScreen();
     } catch (error: any) {
       console.error("Error creating staff account:", error);
       showToast.error(error.message || "Không thể tạo tài khoản nhân viên");

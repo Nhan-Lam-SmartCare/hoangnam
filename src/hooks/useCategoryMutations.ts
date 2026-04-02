@@ -7,6 +7,19 @@ import { showToast } from "../utils/toast";
 
 export const useRenameCategory = () => {
   const qc = useQueryClient();
+
+  const refreshCategoryViews = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["parts"] }),
+      qc.invalidateQueries({ queryKey: ["categories"] }),
+    ]);
+
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["parts"], type: "active" }),
+      qc.refetchQueries({ queryKey: ["categories"], type: "active" }),
+    ]);
+  };
+
   return useMutation({
     mutationFn: async ({
       oldName,
@@ -19,9 +32,9 @@ export const useRenameCategory = () => {
       if (!result.ok) throw result.error;
       return result.data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       showToast.success("Đã đổi tên danh mục");
-      qc.invalidateQueries({ queryKey: ["parts"] });
+      await refreshCategoryViews();
     },
     onError: (err: any) => {
       showToast.error(err?.message || "Lỗi đổi tên danh mục");
@@ -31,15 +44,28 @@ export const useRenameCategory = () => {
 
 export const useDeleteCategory = () => {
   const qc = useQueryClient();
+
+  const refreshCategoryViews = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["parts"] }),
+      qc.invalidateQueries({ queryKey: ["categories"] }),
+    ]);
+
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["parts"], type: "active" }),
+      qc.refetchQueries({ queryKey: ["categories"], type: "active" }),
+    ]);
+  };
+
   return useMutation({
     mutationFn: async ({ name }: { name: string }) => {
       const result = await deleteCategory(name);
       if (!result.ok) throw result.error;
       return result.data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       showToast.success("Đã xóa danh mục");
-      qc.invalidateQueries({ queryKey: ["parts"] });
+      await refreshCategoryViews();
     },
     onError: (err: any) => {
       showToast.error(err?.message || "Lỗi xóa danh mục");

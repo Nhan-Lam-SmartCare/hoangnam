@@ -21,14 +21,27 @@ export const useCategories = () => {
 
 export const useCreateCategory = () => {
   const qc = useQueryClient();
+
+  const refreshCategoryViews = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["categories"] }),
+      qc.invalidateQueries({ queryKey: ["parts"] }),
+    ]);
+
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["categories"], type: "active" }),
+      qc.refetchQueries({ queryKey: ["parts"], type: "active" }),
+    ]);
+  };
+
   return useMutation({
     mutationFn: async (input: Partial<Category>) => {
       const res = await createCategory(input);
       if (!res.ok) throw res.error;
       return res.data;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["categories"] });
+    onSuccess: async () => {
+      await refreshCategoryViews();
       showToast.success("Đã tạo danh mục");
     },
     onError: (err: any) => showToast.error(err?.message || "Lỗi tạo danh mục"),
@@ -37,6 +50,19 @@ export const useCreateCategory = () => {
 
 export const useUpdateCategory = () => {
   const qc = useQueryClient();
+
+  const refreshCategoryViews = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["categories"] }),
+      qc.invalidateQueries({ queryKey: ["parts"] }),
+    ]);
+
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["categories"], type: "active" }),
+      qc.refetchQueries({ queryKey: ["parts"], type: "active" }),
+    ]);
+  };
+
   return useMutation({
     mutationFn: async ({
       id,
@@ -49,8 +75,8 @@ export const useUpdateCategory = () => {
       if (!res.ok) throw res.error;
       return res.data;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["categories"] });
+    onSuccess: async () => {
+      await refreshCategoryViews();
       showToast.success("Đã cập nhật danh mục");
     },
     onError: (err: any) =>
@@ -60,14 +86,27 @@ export const useUpdateCategory = () => {
 
 export const useDeleteCategoryRecord = () => {
   const qc = useQueryClient();
+
+  const refreshCategoryViews = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["categories"] }),
+      qc.invalidateQueries({ queryKey: ["parts"] }),
+    ]);
+
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["categories"], type: "active" }),
+      qc.refetchQueries({ queryKey: ["parts"], type: "active" }),
+    ]);
+  };
+
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const res = await deleteCategoryRecord(id);
       if (!res.ok) throw res.error;
       return res.data;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["categories"] });
+    onSuccess: async () => {
+      await refreshCategoryViews();
       showToast.success("Đã xóa danh mục");
     },
     onError: (err: any) => showToast.error(err?.message || "Lỗi xóa danh mục"),
