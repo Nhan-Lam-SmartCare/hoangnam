@@ -21,6 +21,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { useTheme } from "../../contexts/ThemeContext";
+import { canAccessInventorySection } from "../../utils/inventoryAccess";
 
 // Color types and constants
 export type ColorKey =
@@ -176,10 +177,11 @@ export const NavLink: React.FC<{
 // Bottom Navigation Bar for Mobile
 export const BottomNav: React.FC = () => {
   const location = useLocation();
-  const { profile, signOut } = useAuth();
+  const { profile, user, signOut } = useAuth();
   const role = profile?.role;
   const isOwnerOrManager =
     role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
+  const canViewInventory = canAccessInventorySection(profile, user);
   const [showMenu, setShowMenu] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
@@ -209,7 +211,7 @@ export const BottomNav: React.FC = () => {
       icon: <Boxes className="w-6 h-6" />,
       label: "Kho",
       color: "amber",
-      show: isOwnerOrManager,
+      show: canViewInventory,
     },
     {
       to: "/warranty",
@@ -361,13 +363,15 @@ export const BottomNav: React.FC = () => {
                       onClick={() => setShowMenu(false)}
                     />
                   )}
-                  <MobileDrawerLink
-                    to="/inventory"
-                    icon={<Boxes className="w-5 h-5" />}
-                    label="Kho hàng & Vật tư"
-                    color="amber"
-                    onClick={() => setShowMenu(false)}
-                  />
+                  {canViewInventory && (
+                    <MobileDrawerLink
+                      to="/inventory"
+                      icon={<Boxes className="w-5 h-5" />}
+                      label="Kho hàng & Vật tư"
+                      color="amber"
+                      onClick={() => setShowMenu(false)}
+                    />
+                  )}
                   <MobileDrawerLink
                     to="/warranty"
                     icon={<Shield className="w-5 h-5" />}

@@ -7,6 +7,7 @@ import { supabase } from "../../supabaseClient";
 import NotificationDropdown from "../common/NotificationDropdown";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { NavLink, MobileDrawerLink } from "./index";
+import { canAccessInventorySection } from "../../utils/inventoryAccess";
 import {
   LayoutDashboard,
   Wrench,
@@ -62,6 +63,7 @@ export function Nav() {
     "N";
   const isOwnerOrManager =
     role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
+  const canViewInventory = canAccessInventorySection(profile, user);
   const can = {
     viewFinance: false,
     viewPayroll: false,
@@ -69,7 +71,7 @@ export function Nav() {
     viewDebt: false,
     viewEmployees: isOwnerOrManager,
     viewSettings: isOwnerOrManager,
-    viewInventory: isOwnerOrManager,
+    viewInventory: canViewInventory,
     viewDashboard: isOwnerOrManager,
     viewReports: true,
   } as const;

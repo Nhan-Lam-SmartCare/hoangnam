@@ -24,6 +24,7 @@ import { ShopLayout } from "./components/layout/ShopLayout";
 import Dashboard from "./components/dashboard/Dashboard";
 import RepoErrorPanel from "./components/common/RepoErrorPanel";
 import { lazyImport } from "./utils/lazyImport";
+import { canAccessInventorySection } from "./utils/inventoryAccess";
 
 // Lazy load large components for code splitting
 // Lazy load large components for code splitting
@@ -213,7 +214,12 @@ const MainLayout: React.FC = () => {
           <Route
             path="/inventory"
             element={
-              <ProtectedRoute requiredRoles={["owner", "manager"]}>
+              <ProtectedRoute
+                allow={({ profile, user }) =>
+                  canAccessInventorySection(profile, user)
+                }
+                denyMessage="Chỉ quản lý kho, nhân viên bán hàng, quản lý hoặc chủ cửa hàng mới được vào Kho."
+              >
                 <Inventory />
               </ProtectedRoute>
             }

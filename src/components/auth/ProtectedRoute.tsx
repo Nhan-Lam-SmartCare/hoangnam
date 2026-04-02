@@ -3,15 +3,21 @@ import { Ban } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { showToast } from "../../utils/toast";
+import type { User } from "@supabase/supabase-js";
+import type { UserProfile } from "../../contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRoles?: ("owner" | "manager" | "staff" | "accountant")[];
+  allow?: (context: { user: User; profile: UserProfile }) => boolean;
+  denyMessage?: string;
 }
 
 export const ProtectedRoute = ({
   children,
   requiredRoles,
+  allow,
+  denyMessage,
 }: ProtectedRouteProps) => {
   const { user, profile, loading, error } = useAuth();
 
@@ -33,7 +39,12 @@ export const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRoles && profile && !requiredRoles.includes(profile.role)) {
+  const deniedByRole =
+    !!(requiredRoles && profile && !requiredRoles.includes(profile.role));
+  const deniedByCustomRule =
+    !!(allow && user && profile && !allow({ user, profile }));
+
+  if (deniedByRole || deniedByCustomRule) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -42,7 +53,7 @@ export const ProtectedRoute = ({
             Không có quyền truy cập
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mb-6">
-            Bạn không có quyền truy cập trang này.
+            {denyMessage || "Bạn không có quyền truy cập trang này."}
           </p>
           <button
             onClick={() => window.history.back()}
