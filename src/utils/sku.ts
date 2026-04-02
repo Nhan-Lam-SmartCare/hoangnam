@@ -1,18 +1,18 @@
 /**
- * Generate unique 8-character SKU
- * Format: XXXXXXXX (uppercase alphanumeric)
- * Example: A3B7K9M2
+ * Generate compact SKU
+ * Format: PT-XXXXXX (uppercase alphanumeric)
+ * Example: PT-A3K9M2
  */
 export function generateSKU(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude confusing chars: 0,O,1,I
-  let sku = "";
+  let suffix = "";
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 6; i++) {
     const randomIndex = Math.floor(Math.random() * chars.length);
-    sku += chars[randomIndex];
+    suffix += chars[randomIndex];
   }
 
-  return sku;
+  return `PT-${suffix}`;
 }
 
 /**
@@ -36,8 +36,9 @@ export function generateSKUWithTimestamp(): string {
 }
 
 /**
- * Validate SKU format (8 alphanumeric characters)
+ * Validate SKU format.
+ * Supports both legacy 8-char SKUs and new compact PT-XXXXXX format.
  */
 export function isValidSKU(sku: string): boolean {
-  return /^[A-Z0-9]{8}$/.test(sku);
+  return /^[A-Z0-9]{8}$/.test(sku) || /^PT-[A-Z0-9]{6}$/.test(sku);
 }

@@ -72,123 +72,165 @@ const WorkOrderCard = React.memo(({
   workOrder,
   onEdit,
   onCall,
-  onPrint
+  onPrint,
+  onDelete,
+  canDelete,
 }: {
   workOrder: WorkOrder;
   onEdit: (wo: WorkOrder) => void;
   onCall: (phone: string) => void;
   onPrint: (wo: WorkOrder) => void;
+  onDelete: (wo: WorkOrder) => void;
+  canDelete: boolean;
 }) => {
-  // Get status details
-  const getStatusColor = (status: string) => {
+  const getStatusMeta = (status: string) => {
     switch (status) {
-      case "Tiếp nhận": return "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800";
-      case "Đang sửa": return "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800";
-      case "Đã sửa xong": return "bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800";
-      case "Trả máy": return "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";
-      default: return "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+      case "Tiếp nhận":
+        return {
+          className: "border-blue-500/35 bg-blue-500/10 text-blue-300",
+          icon: <FileText className="w-3.5 h-3.5" />,
+        };
+      case "Đang sửa":
+        return {
+          className: "border-pink-500/35 bg-pink-500/10 text-pink-300",
+          icon: <Wrench className="w-3.5 h-3.5" />,
+        };
+      case "Đã sửa xong":
+        return {
+          className: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300",
+          icon: <Check className="w-3.5 h-3.5" />,
+        };
+      case "Trả máy":
+        return {
+          className: "border-violet-500/35 bg-violet-500/10 text-violet-300",
+          icon: <Key className="w-3.5 h-3.5" />,
+        };
+      default:
+        return {
+          className: "border-slate-500/35 bg-slate-500/10 text-slate-300",
+          icon: <FileText className="w-3.5 h-3.5" />,
+        };
     }
   };
 
+  const statusMeta = getStatusMeta(workOrder.status);
+  const isPaid = workOrder.paymentStatus === "paid";
+  const remainingAmount = Number(
+    workOrder.remainingAmount ??
+      Math.max((workOrder.total || 0) - Number(workOrder.totalPaid || 0), 0)
+  );
+  const hasDebt = !isPaid && remainingAmount > 0;
+  const repairSummary =
+    workOrder.issueDescription?.trim() ||
+    workOrder.repairServices?.[0]?.serviceName?.trim() ||
+    workOrder.additionalServices?.[0]?.description?.trim() ||
+    "Chưa ghi mô tả lỗi";
+
   return (
-    <div
-      onClick={() => onEdit(workOrder)}
-      className="bg-white dark:bg-[#1e1e2d] rounded-xl border border-slate-200 dark:border-gray-800 shadow-sm active:scale-[0.99] transition-transform relative overflow-hidden"
-    >
-      <div className="p-3 space-y-2">
-        {/* Header: ID & Date & Status */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-              {formatWorkOrderId(workOrder.id)}
-            </span>
-            <span className="text-[10px] text-slate-500">{formatDate(workOrder.creationDate)}</span>
+    <div className="overflow-hidden rounded-2xl border border-[#254a8e]/45 bg-[#161922] shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
+      <div className="p-3.5 space-y-2.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[12px] tracking-wide text-slate-200">
+                {formatWorkOrderId(workOrder.id)}
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {formatDate(workOrder.creationDate)}
+              </span>
+            </div>
           </div>
-          <div className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getStatusColor(workOrder.status)}`}>
-            {workOrder.status}
+
+          <div className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold ${statusMeta.className}`}>
+            {statusMeta.icon}
+            <span>{workOrder.status}</span>
           </div>
         </div>
 
-        {/* Customer & Device */}
-        <div className="flex justify-between items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="font-bold text-sm text-slate-900 dark:text-white truncate">
-              {workOrder.customerName}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+          <div className="min-w-0 space-y-1.5">
+            <div className="text-[13px] font-semibold text-slate-100 truncate">
+              {workOrder.customerName || "Khách lẻ"}
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-              <Phone className="w-3 h-3" />
-              {workOrder.customerPhone}
+            <div className="text-[11px] text-slate-400 truncate">{workOrder.vehicleModel || "--"}</div>
+            <div className="text-[11px] text-slate-300/90 truncate">
+              Sửa: {repairSummary}
             </div>
           </div>
-          <div className="text-right min-w-0 flex-1">
-            <div className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate">
-              {workOrder.vehicleModel}
-            </div>
-            <div className="text-xs text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded inline-block">
-              {workOrder.licensePlate}
-            </div>
+          <div className="text-right min-w-0">
+            <div className="text-[12px] font-medium text-slate-300">{workOrder.customerPhone || "--"}</div>
+            <div className="text-[11px] font-mono text-slate-500 mt-0.5">{workOrder.licensePlate || "--"}</div>
           </div>
         </div>
 
-        {/* Issue (if any) */}
-        {workOrder.issueDescription && (
-          <div className="text-xs text-slate-500 italic truncate border-t border-dashed border-slate-100 dark:border-slate-800 pt-1 mt-1">
-            "{workOrder.issueDescription}"
-          </div>
-        )}
+        <div className="h-px bg-[#273348]" />
 
-        {/* Footer: Tech & Money & Quick Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 mt-1">
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300">
-              {workOrder.technicianName?.[0] || "?"}
-            </div>
-            <span className="text-xs text-slate-600 dark:text-slate-400 max-w-[60px] truncate">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] text-slate-400">KTV:</span>
+            <span className="text-[12px] font-semibold text-slate-200 truncate max-w-[120px]">
               {workOrder.technicianName || "Chưa phân"}
             </span>
-          </div>
-
-          {/* Inline Quick Actions */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCall(workOrder.customerPhone || "");
-              }}
-              className="w-7 h-7 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors active:scale-95"
-              title="Gọi điện"
-            >
-              <Phone className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onPrint(workOrder);
-              }}
-              className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors active:scale-95"
-              title="In phiếu"
-            >
-              <Printer className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="flex flex-col items-end">
-            <span className="font-black text-sm text-blue-600 dark:text-blue-400">
-              {formatCurrency(workOrder.total || 0)}
-            </span>
-            {/* Payment Status Indicator */}
-            {workOrder.paymentStatus === "paid" && (
-              <span className="text-[9px] text-green-500 font-bold flex items-center gap-0.5">
-                <Check className="w-2.5 h-2.5" /> Đã trả
+            {isPaid && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                <Check className="w-3 h-3" />Đủ
               </span>
             )}
-            {workOrder.paymentStatus !== "paid" && (workOrder.remainingAmount || 0) > 0 && (
-              <span className="text-[9px] text-red-500 font-bold">
-                Nợ {formatCurrency(workOrder.remainingAmount || 0)}
-              </span>
+          </div>
+
+          <div className="text-right">
+            {hasDebt ? (
+              <>
+                <div className="text-[18px] leading-none font-bold text-red-400">
+                  Nợ {formatCurrency(remainingAmount)}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-400">
+                  Tổng: {formatCurrency(workOrder.total || 0)}
+                </div>
+              </>
+            ) : (
+              <div className="text-[18px] leading-none font-bold text-emerald-300">
+                {formatCurrency(workOrder.total || 0)}
+              </div>
             )}
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-4 border-t border-[#273348]">
+        <button
+          onClick={() => onCall(workOrder.customerPhone || "")}
+          className="h-12 flex items-center justify-center gap-1.5 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          title="Gọi"
+        >
+          <Phone className="w-4 h-4" />
+          <span className="text-[12px] font-medium">Gọi</span>
+        </button>
+        <button
+          onClick={() => onPrint(workOrder)}
+          className="h-12 flex items-center justify-center gap-1.5 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          title="In"
+        >
+          <Printer className="w-4 h-4" />
+          <span className="text-[12px] font-medium">In</span>
+        </button>
+        <button
+          onClick={() => onEdit(workOrder)}
+          className="h-12 flex items-center justify-center gap-1.5 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          title="Sửa"
+        >
+          <Edit2 className="w-4 h-4" />
+          <span className="text-[12px] font-medium">Sửa</span>
+        </button>
+        <button
+          onClick={() => onDelete(workOrder)}
+          disabled={!canDelete}
+          className="h-12 flex items-center justify-center gap-1.5 text-pink-400 disabled:text-slate-600 active:bg-slate-800/50"
+          title={canDelete ? "Xóa" : "Không có quyền xóa"}
+        >
+          <Trash2 className="w-4 h-4" />
+          <span className="text-[12px] font-medium">Xóa</span>
+        </button>
       </div>
     </div>
   );
@@ -468,29 +510,17 @@ export function ServiceManagerMobile({
   const canDeleteWorkOrder = canDo(profile?.role, "work_order.delete");
 
   return (
-    <div className="md:hidden flex flex-col h-screen bg-slate-50 dark:bg-[#151521]">
+    <div className="md:hidden flex flex-col h-screen bg-[#0f131b]">
       {/* SEARCH BAR & TAB NAVIGATION - Always visible */}
-      <div className="bg-white dark:bg-[#1e1e2d] border-b border-slate-200 dark:border-gray-800 px-2 py-2 space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-gray-500" />
-          <input
-            type="text"
-            placeholder="Tìm tên, SĐT, IMEI..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2.5 bg-slate-100 dark:bg-[#2b2b40] border border-slate-300 dark:border-gray-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-gray-500 text-sm focus:outline-none focus:border-[#009ef7]"
-          />
-        </div>
-
-        {/* Segmented Control for Mode: Orders | History | Templates */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-          <button onClick={() => setActiveTab('orders')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === 'orders' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
+      <div className="border-b border-[#22304a] bg-[#111624] px-3 py-2.5">
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => setActiveTab('orders')} className={`py-2 text-xs font-semibold rounded-xl transition-all border ${activeTab === 'orders' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Phiếu SC
           </button>
-          <button onClick={() => setActiveTab('history')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
+          <button onClick={() => setActiveTab('history')} className={`py-2 text-xs font-semibold rounded-xl transition-all border ${activeTab === 'history' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Lịch sử
           </button>
-          <button onClick={() => setActiveTab('templates')} className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeTab === 'templates' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
+          <button onClick={() => setActiveTab('templates')} className={`py-2 text-xs font-semibold rounded-xl transition-all border ${activeTab === 'templates' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Mẫu SC
           </button>
         </div>
@@ -503,8 +533,8 @@ export function ServiceManagerMobile({
             <PullToRefresh onRefresh={onRefresh || (async () => { })}>
               <div className="pb-24">
                 {/* KPI CARDS */}
-                <div className="bg-white dark:bg-[#1e1e2d] border-b border-slate-200 dark:border-gray-800 p-2">
-                  <div className="grid grid-cols-4 gap-1.5">
+                <div className="border-b border-[#22304a] bg-[#111624] px-3 py-3">
+                  <div className="grid grid-cols-4 gap-2">
                     {/* Tiếp nhận */}
                     <button
                       onClick={() =>
@@ -512,14 +542,14 @@ export function ServiceManagerMobile({
                           statusFilter === "Tiếp nhận" ? "all" : "Tiếp nhận"
                         )
                       }
-                      className={`p-2 rounded-lg text-center transition-all ${statusFilter === "Tiếp nhận"
-                        ? "bg-gradient-to-br from-[#009ef7]/20 to-[#009ef7]/10 border-2 border-[#009ef7]"
-                        : "bg-slate-100 dark:bg-[#2b2b40] border border-slate-300 dark:border-gray-700"
+                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Tiếp nhận"
+                        ? "bg-[#16365d] border-[#2f6ea8]"
+                        : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <FileText className="w-4 h-4 text-[#009ef7] mx-auto mb-0.5" />
-                      <div className="text-lg font-bold text-slate-900 dark:text-white">{kpis.tiepNhan}</div>
-                      <span className="text-[8px] text-slate-600 dark:text-gray-400">Tiếp nhận</span>
+                      <FileText className="w-4 h-4 text-[#54b3ff] mx-auto mb-1" />
+                      <div className="text-2xl leading-none font-bold text-slate-100">{kpis.tiepNhan}</div>
+                      <span className="text-[11px] text-slate-400">Tiếp nhận</span>
                     </button>
 
                     {/* Đang sửa */}
@@ -527,14 +557,14 @@ export function ServiceManagerMobile({
                       onClick={() =>
                         setStatusFilter(statusFilter === "Đang sửa" ? "all" : "Đang sửa")
                       }
-                      className={`p-2 rounded-lg text-center transition-all ${statusFilter === "Đang sửa"
-                        ? "bg-gradient-to-br from-[#f1416c]/20 to-[#f1416c]/10 border-2 border-[#f1416c]"
-                        : "bg-slate-100 dark:bg-[#2b2b40] border border-slate-300 dark:border-gray-700"
+                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Đang sửa"
+                        ? "bg-[#442131] border-[#8d3a5c]"
+                        : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <Wrench className="w-4 h-4 text-[#f1416c] mx-auto mb-0.5" />
-                      <div className="text-lg font-bold text-slate-900 dark:text-white">{kpis.dangSua}</div>
-                      <span className="text-[8px] text-slate-600 dark:text-gray-400">Đang sửa</span>
+                      <Wrench className="w-4 h-4 text-[#ff6e9f] mx-auto mb-1" />
+                      <div className="text-2xl leading-none font-bold text-slate-100">{kpis.dangSua}</div>
+                      <span className="text-[11px] text-slate-400">Đang sửa</span>
                     </button>
 
                     {/* Đã sửa xong */}
@@ -544,16 +574,16 @@ export function ServiceManagerMobile({
                           statusFilter === "Đã sửa xong" ? "all" : "Đã sửa xong"
                         )
                       }
-                      className={`p-2 rounded-lg text-center transition-all ${statusFilter === "Đã sửa xong"
-                        ? "bg-gradient-to-br from-[#50cd89]/20 to-[#50cd89]/10 border-2 border-[#50cd89]"
-                        : "bg-slate-100 dark:bg-[#2b2b40] border border-slate-300 dark:border-gray-700"
+                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Đã sửa xong"
+                        ? "bg-[#153b32] border-[#2f7f6b]"
+                        : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <Check className="w-4 h-4 text-[#50cd89] mx-auto mb-0.5" />
-                      <div className="text-lg font-bold text-slate-900 dark:text-white">
+                      <Check className="w-4 h-4 text-[#7ce0bf] mx-auto mb-1" />
+                      <div className="text-2xl leading-none font-bold text-slate-100">
                         {kpis.daHoanThanh}
                       </div>
-                      <span className="text-[8px] text-slate-600 dark:text-gray-400">Đã sửa</span>
+                      <span className="text-[11px] text-slate-400">Đã sửa</span>
                     </button>
 
                     {/* Trả máy */}
@@ -561,89 +591,100 @@ export function ServiceManagerMobile({
                       onClick={() =>
                         setStatusFilter(statusFilter === "Trả máy" ? "all" : "Trả máy")
                       }
-                      className={`p-2 rounded-lg text-center transition-all ${statusFilter === "Trả máy"
-                        ? "bg-gradient-to-br from-purple-500/20 to-purple-500/10 border-2 border-purple-500"
-                        : "bg-slate-100 dark:bg-[#2b2b40] border border-slate-300 dark:border-gray-700"
+                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Trả máy"
+                        ? "bg-[#2f1f4a] border-[#6650a4]"
+                        : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <Key className="w-4 h-4 text-purple-500 mx-auto mb-0.5" />
-                      <div className="text-lg font-bold text-slate-900 dark:text-white">{kpis.traMay}</div>
-                      <span className="text-[8px] text-slate-600 dark:text-gray-400">Trả máy</span>
+                      <Key className="w-4 h-4 text-[#9d72ff] mx-auto mb-1" />
+                      <div className="text-2xl leading-none font-bold text-slate-100">{kpis.traMay}</div>
+                      <span className="text-[11px] text-slate-400">Trả máy</span>
                     </button>
                   </div>
 
                   {/* Doanh thu & Lợi nhuận */}
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 shadow-lg shadow-emerald-500/20 text-white">
+                    <div className="relative overflow-hidden rounded-2xl border border-[#27364e] bg-[#171b2a] p-3 text-white">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-emerald-50 opacity-90">
+                        <span className="text-[11px] font-semibold text-slate-300">
                           Doanh thu {getDateLabel()}
                         </span>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 text-[#79dfbe]">
                           {isOwner && (
                             <button
                               onClick={() => setShowFinancials(!showFinancials)}
-                              className="p-1 hover:bg-white/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/10 rounded transition-colors"
                               aria-label="Toggle revenue visibility"
                             >
                               {showFinancials ? (
-                                <Eye className="w-3.5 h-3.5 text-white" />
+                                <Eye className="w-3.5 h-3.5" />
                               ) : (
-                                <EyeOff className="w-3.5 h-3.5 text-white" />
+                                <EyeOff className="w-3.5 h-3.5" />
                               )}
                             </button>
                           )}
-                          <DollarSign className="w-4 h-4 text-white" />
+                          <DollarSign className="w-4 h-4" />
                         </div>
                       </div>
-                      <div className="text-base font-black text-white">
+                      <div className="text-base font-black text-emerald-300">
                         {showFinancials ? formatCurrency(kpis.doanhThu) : "•••••••"}
                       </div>
                     </div>
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 shadow-lg shadow-blue-500/20 text-white">
+                    <div className="relative overflow-hidden rounded-2xl border border-[#27364e] bg-[#171b2a] p-3 text-white">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-blue-50 opacity-90">
+                        <span className="text-[11px] font-semibold text-slate-300">
                           Lợi nhuận {getDateLabel()}
                         </span>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 text-[#66bbff]">
                           {isOwner && (
                             <button
                               onClick={() => setShowFinancials(!showFinancials)}
-                              className="p-1 hover:bg-white/20 rounded transition-colors"
+                              className="p-1 hover:bg-white/10 rounded transition-colors"
                               aria-label="Toggle profit visibility"
                             >
                               {showFinancials ? (
-                                <Eye className="w-3.5 h-3.5 text-white" />
+                                <Eye className="w-3.5 h-3.5" />
                               ) : (
-                                <EyeOff className="w-3.5 h-3.5 text-white" />
+                                <EyeOff className="w-3.5 h-3.5" />
                               )}
                             </button>
                           )}
-                          <TrendingUp className="w-4 h-4 text-white" />
+                          <TrendingUp className="w-4 h-4" />
                         </div>
                       </div>
-                      <div className="text-base font-black text-white">
+                      <div className="text-base font-black text-blue-300">
                         {showFinancials ? formatCurrency(kpis.loiNhuan) : "•••••••"}
                       </div>
                     </div>
                   </div>
+
+                  <div className="mt-3 relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Tìm tên, SĐT, biển số, dòng xe..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full h-12 pl-11 pr-3 rounded-2xl border border-[#334968] bg-[#141a28] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#4a8bd1]"
+                    />
+                  </div>
                 </div>
 
                 {/* DATE FILTER - Only for Orders tab */}
-                <div className="bg-white dark:bg-[#1e1e2d] border-b border-slate-200 dark:border-gray-800 px-2 py-2">
-                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+                <div className="border-b border-[#22304a] bg-[#111624] px-3 py-2.5">
+                  <div className="grid grid-cols-4 gap-2">
                     {[
                       { label: "Hôm nay", value: "today" },
                       { label: "7 ngày", value: "week" },
-                      { label: "Tháng", value: "month" },
+                      { label: "Tháng này", value: "month" },
                       { label: "Tất cả", value: "all" },
                     ].map((option) => (
                       <button
                         key={option.value}
                         onClick={() => setDateFilter(option.value)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${dateFilter === option.value
-                          ? "bg-[#009ef7]/20 text-[#009ef7] border border-[#009ef7]/50"
-                          : "bg-slate-100 dark:bg-[#2b2b40] text-slate-700 dark:text-gray-400 border border-slate-300 dark:border-gray-700"
+                        className={`h-12 rounded-2xl text-sm font-semibold transition-colors ${dateFilter === option.value
+                          ? "bg-[#173b65] text-[#54b3ff] border border-[#2f6ea8]"
+                          : "bg-[#171e2d] text-slate-300 border border-[#27364e]"
                           }`}
                       >
                         {option.label}
@@ -653,7 +694,7 @@ export function ServiceManagerMobile({
                 </div>
 
                 {/* DANH SÁCH PHIẾU SỬA CHỮA */}
-                <div className="space-y-2 px-2 pb-4 min-h-[50vh]">
+                <div className="space-y-3 px-3 pb-4 pt-3 min-h-[50vh]">
                   {isLoading ? (
                     // Loading Skeletons using shared Skeleton component
                     Array.from({ length: 4 }).map((_, i) => (
@@ -724,6 +765,8 @@ export function ServiceManagerMobile({
                         onEdit={onEditWorkOrder}
                         onCall={onCallCustomer}
                         onPrint={onPrintWorkOrder}
+                        onDelete={onDeleteWorkOrder}
+                        canDelete={canDeleteWorkOrder}
                       />
                     ))
                   )}

@@ -38,7 +38,24 @@ const InventoryHistorySectionMobile: React.FC<
   } | null>(null);
 
   const filteredTransactions = useMemo(() => {
-    let filtered = transactions.filter((t) => t.type === "Nhập kho");
+    let filtered = transactions.filter((t) => {
+      const rawType = String(t.type || "").toLowerCase();
+      const rawNotes = String(t.notes || "").toLowerCase();
+      const hasReceiptHint =
+        rawNotes.includes("phiếu nhập") ||
+        rawNotes.includes("phieu nhap") ||
+        rawNotes.includes("nhập kho") ||
+        rawNotes.includes("nhap kho") ||
+        rawNotes.includes("nh-");
+      const isImportType =
+        rawType === "nhập kho" ||
+        rawType === "nhap kho" ||
+        rawType === "import" ||
+        rawType === "receipt";
+      const likelyImportRow = Number(t.quantity || 0) > 0 && Number(t.totalPrice || 0) >= 0;
+
+      return isImportType || hasReceiptHint || likelyImportRow;
+    });
     const now = new Date();
 
     switch (activeTimeFilter) {

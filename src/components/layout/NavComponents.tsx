@@ -351,6 +351,15 @@ export const BottomNav: React.FC = () => {
                     color="cyan"
                     onClick={() => setShowMenu(false)}
                   />
+                  {isOwnerOrManager && (
+                    <MobileDrawerLink
+                      to="/employees"
+                      icon={<CircleUser className="w-5 h-5" />}
+                      label="Nhân viên"
+                      color="indigo"
+                      onClick={() => setShowMenu(false)}
+                    />
+                  )}
                   <MobileDrawerLink
                     to="/inventory"
                     icon={<Boxes className="w-5 h-5" />}

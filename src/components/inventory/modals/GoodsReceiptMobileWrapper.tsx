@@ -2,6 +2,7 @@
 import { useAuth } from '../../../contexts/AuthContext';
 import { GoodsReceiptMobileModal } from '../../inventory/GoodsReceiptMobileModal';
 import { showToast } from '../../../utils/toast';
+import { generateSKU } from '../../../utils/sku';
 import { useCreatePartRepo } from '../../../hooks/usePartsRepository';
 import AddProductModal from './AddProductModal';
 import type { Part } from '../../../types';
@@ -85,7 +86,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
     // Sản phẩm sẽ được tạo khi hoàn tất phiếu nhập (bấm "Nhập kho")
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const tempSku =
-      productData.barcode?.trim() || productData.sku || `PT-${Date.now()}`;
+      productData.barcode?.trim() || productData.sku || generateSKU();
 
     // Add to receipt items with temporary ID (marked as new product)
     setReceiptItems((items) => [

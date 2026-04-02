@@ -824,6 +824,109 @@ export const useDashboardData = (
         return months;
     }, [sales, workOrders]);
 
+    const ownerInsights = useMemo(() => {
+        const normalizeNumber = (value: any) => Number(value || 0);
+        const normalizedWorkOrders = (workOrders || []).filter((wo: any) => !wo?.refunded);
+
+        const paidOrders = normalizedWorkOrders.filter((wo: any) => {
+            const paymentStatus = wo.paymentStatus || wo.paymentstatus;
+            return paymentStatus === "paid" || paymentStatus === "partial";
+        });
+
+        const unpaidOrders = normalizedWorkOrders.filter((wo: any) => {
+            const remaining = normalizeNumber(wo.remainingAmount ?? wo.remainingamount);
+            return remaining > 0;
+        });
+
+        const receivables = unpaidOrders.reduce(
+            (sum: number, wo: any) => sum + normalizeNumber(wo.remainingAmount ?? wo.remainingamount),
+            0
+        );
+
+        const openStatuses = ["Tiếp nhận", "Đang sửa", "Đã sửa xong"];
+        const openOrders = normalizedWorkOrders.filter((wo: any) =>
+            openStatuses.includes(wo.status)
+        );
+
+        const openWorkValue = openOrders.reduce(
+            (sum: number, wo: any) => sum + normalizeNumber(wo.total),
+            0
+        );
+
+        const realizedRevenue = paidOrders.reduce(
+            (sum: number, wo: any) =>
+                sum + normalizeNumber(wo.totalPaid ?? wo.totalpaid ?? wo.total),
+            0
+        );
+
+        const avgTicketPaid = paidOrders.length > 0 ? realizedRevenue / paidOrders.length : 0;
+
+        const techMap: Record<string, { name: string; jobs: number; revenue: number; openJobs: number }> = {};
+
+        normalizedWorkOrders.forEach((wo: any) => {
+            const techName =
+                wo.technicianName || wo.technicianname || "Chưa phân công";
+            if (!techMap[techName]) {
+                techMap[techName] = { name: techName, jobs: 0, revenue: 0, openJobs: 0 };
+            }
+
+            techMap[techName].jobs += 1;
+            const isOpen = openStatuses.includes(wo.status);
+            if (isOpen) {
+                techMap[techName].openJobs += 1;
+            }
+
+            const paymentStatus = wo.paymentStatus || wo.paymentstatus;
+            if (paymentStatus === "paid" || paymentStatus === "partial") {
+                techMap[techName].revenue += normalizeNumber(
+                    wo.totalPaid ?? wo.totalpaid ?? wo.total
+                );
+            }
+        });
+
+        const topTechnicians = Object.values(techMap)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+
+        const lowStockParts = (parts || [])
+            .map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                stock: normalizeNumber(p.stock?.[currentBranchId] || 0),
+            }))
+            .filter((p: any) => p.stock <= 10)
+            .sort((a: any, b: any) => a.stock - b.stock)
+            .slice(0, 8);
+
+        const paymentMix = [
+            {
+                name: "Đã đủ",
+                value: normalizedWorkOrders.filter((wo: any) => (wo.paymentStatus || wo.paymentstatus) === "paid").length,
+                color: "#22c55e",
+            },
+            {
+                name: "Một phần",
+                value: normalizedWorkOrders.filter((wo: any) => (wo.paymentStatus || wo.paymentstatus) === "partial").length,
+                color: "#f59e0b",
+            },
+            {
+                name: "Chưa thu",
+                value: normalizedWorkOrders.filter((wo: any) => (wo.paymentStatus || wo.paymentstatus) === "unpaid").length,
+                color: "#ef4444",
+            },
+        ];
+
+        return {
+            receivables,
+            unpaidOrdersCount: unpaidOrders.length,
+            openWorkValue,
+            avgTicketPaid,
+            topTechnicians,
+            lowStockParts,
+            paymentMix,
+        };
+    }, [workOrders, parts, currentBranchId]);
+
     return {
         todayStats,
         filteredStats,
@@ -835,5 +938,6 @@ export const useDashboardData = (
         cashBalance,
         bankBalance,
         debugData, // EXPORT DEBUG DATA HERE
+        ownerInsights,
     };
 };

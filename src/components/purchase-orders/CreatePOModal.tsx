@@ -20,6 +20,7 @@ import { useCategories } from "../../hooks/useCategories";
 import { useCreatePartRepo } from "../../hooks/usePartsRepository";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
+import { generateSKU } from "../../utils/sku";
 import FormattedNumberInput from "../common/FormattedNumberInput";
 import SupplierModal from "../inventory/components/SupplierModal";
 import { useStoreSettings } from "../../hooks/useStoreSettings";
@@ -993,7 +994,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
     try {
       const newPart = await createPartMutation.mutateAsync({
         name: formData.name.trim(),
-        sku: formData.sku.trim() || `SP-${Date.now()}`,
+        sku: formData.sku.trim() || generateSKU(),
         barcode: formData.barcode.trim(),
         category: formData.category,
         stock: { [branchId]: formData.stock },

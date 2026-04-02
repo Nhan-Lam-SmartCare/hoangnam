@@ -10,7 +10,12 @@ import type {
   WorkOrderPart,
   Vehicle,
 } from "../../../types";
-import { formatCurrency, formatWorkOrderId, normalizeSearchText } from "../../../utils/format";
+import {
+  formatCurrency,
+  formatWorkOrderId,
+  generateWorkOrderId,
+  normalizeSearchText,
+} from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";
 import { getCategoryColor } from "../../../utils/categoryColors";
 import { AndroidPatternLock } from "../../common/AndroidPatternLock";
@@ -835,10 +840,10 @@ const WorkOrderModal: React.FC<{
           "Khách vãng lai";
 
         // Tạo nội dung chi tiết từ phiếu sửa chữa
-        const workOrderNumber =
-          formatWorkOrderId(workOrder.id, storeSettings?.work_order_prefix)
-            .split("-")
-            .pop() || "";
+        const workOrderNumber = formatWorkOrderId(
+          workOrder.id,
+          storeSettings?.work_order_prefix
+        );
 
         let description = `${workOrder.vehicleModel || "Xe"
           } (Phiếu sửa chữa #${workOrderNumber})`;
@@ -1111,7 +1116,7 @@ const WorkOrderModal: React.FC<{
       try {
         const orderId =
           formData.id ||
-          `${storeSettings?.work_order_prefix || "SC"}-${Date.now()}`;
+          generateWorkOrderId(storeSettings?.work_order_prefix);
 
         // Prepare work order data with deposit
         const workOrderData: WorkOrder = {
@@ -1223,8 +1228,10 @@ const WorkOrderModal: React.FC<{
           category: "service_deposit",
           amount: depositAmount,
           date: new Date().toISOString(),
-          description: `Đặt cọc sửa chữa #${orderId.split("-").pop()} - ${formData.customerName
-            }`,
+          description: `Đặt cọc sửa chữa #${formatWorkOrderId(
+            orderId,
+            storeSettings?.work_order_prefix
+          )} - ${formData.customerName}`,
           branchid: currentBranchId,
           paymentsource: formData.paymentMethod,
           reference: orderId,
@@ -1240,8 +1247,10 @@ const WorkOrderModal: React.FC<{
           category: "parts_purchase",
           amount: depositAmount,
           date: new Date().toISOString(),
-          description: `Đặt hàng phụ tùng cho #${orderId.split("-").pop()} - ${formData.customerName
-            }`,
+          description: `Đặt hàng phụ tùng cho #${formatWorkOrderId(
+            orderId,
+            storeSettings?.work_order_prefix
+          )} - ${formData.customerName}`,
           branchid: currentBranchId,
           paymentsource: formData.paymentMethod,
           reference: orderId,
@@ -1347,7 +1356,7 @@ const WorkOrderModal: React.FC<{
       try {
         const orderId =
           order?.id ||
-          `${storeSettings?.work_order_prefix || "SC"}-${Date.now()}`;
+          generateWorkOrderId(storeSettings?.work_order_prefix);
 
         const resolvedCreationDate =
           order?.creationDate || new Date().toISOString();
@@ -1600,7 +1609,7 @@ const WorkOrderModal: React.FC<{
     };
 
     // 🔹 Function to handle payment processing
-    const handleSave = async () => {
+    const handleSave = async (forceFullPayment = false) => {
       // 🔹 DEBUG - Log order info
       console.log(
         "[handleSave] Starting - order:",
@@ -1697,19 +1706,29 @@ const WorkOrderModal: React.FC<{
           }
         }
 
+        const additionalPaymentToApply =
+          formData.status === "Trả máy"
+            ? forceFullPayment
+              ? Math.max(0, total - totalDeposit)
+              : showPartialPayment
+                ? partialPayment
+                : 0
+            : 0;
+        const totalPaidToApply = totalDeposit + additionalPaymentToApply;
+        const remainingAmountToApply = Math.max(0, total - totalPaidToApply);
+
         // Determine payment status
         let paymentStatus: "unpaid" | "paid" | "partial" = "unpaid";
-        if (totalPaid >= total) {
+        if (totalPaidToApply >= total) {
           paymentStatus = "paid";
-        } else if (totalPaid > 0) {
+        } else if (totalPaidToApply > 0) {
           paymentStatus = "partial";
         }
 
         // If this is a NEW work order, ALWAYS use atomic RPC
         if (!order?.id) {
           try {
-            const orderId = `${storeSettings?.work_order_prefix || "SC"
-              }-${Date.now()}`;
+            const orderId = generateWorkOrderId(storeSettings?.work_order_prefix);
 
             // Prepare issue description with password
             let finalIssueDescription = formData.issueDescription || "";
@@ -1740,9 +1759,9 @@ const WorkOrderModal: React.FC<{
               paymentMethod: formData.paymentMethod,
               depositAmount: depositAmount > 0 ? depositAmount : undefined,
               additionalPayment:
-                totalAdditionalPayment > 0 ? totalAdditionalPayment : undefined,
-              totalPaid: totalPaid > 0 ? totalPaid : undefined,
-              remainingAmount: remainingAmount,
+                additionalPaymentToApply > 0 ? additionalPaymentToApply : undefined,
+              totalPaid: totalPaidToApply > 0 ? totalPaidToApply : undefined,
+              remainingAmount: remainingAmountToApply,
               creationDate: new Date().toISOString(),
             } as any);
 
@@ -1793,9 +1812,9 @@ const WorkOrderModal: React.FC<{
               paymentStatus: paymentStatus,
               paymentMethod: formData.paymentMethod,
               additionalPayment:
-                totalAdditionalPayment > 0 ? totalAdditionalPayment : undefined,
-              totalPaid: totalPaid > 0 ? totalPaid : undefined,
-              remainingAmount: remainingAmount,
+                additionalPaymentToApply > 0 ? additionalPaymentToApply : undefined,
+              totalPaid: totalPaidToApply > 0 ? totalPaidToApply : undefined,
+              remainingAmount: remainingAmountToApply,
               cashTransactionId: paymentTxId,
               paymentDate: paymentTxId ? new Date().toISOString() : undefined,
               creationDate: new Date().toISOString(),
@@ -1875,7 +1894,7 @@ const WorkOrderModal: React.FC<{
               );
             }
 
-            if (paymentTxId && totalAdditionalPayment > 0) {
+            if (paymentTxId && additionalPaymentToApply > 0) {
               // INSERT payment transaction to database
               try {
                 const { error: paymentDbError } = await supabase
@@ -1884,7 +1903,7 @@ const WorkOrderModal: React.FC<{
                     id: paymentTxId,
                     type: "income",
                     category: "service_income",
-                    amount: totalAdditionalPayment,
+                    amount: additionalPaymentToApply,
                     date: new Date().toISOString(),
                     description: `Thu tien sua chua #${(
                       formatWorkOrderId(
@@ -2209,7 +2228,7 @@ const WorkOrderModal: React.FC<{
             }
 
             // 🔹 Auto-create customer debt ONLY when status is "Trả máy" and there's remaining amount
-            if (formData.status === "Trả máy" && remainingAmount > 0) {
+            if (formData.status === "Trả máy" && remainingAmountToApply > 0) {
               console.log("[handleSave] Creating debt with finalOrder:", {
                 id: finalOrder.id,
                 customerName: finalOrder.customerName,
@@ -2219,9 +2238,9 @@ const WorkOrderModal: React.FC<{
               });
               await createCustomerDebtIfNeeded(
                 finalOrder,
-                remainingAmount,
+                remainingAmountToApply,
                 total,
-                totalPaid
+                totalPaidToApply
               );
             }
 
@@ -2273,9 +2292,9 @@ const WorkOrderModal: React.FC<{
               paymentMethod: formData.paymentMethod,
               depositAmount: depositAmount > 0 ? depositAmount : undefined,
               additionalPayment:
-                totalAdditionalPayment > 0 ? totalAdditionalPayment : undefined,
-              totalPaid: totalPaid > 0 ? totalPaid : undefined,
-              remainingAmount: remainingAmount,
+                additionalPaymentToApply > 0 ? additionalPaymentToApply : undefined,
+              totalPaid: totalPaidToApply > 0 ? totalPaidToApply : undefined,
+              remainingAmount: remainingAmountToApply,
             } as any);
 
             const workOrderRow = (responseData as any).workOrder;
@@ -2433,9 +2452,9 @@ const WorkOrderModal: React.FC<{
                 depositTransactionId: depositTxId || order.depositTransactionId,
                 paymentStatus: paymentStatus,
                 paymentMethod: formData.paymentMethod || order.paymentMethod,
-                additionalPayment: totalAdditionalPayment,
-                totalPaid: totalPaid,
-                remainingAmount: remainingAmount,
+                additionalPayment: additionalPaymentToApply,
+                totalPaid: totalPaidToApply,
+                remainingAmount: remainingAmountToApply,
                 cashTransactionId: paymentTxId || order.cashTransactionId,
                 paymentDate: paymentTxId
                   ? new Date().toISOString()
@@ -2614,12 +2633,12 @@ const WorkOrderModal: React.FC<{
             }
 
             // 🔹 Auto-create customer debt ONLY when status is "Trả máy" and there's remaining amount
-            if (formData.status === "Trả máy" && remainingAmount > 0) {
+            if (formData.status === "Trả máy" && remainingAmountToApply > 0) {
               await createCustomerDebtIfNeeded(
                 finalOrder,
-                remainingAmount,
+                remainingAmountToApply,
                 total,
-                totalPaid
+                totalPaidToApply
               );
             }
 
@@ -2639,6 +2658,13 @@ const WorkOrderModal: React.FC<{
         setIsSubmitting(false);
         submittingRef.current = false; // Reset synchronous guard
       }
+    };
+
+    const handlePayFull = async () => {
+      const fullPayment = Math.max(0, total - totalDeposit);
+      setShowPartialPayment(true);
+      setPartialPayment(fullPayment);
+      await handleSave(true);
     };
 
     const handleAddPart = (part: Part) => {
@@ -2687,18 +2713,85 @@ const WorkOrderModal: React.FC<{
     }, [availableParts, searchPart]);
 
     return (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-        <div className="bg-white dark:bg-slate-800 w-full h-full md:h-auto md:max-h-[90vh] md:max-w-5xl rounded-t-3xl md:rounded-xl shadow-2xl md:shadow-lg flex flex-col overflow-hidden">
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-1.5 sm:p-2.5 md:p-4">
+        <div className="bg-white dark:bg-slate-800 w-full max-h-[95vh] max-w-[99vw] lg:max-w-[96vw] xl:max-w-6xl rounded-xl shadow-2xl flex flex-col overflow-hidden text-[12px] sm:text-[13px]">
           {/* Header */}
-          <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between rounded-t-3xl md:rounded-t-xl flex-shrink-0">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              {formData.id
-                ? `Chi tiết Phiếu sửa chữa - ${formatWorkOrderId(
-                  formData.id,
-                  storeSettings?.work_order_prefix
-                )}`
-                : "Tạo Phiếu sửa chữa mới"}
-            </h2>
+          <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 md:px-5 md:py-2.5 flex items-center justify-between gap-2.5 rounded-t-xl flex-shrink-0">
+            <div className="flex-1 min-w-0">
+              <div className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/80 dark:bg-slate-900/30">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    {
+                      value: "Tiếp nhận",
+                      label: "Tiếp nhận",
+                      activeClass:
+                        "bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-500/30",
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h8M8 12h8M8 17h5M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      value: "Đang sửa",
+                      label: "Đang sửa",
+                      activeClass:
+                        "bg-amber-500 text-white border-amber-400 shadow-sm shadow-amber-500/30",
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a4 4 0 01-5.4 5.4l-5 5a1.5 1.5 0 102.1 2.1l5-5a4 4 0 005.4-5.4l-2.1 2.1-1.4-1.4 2.1-2.1z" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      value: "Đã sửa xong",
+                      label: "Đã xong",
+                      activeClass:
+                        "bg-emerald-600 text-white border-emerald-500 shadow-sm shadow-emerald-500/30",
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7L9 18l-5-5" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      value: "Trả máy",
+                      label: "Trả máy",
+                      activeClass:
+                        "bg-violet-600 text-white border-violet-500 shadow-sm shadow-violet-500/30",
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 5h14v10H5zM9 19h6M12 15v4" />
+                        </svg>
+                      ),
+                    },
+                  ].map((step) => {
+                    const isActive = (formData.status || "Tiếp nhận") === step.value;
+                    return (
+                      <button
+                        key={step.value}
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            status: step.value as any,
+                          })
+                        }
+                        className={`px-2.5 py-1.5 rounded-lg text-xs md:text-sm font-semibold border transition-all ${isActive
+                          ? step.activeClass
+                          : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600"
+                          }`}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {step.icon}
+                          {step.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
@@ -2755,12 +2848,13 @@ const WorkOrderModal: React.FC<{
           )}
 
           {/* Scrollable Content */}
-          <div className="px-4 py-5 md:px-6 md:py-6 space-y-6 overflow-y-auto flex-1 pb-24 md:pb-6">
+          <div className="px-3 py-3 md:px-5 md:py-5 grid gap-3.5 md:gap-5 grid-cols-[minmax(0,1fr)_minmax(200px,30%)] items-start overflow-auto flex-1 pb-4 [&_th]:px-2.5 [&_th]:py-1.5 [&_td]:px-2.5 [&_td]:py-1.5">
             {/* Customer & Vehicle Info */}
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 grid-cols-2 col-start-1">
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Thông tin Khách hàng & Sự cố
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+                  Khách hàng & Xe
                 </h3>
 
                 <div>
@@ -3353,58 +3447,12 @@ const WorkOrderModal: React.FC<{
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                   Chi tiết Dịch vụ
                 </h3>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Trạng thái
-                    </label>
-                    <select
-                      value={formData.status || "Tiếp nhận"}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          status: e.target.value as any,
-                        })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg font-medium ${formData.status === "Tiếp nhận"
-                        ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
-                        : formData.status === "Đang sửa"
-                          ? "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300"
-                          : formData.status === "Đã sửa xong"
-                            ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300"
-                            : "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300"
-                        }`}
-                    >
-                      <option
-                        value="Tiếp nhận"
-                        className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      >
-                        Tiếp nhận
-                      </option>
-                      <option
-                        value="Đang sửa"
-                        className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      >
-                        Đang sửa
-                      </option>
-                      <option
-                        value="Đã sửa xong"
-                        className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      >
-                        Đã sửa xong
-                      </option>
-                      <option
-                        value="Trả máy"
-                        className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      >
-                        Trả máy
-                      </option>
-                    </select>
-                  </div>
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Kỹ thuật viên
@@ -3893,9 +3941,10 @@ const WorkOrderModal: React.FC<{
             </div>
 
             {/* Parts Used */}
-            <div className="space-y-3">
+            <div className="space-y-3 col-start-1">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
                   Phụ tùng sử dụng
                 </h3>
                 <button
@@ -4127,8 +4176,9 @@ const WorkOrderModal: React.FC<{
             </div>
 
             {/* Quote/Estimate Section */}
-            <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-4 col-start-1">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
                 Báo giá (Gia công, Đặt hàng)
               </h3>
 
@@ -4358,10 +4408,10 @@ const WorkOrderModal: React.FC<{
             </div>
 
             {/* Payment Section */}
-            <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
-              <div className="grid gap-6 lg:grid-cols-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-0 mt-0 border-t-0 col-start-2 row-start-1 row-span-3 sticky top-0 space-y-4">
+              <div className="grid gap-4 grid-cols-1">
                 {/* Left: Payment Options */}
-                <div className="space-y-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                <div className="space-y-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4 order-2">
                   <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Thanh toán
                   </h3>
@@ -4483,7 +4533,11 @@ const WorkOrderModal: React.FC<{
                             checked={showPartialPayment}
                             onChange={(e) => {
                               setShowPartialPayment(e.target.checked);
-                              if (!e.target.checked) setPartialPayment(0);
+                              if (e.target.checked) {
+                                setPartialPayment(Math.max(0, remainingAmount));
+                              } else {
+                                setPartialPayment(0);
+                              }
                             }}
                             className="w-4 h-4"
                           />
@@ -4498,35 +4552,37 @@ const WorkOrderModal: React.FC<{
                             <label className="text-xs text-slate-600 dark:text-slate-400">
                               Số tiền thanh toán thêm:
                             </label>
-                            <div className="flex items-center gap-2">
+                            <div className="space-y-2">
                               <NumberInput
                                 placeholder="0"
                                 value={partialPayment || ""}
                                 onChange={(val) => setPartialPayment(val)}
-                                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right font-semibold"
                               />
-                              <button
-                                onClick={() => setPartialPayment(0)}
-                                className="px-3 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 rounded text-xs font-medium"
-                              >
-                                0%
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setPartialPayment(
-                                    Math.round(remainingAmount * 0.5)
-                                  )
-                                }
-                                className="px-3 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 rounded text-xs font-medium"
-                              >
-                                50%
-                              </button>
-                              <button
-                                onClick={() => setPartialPayment(remainingAmount)}
-                                className="px-3 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 rounded text-xs font-medium"
-                              >
-                                100%
-                              </button>
+                              <div className="grid grid-cols-3 gap-1.5 w-full">
+                                <button
+                                  onClick={() => setPartialPayment(0)}
+                                  className="px-2 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 rounded text-xs font-medium"
+                                >
+                                  0%
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setPartialPayment(
+                                      Math.round(remainingAmount * 0.5)
+                                    )
+                                  }
+                                  className="px-2 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 rounded text-xs font-medium"
+                                >
+                                  50%
+                                </button>
+                                <button
+                                  onClick={() => setPartialPayment(remainingAmount)}
+                                  className="px-2 py-1.5 bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-700 dark:text-slate-200 rounded text-xs font-medium"
+                                >
+                                  100%
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -4543,7 +4599,7 @@ const WorkOrderModal: React.FC<{
                 </div>
 
                 {/* Right: Summary */}
-                <div className="space-y-3 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                <div className="space-y-3 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 rounded-lg p-4 order-1">
                   <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                     Tổng kết
                   </h3>
@@ -4709,11 +4765,45 @@ const WorkOrderModal: React.FC<{
                   </div>
                 </div>
               </div>
+
+              <div className="flex flex-col gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                <button
+                  onClick={handleSaveOnly}
+                  className="w-full px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium"
+                >
+                  Lưu Phiếu
+                </button>
+
+                {formData.status !== "Trả máy" && showDepositInput && (
+                  <button
+                    onClick={() => handleSave()}
+                    className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+                  >
+                    Đặt cọc
+                  </button>
+                )}
+
+                {formData.status === "Trả máy" && (
+                  <button
+                    onClick={handlePayFull}
+                    className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
+                  >
+                    Thanh toán
+                  </button>
+                )}
+
+                <button
+                  onClick={onClose}
+                  className="w-full px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg"
+                >
+                  Hủy
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-4 md:px-6 flex items-center justify-end gap-3 bg-white md:bg-slate-50 dark:bg-slate-800/70 md:dark:bg-slate-800/50 rounded-b-3xl md:rounded-b-xl flex-shrink-0">
+          <div className="hidden border-t border-slate-200 dark:border-slate-700 px-4 py-4 md:px-6 items-center justify-end gap-3 bg-white md:bg-slate-50 dark:bg-slate-800/70 md:dark:bg-slate-800/50 rounded-b-xl flex-shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg"
@@ -4732,7 +4822,7 @@ const WorkOrderModal: React.FC<{
             {/* Show "Đặt cọc" button only when status is NOT "Trả máy" and deposit input is shown */}
             {formData.status !== "Trả máy" && showDepositInput && (
               <button
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2"
               >
                 <svg
@@ -4755,7 +4845,7 @@ const WorkOrderModal: React.FC<{
             {/* Show "Thanh toán" button only when status is "Trả máy" */}
             {formData.status === "Trả máy" && (
               <button
-                onClick={handleSave}
+                onClick={handlePayFull}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium flex items-center gap-2"
               >
                 <svg

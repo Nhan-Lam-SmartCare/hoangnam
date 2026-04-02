@@ -924,6 +924,25 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                             </div>
                           )}
 
+                        {order.repairServices &&
+                          order.repairServices.length > 0 && (
+                            <div className="mb-2">
+                              <div className="text-xs font-medium text-slate-400 mb-0.5">
+                                Công sửa:
+                              </div>
+                              <div className="space-y-0.5">
+                                {order.repairServices.map((service) => (
+                                  <div
+                                    key={service.id}
+                                    className="text-xs text-slate-300"
+                                  >
+                                    • {service.serviceName} - {formatCurrency(service.laborAmount)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                         {/* Trạng thái */}
                         <div className="mt-2">
                           <StatusBadge status={order.status || "Tiếp nhận"} />
@@ -931,6 +950,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
 
                         {/* Nếu không có gì */}
                         {(!order.partsUsed || order.partsUsed.length === 0) &&
+                          (!order.repairServices ||
+                            order.repairServices.length === 0) &&
                           (!order.additionalServices ||
                             order.additionalServices.length === 0) && (
                             <div className="text-xs text-slate-500 italic mb-2">
@@ -1218,11 +1239,11 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
           id="work-order-receipt"
           className="hidden print:block"
           style={{
-            width: "148mm",
+            width: "80mm",
             margin: "0 auto",
-            padding: "10mm",
+            padding: "3mm",
             fontFamily: "Arial, sans-serif",
-            fontSize: "11pt",
+            fontSize: "9pt",
             color: "#000",
             backgroundColor: "#fff",
           }}
@@ -1253,22 +1274,24 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
             )}
 
             {/* Center: Store Info */}
-            <div style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1 }}>
+            <div style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1, textAlign: "center" }}>
               <div
                 style={{
                   fontWeight: "bold",
                   fontSize: "11pt",
                   marginBottom: "1mm",
                   color: "#1e40af",
+                  letterSpacing: "0.2mm",
                 }}
               >
-                {storeSettings?.store_name || "Sơn Nam"}
+                {storeSettings?.store_name || "SƠN NAM"}
               </div>
               <div
                 style={{
                   color: "#000",
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: "1mm",
                 }}
               >
@@ -1289,6 +1312,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                   color: "#000",
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: "1mm",
                 }}
               >
@@ -1406,11 +1430,12 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
             <div style={{ textAlign: "center", marginBottom: "2mm" }}>
               <h1
                 style={{
-                  fontSize: "16pt",
+                  fontSize: "13pt",
                   fontWeight: "bold",
                   margin: "0",
                   textTransform: "uppercase",
                   color: "#1e40af",
+                  lineHeight: 1.25,
                 }}
               >
                 PHIẾU DỊCH VỤ SỬA CHỮA
@@ -1420,7 +1445,9 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                fontSize: "9pt",
+                alignItems: "flex-start",
+                gap: "2mm",
+                fontSize: "8.5pt",
                 color: "#666",
               }}
             >
@@ -1447,87 +1474,39 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
           <div
             style={{
               border: "1px solid #ddd",
-              padding: "4mm",
+              padding: "3mm",
               marginBottom: "4mm",
               borderRadius: "2mm",
             }}
           >
-            <table style={{ width: "100%", borderSpacing: "0" }}>
-              <tbody>
-                <tr>
-                  <td
-                    style={{
-                      fontWeight: "bold",
-                      width: "20%",
-                      paddingBottom: "2mm",
-                    }}
-                  >
-                    Khách hàng:
-                  </td>
-                  <td style={{ paddingBottom: "2mm", width: "30%" }}>
-                    {printOrder.customerName}
-                  </td>
-                  <td
-                    style={{
-                      fontWeight: "bold",
-                      width: "15%",
-                      paddingBottom: "2mm",
-                      paddingLeft: "3mm",
-                    }}
-                  >
-                    SĐT:
-                  </td>
-                  <td style={{ paddingBottom: "2mm" }}>
-                    {printOrder.customerPhone}
-                  </td>
-                </tr>
-                <tr>
-                  <td
-                    style={{
-                      fontWeight: "bold",
-                      paddingBottom: "2mm",
-                    }}
-                  >
-                    Loại xe:
-                  </td>
-                  <td style={{ paddingBottom: "2mm" }}>
-                    {printOrder.vehicleModel}
-                  </td>
-                  <td
-                    style={{
-                      fontWeight: "bold",
-                      paddingBottom: "2mm",
-                      paddingLeft: "3mm",
-                    }}
-                  >
-                    Biển số:
-                  </td>
-                  <td style={{ paddingBottom: "2mm" }}>
-                    {printOrder.licensePlate}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+              <span style={{ fontWeight: "bold" }}>Khách hàng:</span> {printOrder.customerName}
+            </div>
+            <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+              <span style={{ fontWeight: "bold" }}>SĐT:</span> {printOrder.customerPhone}
+            </div>
+            <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+              <span style={{ fontWeight: "bold" }}>Loại xe:</span> {printOrder.vehicleModel}
+            </div>
+            <div style={{ wordBreak: "break-word" }}>
+              <span style={{ fontWeight: "bold" }}>Biển số:</span> {printOrder.licensePlate}
+            </div>
           </div>
 
           {/* Issue Description */}
           <div
             style={{
               border: "1px solid #ddd",
-              padding: "4mm",
+              padding: "3mm",
               marginBottom: "4mm",
               borderRadius: "2mm",
             }}
           >
-            <div style={{ display: "flex", gap: "3mm" }}>
-              <div
-                style={{ fontWeight: "bold", minWidth: "20%", flexShrink: 0 }}
-              >
-                Mô tả sự cố:
-              </div>
-              <div style={{ flex: 1, whiteSpace: "pre-wrap" }}>
-                {printOrder.issueDescription || "Không có mô tả"}
-              </div>
+            <div style={{ fontWeight: "bold", marginBottom: "1.5mm" }}>
+              Mô tả sự cố:
+            </div>
+            <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {printOrder.issueDescription || "Không có mô tả"}
             </div>
           </div>
 
@@ -1543,109 +1522,47 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               >
                 Phụ tùng sử dụng:
               </p>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  border: "1px solid #ddd",
-                }}
-              >
-                <thead>
-                  <tr style={{ backgroundColor: "#f5f5f5" }}>
-                    <th
+              <div style={{ display: "flex", flexDirection: "column", gap: "2mm" }}>
+                {printOrder.partsUsed.map((part: WorkOrderPart, idx: number) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: "1px solid #ddd",
+                      borderRadius: "2mm",
+                      padding: "2.5mm",
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <div
                       style={{
-                        border: "1px solid #ddd",
-                        padding: "2mm",
-                        textAlign: "left",
                         fontSize: "10pt",
+                        fontWeight: "bold",
+                        marginBottom: "1mm",
+                        wordBreak: "break-word",
                       }}
                     >
-                      Tên phụ tùng
-                    </th>
-                    <th
+                      {part.partName}
+                    </div>
+                    <div
                       style={{
-                        border: "1px solid #ddd",
-                        padding: "2mm",
-                        textAlign: "center",
-                        fontSize: "10pt",
-                        width: "15%",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: "2mm",
+                        fontSize: "9pt",
+                        color: "#374151",
                       }}
                     >
-                      SL
-                    </th>
-                    <th
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "2mm",
-                        textAlign: "right",
-                        fontSize: "10pt",
-                        width: "25%",
-                      }}
-                    >
-                      Đơn giá
-                    </th>
-                    <th
-                      style={{
-                        border: "1px solid #ddd",
-                        padding: "2mm",
-                        textAlign: "right",
-                        fontSize: "10pt",
-                        width: "25%",
-                      }}
-                    >
-                      Thành tiền
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {printOrder.partsUsed.map(
-                    (part: WorkOrderPart, idx: number) => (
-                      <tr key={idx}>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            fontSize: "10pt",
-                          }}
-                        >
-                          {part.partName}
-                        </td>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            textAlign: "center",
-                            fontSize: "10pt",
-                          }}
-                        >
-                          {part.quantity}
-                        </td>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            textAlign: "right",
-                            fontSize: "10pt",
-                          }}
-                        >
-                          {formatCurrency(part.price)}
-                        </td>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            textAlign: "right",
-                            fontSize: "10pt",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {formatCurrency(part.price * part.quantity)}
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                      <div>
+                        SL: {part.quantity} x {formatCurrency(part.price)}
+                      </div>
+                      <div style={{ fontWeight: "bold", color: "#111827", whiteSpace: "nowrap" }}>
+                        {formatCurrency(part.price * part.quantity)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

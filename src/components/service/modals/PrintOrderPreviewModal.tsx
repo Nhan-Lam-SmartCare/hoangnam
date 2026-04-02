@@ -159,41 +159,14 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                 <div className="flex-1 overflow-y-auto p-4 bg-slate-100 dark:bg-slate-900 flex justify-center">
                     <div
                         id="mobile-print-preview-content"
-                        className="bg-white shadow-lg relative !bg-white !text-black flex-shrink-0 transform origin-top scale-[0.63] mb-[-75mm] md:transform-none md:scale-100 md:mb-0"
+                        className="bg-white shadow-lg relative !bg-white !text-black flex-shrink-0"
                         style={{
-                            width: "148mm", // Keep original A5 width
-                            minHeight: "210mm",
+                            width: "80mm",
+                            minHeight: "auto",
                             color: "#000000",
                             backgroundColor: "#ffffff",
                         }}
                     >
-                        {/* Watermark Logo for Print */}
-                        <div
-                            style={{
-                                position: "absolute",
-                                top: "50%",
-                                left: "50%",
-                                transform: "translate(-50%, -50%)",
-                                width: "60%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                pointerEvents: "none",
-                                zIndex: 0,
-                            }}
-                        >
-                            <img
-                                src={storeSettings?.logo_url || "/logo-smartcare.png"}
-                                alt="watermark"
-                                style={{
-                                    width: "100%",
-                                    height: "auto",
-                                    objectFit: "contain",
-                                    opacity: 0.1,
-                                    filter: "grayscale(100%)",
-                                }}
-                            />
-                        </div>
                         <div style={{ padding: "16px" }}>
                             {/* Store Info Header - Compact Layout */}
                             {/* Store Info Header - Mobile Optimized (Stacked) */}
@@ -224,7 +197,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
 
                                 {/* Center: Store Info */}
                                 <div
-                                    style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1 }}
+                                    style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1, textAlign: "center" }}
                                 >
                                     <div
                                         style={{
@@ -232,15 +205,17 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                             fontSize: "11pt",
                                             marginBottom: "1mm",
                                             color: "#1e40af",
+                                            letterSpacing: "0.2mm",
                                         }}
                                     >
-                                        {storeSettings?.store_name || "Sơn Nam"}
+                                        {storeSettings?.store_name || "SƠN NAM"}
                                     </div>
                                     <div
                                         style={{
                                             color: "#000",
                                             display: "flex",
                                             alignItems: "center",
+                                            justifyContent: "center",
                                             gap: "1mm",
                                         }}
                                     >
@@ -265,6 +240,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                             color: "#000",
                                             display: "flex",
                                             alignItems: "center",
+                                            justifyContent: "center",
                                             gap: "1mm",
                                         }}
                                     >
@@ -389,11 +365,12 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                 <div style={{ textAlign: "center", marginBottom: "2mm" }}>
                                     <h1
                                         style={{
-                                            fontSize: "16pt",
+                                            fontSize: "13pt",
                                             fontWeight: "bold",
                                             margin: "0",
                                             textTransform: "uppercase",
                                             color: "#1e40af",
+                                            lineHeight: 1.25,
                                         }}
                                     >
                                         PHIẾU DỊCH VỤ SỬA CHỮA
@@ -403,7 +380,9 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                     style={{
                                         display: "flex",
                                         justifyContent: "space-between",
-                                        fontSize: "9pt",
+                                        alignItems: "flex-start",
+                                        gap: "2mm",
+                                        fontSize: "8.5pt",
                                         color: "#666",
                                     }}
                                 >
@@ -438,31 +417,17 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                     fontSize: "9pt",
                                 }}
                             >
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        gap: "4mm",
-                                        marginBottom: "1.5mm",
-                                    }}
-                                >
-                                    <div style={{ flex: 1 }}>
-                                        <span style={{ fontWeight: "bold" }}>Khách hàng:</span>{" "}
-                                        {printOrder.customerName}
-                                    </div>
-                                    <div style={{ flex: "0 0 auto" }}>
-                                        <span style={{ fontWeight: "bold" }}>SĐT:</span>{" "}
-                                        {printOrder.customerPhone}
-                                    </div>
+                                <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                                    <span style={{ fontWeight: "bold" }}>Khách hàng:</span> {printOrder.customerName}
                                 </div>
-                                <div style={{ display: "flex", gap: "4mm" }}>
-                                    <div style={{ flex: 1 }}>
-                                        <span style={{ fontWeight: "bold" }}>Loại xe:</span>{" "}
-                                        {printOrder.vehicleModel}
-                                    </div>
-                                    <div style={{ flex: "0 0 auto" }}>
-                                        <span style={{ fontWeight: "bold" }}>Biển số:</span>{" "}
-                                        {printOrder.licensePlate}
-                                    </div>
+                                <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                                    <span style={{ fontWeight: "bold" }}>SĐT:</span> {printOrder.customerPhone}
+                                </div>
+                                <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                                    <span style={{ fontWeight: "bold" }}>Loại xe:</span> {printOrder.vehicleModel}
+                                </div>
+                                <div style={{ wordBreak: "break-word" }}>
+                                    <span style={{ fontWeight: "bold" }}>Biển số:</span> {printOrder.licensePlate}
                                 </div>
                             </div>
 
@@ -470,25 +435,17 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                             <div
                                 style={{
                                     border: "1px solid #ddd",
-                                    padding: "4mm",
+                                    padding: "3mm",
                                     marginBottom: "4mm",
                                     borderRadius: "2mm",
                                     color: "#000",
                                 }}
                             >
-                                <div style={{ display: "flex", gap: "3mm" }}>
-                                    <div
-                                        style={{
-                                            fontWeight: "bold",
-                                            minWidth: "20%",
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        Mô tả sự cố:
-                                    </div>
-                                    <div style={{ flex: 1, whiteSpace: "pre-wrap" }}>
-                                        {printOrder.issueDescription || "Không có mô tả"}
-                                    </div>
+                                <div style={{ fontWeight: "bold", marginBottom: "1.5mm" }}>
+                                    Mô tả sự cố:
+                                </div>
+                                <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                    {printOrder.issueDescription || "Không có mô tả"}
                                 </div>
                             </div>
 
@@ -502,111 +459,49 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                             fontSize: "11pt",
                                         }}
                                     >
-                                        Phụ tùng sử dụng:
+                                        Linh kiện:
                                     </p>
-                                    <table
-                                        style={{
-                                            width: "100%",
-                                            borderCollapse: "collapse",
-                                            border: "1px solid #ddd",
-                                        }}
-                                    >
-                                        <thead>
-                                            <tr style={{ backgroundColor: "#f5f5f5" }}>
-                                                <th
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "2mm" }}>
+                                        {printOrder.partsUsed.map((part: WorkOrderPart, idx: number) => (
+                                            <div
+                                                key={idx}
+                                                style={{
+                                                    border: "1px solid #ddd",
+                                                    borderRadius: "2mm",
+                                                    padding: "2.5mm",
+                                                    backgroundColor: "#fff",
+                                                }}
+                                            >
+                                                <div
                                                     style={{
-                                                        border: "1px solid #ddd",
-                                                        padding: "2mm",
-                                                        textAlign: "left",
                                                         fontSize: "10pt",
+                                                        fontWeight: "bold",
+                                                        marginBottom: "1mm",
+                                                        wordBreak: "break-word",
                                                     }}
                                                 >
-                                                    Tên phụ tùng
-                                                </th>
-                                                <th
+                                                    {part.partName}
+                                                </div>
+                                                <div
                                                     style={{
-                                                        border: "1px solid #ddd",
-                                                        padding: "2mm",
-                                                        textAlign: "center",
-                                                        fontSize: "10pt",
-                                                        width: "15%",
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                        alignItems: "baseline",
+                                                        gap: "2mm",
+                                                        fontSize: "9pt",
+                                                        color: "#374151",
                                                     }}
                                                 >
-                                                    SL
-                                                </th>
-                                                <th
-                                                    style={{
-                                                        border: "1px solid #ddd",
-                                                        padding: "2mm",
-                                                        textAlign: "right",
-                                                        fontSize: "10pt",
-                                                        width: "25%",
-                                                    }}
-                                                >
-                                                    Đơn giá
-                                                </th>
-                                                <th
-                                                    style={{
-                                                        border: "1px solid #ddd",
-                                                        padding: "2mm",
-                                                        textAlign: "right",
-                                                        fontSize: "10pt",
-                                                        width: "25%",
-                                                    }}
-                                                >
-                                                    Thành tiền
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {printOrder.partsUsed.map(
-                                                (part: WorkOrderPart, idx: number) => (
-                                                    <tr key={idx}>
-                                                        <td
-                                                            style={{
-                                                                border: "1px solid #ddd",
-                                                                padding: "2mm",
-                                                                fontSize: "10pt",
-                                                            }}
-                                                        >
-                                                            {part.partName}
-                                                        </td>
-                                                        <td
-                                                            style={{
-                                                                border: "1px solid #ddd",
-                                                                padding: "2mm",
-                                                                textAlign: "center",
-                                                                fontSize: "10pt",
-                                                            }}
-                                                        >
-                                                            {part.quantity}
-                                                        </td>
-                                                        <td
-                                                            style={{
-                                                                border: "1px solid #ddd",
-                                                                padding: "2mm",
-                                                                textAlign: "right",
-                                                                fontSize: "10pt",
-                                                            }}
-                                                        >
-                                                            {formatCurrency(part.price)}
-                                                        </td>
-                                                        <td
-                                                            style={{
-                                                                border: "1px solid #ddd",
-                                                                padding: "2mm",
-                                                                textAlign: "right",
-                                                                fontSize: "10pt",
-                                                                fontWeight: "bold",
-                                                            }}
-                                                        >
-                                                            {formatCurrency(part.price * part.quantity)}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            )}
-                                        </tbody>
-                                    </table>
+                                                    <div>
+                                                        SL: {part.quantity} x {formatCurrency(part.price)}
+                                                    </div>
+                                                    <div style={{ fontWeight: "bold", color: "#111827", whiteSpace: "nowrap" }}>
+                                                        {formatCurrency(part.price * part.quantity)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
@@ -724,41 +619,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                             >
                                 <table style={{ width: "100%", borderSpacing: "0" }}>
                                     <tbody>
-                                        {/* Tiền phụ tùng - chỉ hiển thị khi > 0 */}
-                                        {(() => {
-                                            const partsTotal =
-                                                printOrder.partsUsed?.reduce(
-                                                    (sum: number, p: WorkOrderPart) =>
-                                                        sum + p.price * p.quantity,
-                                                    0
-                                                ) || 0;
-                                            return (
-                                                partsTotal > 0 && (
-                                                    <tr>
-                                                        <td
-                                                            style={{
-                                                                fontWeight: "bold",
-                                                                paddingBottom: "2mm",
-                                                                fontSize: "10pt",
-                                                            }}
-                                                        >
-                                                            Tiền phụ tùng:
-                                                        </td>
-                                                        <td
-                                                            style={{
-                                                                textAlign: "right",
-                                                                paddingBottom: "2mm",
-                                                                fontSize: "10pt",
-                                                            }}
-                                                        >
-                                                            {formatCurrency(partsTotal)}
-                                                        </td>
-                                                    </tr>
-                                                )
-                                            );
-                                        })()}
-
-                                        {/* Phí dịch vụ (laborCost) - chỉ hiển thị khi > 0 */}
+                                        {/* Tiền công - chỉ hiển thị khi > 0 */}
                                         {(printOrder.laborCost ?? 0) > 0 && (
                                             <tr>
                                                 <td
@@ -768,7 +629,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                                                         fontSize: "10pt",
                                                     }}
                                                 >
-                                                    Phí dịch vụ:
+                                                    Tiền công:
                                                 </td>
                                                 <td
                                                     style={{

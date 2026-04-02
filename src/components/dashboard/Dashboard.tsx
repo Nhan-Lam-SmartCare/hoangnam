@@ -3,7 +3,6 @@ import {
   DollarSign,
   TrendingUp,
   Wallet,
-  Landmark,
   BarChart3,
   Package,
   Trash2,
@@ -13,13 +12,7 @@ import {
   Boxes,
   AlertTriangle,
   Wrench,
-  ShoppingCart,
-  FileText,
-  Search,
   Settings,
-  List,
-  Eye,
-  EyeOff,
   Bell,
   CheckCircle2,
   Car,
@@ -27,7 +20,6 @@ import {
   XCircle,
   HandCoins,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -38,7 +30,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 
@@ -57,11 +48,7 @@ import { useDashboardData } from "./hooks/useDashboardData";
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const [reportFilter, setReportFilter] = useState<string>("month");
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
-  const [selectedQuarter, setSelectedQuarter] = useState<number>(Math.ceil((new Date().getMonth() + 1) / 3));
   const [isLoading, setIsLoading] = useState(true);
-  const [showBalance, setShowBalance] = useState(false);
-  const [showRevenue, setShowRevenue] = useState(false);
 
   // Load data using custom hook
   const {
@@ -72,11 +59,18 @@ const Dashboard: React.FC = () => {
     topProducts,
     workOrderStats,
     alerts,
-    cashBalance,
-    bankBalance,
-    // @ts-ignore
-    debugData,
+    ownerInsights,
   } = useDashboardData(reportFilter);
+
+  const totalCashflow = filteredStats.income + filteredStats.expense;
+  const collectionRate =
+    totalCashflow > 0
+      ? Math.round((filteredStats.income / totalCashflow) * 100)
+      : 0;
+  const avgOrderValue =
+    filteredStats.orderCount > 0
+      ? filteredStats.revenue / filteredStats.orderCount
+      : 0;
 
   // ... (existing code)
 
@@ -296,74 +290,200 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Overview & Charts - Removed Finance/Sales charts */}
-      {/* Work Order Stats and Alerts only */}
+      <div className="hidden md:grid md:grid-cols-3 gap-4">
+        <StatCard
+          title="Doanh thu kỳ"
+          value={formatCurrency(filteredStats.revenue)}
+          subtitle={`${filteredStats.orderCount} giao dịch`}
+          colorKey="blue"
+          icon={DollarSign}
+        />
+        <StatCard
+          title="Lợi nhuận ròng"
+          value={formatCurrency(filteredStats.profit)}
+          subtitle={`Biên gộp: ${formatCurrency(filteredStats.grossProfit)}`}
+          colorKey="emerald"
+          icon={TrendingUp}
+        />
+        <StatCard
+          title="Ticket trung bình"
+          value={formatCurrency(avgOrderValue)}
+          subtitle="Giá trị mỗi đơn"
+          colorKey="cyan"
+          icon={BarChart3}
+        />
+        <StatCard
+          title="Công nợ phải thu"
+          value={formatCurrency(ownerInsights.receivables)}
+          subtitle={`${ownerInsights.unpaidOrdersCount} phiếu chưa thu đủ`}
+          colorKey="rose"
+          icon={HandCoins}
+        />
+        <StatCard
+          title="Giá trị phiếu đang mở"
+          value={formatCurrency(ownerInsights.openWorkValue)}
+          subtitle={`${workOrderStats.newOrders + workOrderStats.inProgress + workOrderStats.completed} phiếu đang xử lý`}
+          colorKey="amber"
+          icon={BriefcaseBusiness}
+        />
+        <StatCard
+          title="Tỷ lệ thu tiền"
+          value={`${collectionRate}%`}
+          subtitle={`Thu: ${formatCurrency(filteredStats.income)} | Chi: ${formatCurrency(filteredStats.expense)}`}
+          colorKey="violet"
+          icon={Wallet}
+        />
+      </div>
 
-      <div className="hidden md:grid gap-4 md:grid-cols-3">
-        {/* Alerts & Warnings - Now full width or large part */}
+      <div className="hidden md:grid md:grid-cols-3 gap-4">
+        <div className="md:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-blue-500" />
+            Xu hướng thu chi 7 ngày
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={last7DaysRevenue}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.25} />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `${Math.round(value / 1000000)}tr`} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value: number, name: string) => [formatCurrency(Number(value)), name === "revenue" ? "Thu" : name === "expense" ? "Chi" : "Lãi"]}
+                />
+                <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2.5} dot={false} name="revenue" />
+                <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={false} name="expense" />
+                <Line type="monotone" dataKey="profit" stroke="#22c55e" strokeWidth={2} dot={false} name="profit" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-emerald-500" />
+            Trạng thái thu tiền
+          </h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={ownerInsights.paymentMix}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={52}
+                  outerRadius={78}
+                  paddingAngle={3}
+                >
+                  {ownerInsights.paymentMix.map((entry: any) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => [`${value} phiếu`, "Số lượng"]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="space-y-2">
+            {ownerInsights.paymentMix.map((entry: any) => (
+              <div key={entry.name} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                  <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
+                </div>
+                <span className="font-semibold text-slate-900 dark:text-white">{entry.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden md:grid md:grid-cols-3 gap-4">
         <div className="md:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />
             Cần chú ý
           </h3>
           <div className="space-y-3">
             {alerts.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                Mọi thứ đều ổn định!
-              </div>
+              <div className="text-sm text-slate-500">Mọi thứ đang ổn định.</div>
             ) : (
               alerts.map((alert, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/20"
+                  className="p-3 rounded-xl border border-orange-200/70 dark:border-orange-900/30 bg-orange-50/70 dark:bg-orange-900/10"
                 >
-                  <AlertTriangle className={`w-5 h-5 shrink-0 ${alert.color}`} />
-                  <div>
-                    <h4
-                      className={`text-sm font-bold ${alert.color} mb-0.5`}
-                    >
-                      {alert.type}
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      {alert.message}
-                    </p>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{alert.type}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">{alert.message}</div>
+                </div>
+              ))
+            )}
+            {ownerInsights.lowStockParts.length > 0 && (
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tồn kho thấp</div>
+                <div className="space-y-1.5">
+                  {ownerInsights.lowStockParts.slice(0, 5).map((part: any) => (
+                    <div key={part.id} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-slate-300 truncate max-w-[180px]">{part.name}</span>
+                      <span className={`font-semibold ${part.stock <= 3 ? "text-red-500" : "text-amber-500"}`}>{part.stock}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="md:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-amber-500" />
+            Top kỹ thuật viên
+          </h3>
+          <div className="space-y-3">
+            {ownerInsights.topTechnicians.length === 0 ? (
+              <div className="text-sm text-slate-500">Chưa có dữ liệu kỹ thuật viên.</div>
+            ) : (
+              ownerInsights.topTechnicians.map((tech: any, idx: number) => (
+                <div key={tech.name} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {idx + 1}. {tech.name}
+                    </div>
+                    <div className="text-xs text-slate-500">{tech.jobs} phiếu</div>
                   </div>
+                  <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Doanh thu xử lý: {formatCurrency(tech.revenue)}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">Đang mở: {tech.openJobs} phiếu</div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Work Order Stats - Expanded */}
-        <div className="md:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-blue-500" />
-            Trạng thái sửa chữa
+        <div className="md:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Boxes className="w-5 h-5 text-cyan-500" />
+            Hạng mục bán chạy
           </h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Tiếp nhận mới
-              </span>
-              <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {workOrderStats.newOrders}
-              </span>
-            </div>
-            <div className="flex flex-col items-center justify-center p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Đang sửa chữa
-              </span>
-              <span className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                {workOrderStats.inProgress}
-              </span>
-            </div>
-            <div className="flex flex-col items-center justify-center p-4 bg-green-50 dark:bg-green-900/10 rounded-xl">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Đã hoàn thành
-              </span>
-              <span className="text-3xl font-bold text-green-600 dark:text-green-400">
-                {workOrderStats.completed}
-              </span>
-            </div>
+          <div className="space-y-3">
+            {topProducts.length === 0 ? (
+              <div className="text-sm text-slate-500">Chưa có dữ liệu hạng mục.</div>
+            ) : (
+              topProducts.slice(0, 6).map((item: any) => {
+                const maxQty = Math.max(...topProducts.slice(0, 6).map((p: any) => p.quantity || 1));
+                const ratio = maxQty > 0 ? ((item.quantity || 0) / maxQty) * 100 : 0;
+                return (
+                  <div key={item.name}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-700 dark:text-slate-200 truncate max-w-[180px]">{item.name}</span>
+                      <span className="font-semibold text-slate-500">{item.quantity}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                      <div className="h-full rounded-full bg-cyan-500" style={{ width: `${Math.max(8, ratio)}%` }} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

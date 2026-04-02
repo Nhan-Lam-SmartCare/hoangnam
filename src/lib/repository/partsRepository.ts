@@ -7,6 +7,77 @@ import { generateSKU } from "../../utils/sku";
 // Centralized table name constant
 const PARTS_TABLE = "parts";
 
+function getMissingColumnFromSupabaseError(err: any): string | null {
+  const message = String(err?.message || "");
+  const details = String(err?.details || "");
+  const text = `${message} ${details}`;
+  const match = text.match(/Could not find the '([^']+)' column/i);
+  return match?.[1] || null;
+}
+
+async function insertPartWithSchemaFallback(payload: Record<string, any>) {
+  const workingPayload: Record<string, any> = { ...payload };
+
+  // Retry a few times in case DB schema is older and misses optional columns.
+  for (let i = 0; i < 5; i++) {
+    const { data, error } = await supabase
+      .from(PARTS_TABLE)
+      .insert([workingPayload])
+      .select()
+      .single();
+
+    if (!error && data) return { data, error: null };
+
+    const missingColumn = getMissingColumnFromSupabaseError(error);
+    if (!missingColumn || !(missingColumn in workingPayload)) {
+      return { data: null, error };
+    }
+
+    delete workingPayload[missingColumn];
+    console.warn(
+      `[partsRepository] Missing column '${missingColumn}' in DB schema, retrying insert without it`
+    );
+  }
+
+  return {
+    data: null,
+    error: { message: "Insert parts failed after schema fallback retries" },
+  };
+}
+
+async function updatePartWithSchemaFallback(
+  id: string,
+  updates: Record<string, any>
+) {
+  const workingUpdates: Record<string, any> = { ...updates };
+
+  for (let i = 0; i < 5; i++) {
+    const { data, error } = await supabase
+      .from(PARTS_TABLE)
+      .update(workingUpdates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (!error && data) return { data, error: null };
+
+    const missingColumn = getMissingColumnFromSupabaseError(error);
+    if (!missingColumn || !(missingColumn in workingUpdates)) {
+      return { data: null, error };
+    }
+
+    delete workingUpdates[missingColumn];
+    console.warn(
+      `[partsRepository] Missing column '${missingColumn}' in DB schema, retrying update without it`
+    );
+  }
+
+  return {
+    data: null,
+    error: { message: "Update parts failed after schema fallback retries" },
+  };
+}
+
 // Fetch all parts
 export async function fetchParts(): Promise<RepoResult<Part[]>> {
   try {
@@ -108,11 +179,7 @@ export async function createPart(
       warrantyPeriod: input.warrantyPeriod,
       // costPrice, vatRate không có trong schema parts của bản hiện tại => không insert
     };
-    const { data, error } = await supabase
-      .from(PARTS_TABLE)
-      .insert([payload])
-      .select()
-      .single();
+    const { data, error } = await insertPartWithSchemaFallback(payload);
     if (error || !data) {
       const msg =
         (error as any)?.message ||
@@ -156,12 +223,10 @@ export async function updatePart(
         cause: oldErr,
       });
     }
-    const { data, error } = await supabase
-      .from(PARTS_TABLE)
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single();
+    const { data, error } = await updatePartWithSchemaFallback(
+      id,
+      updates as Record<string, any>
+    );
     if (error || !data)
       return failure({
         code: "supabase",

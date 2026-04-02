@@ -5,13 +5,13 @@ describe("formatWorkOrderId", () => {
   it("formats WO-<timestamp> using provided prefix", () => {
     const ts = 1700000000000; // known timestamp
     const formatted = formatWorkOrderId(`WO-${ts}`, "SC");
-    expect(formatted).toMatch(/^SC-\d{8}-\d{6}$/);
+    expect(formatted).toMatch(/^SC-\d{6}$/);
   });
 
   it("formats numeric timestamp with prefix", () => {
     const ts = 1700000000000;
     const formatted = formatWorkOrderId(`${ts}`, "SC");
-    expect(formatted).toMatch(/^SC-\d{8}-\d{6}$/);
+    expect(formatted).toMatch(/^SC-\d{6}$/);
   });
 
   it("returns unchanged if already formatted with human prefix and suffix", () => {

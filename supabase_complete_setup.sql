@@ -192,6 +192,24 @@ CREATE TABLE IF NOT EXISTS public.supplier_debts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.inventory_transactions (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL DEFAULT 'Nhập kho',
+  "partId" TEXT,
+  "partName" TEXT,
+  quantity NUMERIC DEFAULT 0,
+  date TIMESTAMPTZ DEFAULT NOW(),
+  "unitPrice" NUMERIC DEFAULT 0,
+  "totalPrice" NUMERIC DEFAULT 0,
+  "branchId" TEXT DEFAULT 'CN1',
+  notes TEXT,
+  "saleId" TEXT,
+  "workOrderId" TEXT,
+  "supplierId" TEXT,
+  "userId" TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- II. CẤU HÌNH BẢO MẬT (RLS)
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.parts ENABLE ROW LEVEL SECURITY;
@@ -200,6 +218,7 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_transactions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Enable all access for all users" ON public.customers FOR ALL USING (true);
 CREATE POLICY "Enable all access for all users" ON public.parts FOR ALL USING (true);
@@ -208,6 +227,7 @@ CREATE POLICY "Enable all access for all users" ON public.categories FOR ALL USI
 CREATE POLICY "Enable all access for all users" ON public.suppliers FOR ALL USING (true);
 CREATE POLICY "Enable all access for all users" ON public.employees FOR ALL USING (true);
 CREATE POLICY "Enable all access for all users" ON public.store_settings FOR ALL USING (true);
+CREATE POLICY "Enable all access for all users" ON public.inventory_transactions FOR ALL USING (true);
 
 
 -- III. DỮ LIỆU MẪU (SEED DATA) - ĐIỆN TỬ

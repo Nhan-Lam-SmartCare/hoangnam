@@ -110,70 +110,155 @@ export async function createCashTransaction(
     if (!input.type)
       return failure({ code: "validation", message: "Thiếu loại thu/chi" });
 
-    // Build payload with lowercase column names (PostgreSQL converts to lowercase)
-    // DB columns: id, type, category, amount, date, description, branchid, paymentsource, reference, created_at, recipient
-    const payload: any = {
-      id: crypto.randomUUID(),
-      type: input.type, // Required: "income" or "expense"
-      amount: input.amount,
-      branchid: input.branchId,
-      paymentsource: input.paymentSourceId,
-      category:
-        canonicalizeMotocareCashTxCategory(input.category) ||
-        (input.type === "income" ? "general_income" : "general_expense"),
-      date: input.date || new Date().toISOString(),
-      description: input.notes || "",
-      recipient: input.recipient || null,
+    const getMissingColumnFromSupabaseError = (err: any): string | null => {
+      const message = String(err?.message || "");
+      const details = String(err?.details || "");
+      const text = `${message} ${details}`;
+      const match = text.match(/Could not find the '([^']+)' column/i);
+      return match?.[1] || null;
     };
 
-    console.log("[CashTx] Creating transaction with payload:", payload);
+    const insertWithSchemaFallback = async (
+      tableName: string,
+      basePayload: Record<string, any>
+    ): Promise<{ ok: boolean; error?: any; usedPayload?: Record<string, any> }> => {
+      const workingPayload: Record<string, any> = { ...basePayload };
 
-    const { data, error } = await supabase
-      .from(TABLE)
-      .insert([payload])
-      .select()
-      .single();
+      for (let i = 0; i < 8; i++) {
+        // Insert without .select() to avoid failing on schemas with insert-only permissions.
+        const { error } = await supabase.from(tableName).insert([workingPayload]);
+        if (!error) return { ok: true, usedPayload: workingPayload };
 
-    if (error) {
-      console.error("[CashTx] Supabase error:", error);
-      console.error(
-        "[CashTx] Error details - code:",
-        error.code,
-        "message:",
-        error.message,
-        "details:",
-        error.details,
-        "hint:",
-        error.hint
-      );
+        const missingColumn = getMissingColumnFromSupabaseError(error);
+        if (missingColumn && missingColumn in workingPayload) {
+          delete workingPayload[missingColumn];
+          console.warn(
+            `[CashTx] Missing column '${missingColumn}' in table ${tableName}, retrying without it`
+          );
+          continue;
+        }
+
+        return { ok: false, error };
+      }
+
+      return {
+        ok: false,
+        error: { message: `Insert cash transaction failed after retries for ${tableName}` },
+      };
+    };
+
+    const txId =
+      typeof crypto !== "undefined" && (crypto as any).randomUUID
+        ? (crypto as any).randomUUID()
+        : `${Math.random().toString(36).slice(2)}-${Date.now()}`;
+
+    const canonicalCategory =
+      canonicalizeMotocareCashTxCategory(input.category) ||
+      (input.type === "income" ? "general_income" : "general_expense");
+    const txDate = input.date || new Date().toISOString();
+
+    const payloadAttempts: Array<{ table: string; payload: Record<string, any> }> = [
+      {
+        table: "cash_transactions",
+        payload: {
+          id: txId,
+          type: input.type,
+          amount: input.amount,
+          branchid: input.branchId,
+          paymentsource: input.paymentSourceId,
+          category: canonicalCategory,
+          date: txDate,
+          description: input.notes || "",
+          recipient: input.recipient || null,
+          saleid: input.saleId,
+          workorderid: input.workOrderId,
+          supplierid: input.supplierId,
+          customerid: input.customerId,
+        },
+      },
+      {
+        table: "cash_transactions",
+        payload: {
+          id: txId,
+          type: input.type,
+          amount: input.amount,
+          branchId: input.branchId,
+          paymentSource: input.paymentSourceId,
+          category: canonicalCategory,
+          date: txDate,
+          notes: input.notes || "",
+          recipient: input.recipient || null,
+          saleId: input.saleId,
+          workOrderId: input.workOrderId,
+          supplierId: input.supplierId,
+          customerId: input.customerId,
+        },
+      },
+      {
+        table: "cashtransactions",
+        payload: {
+          id: txId,
+          type: input.type,
+          amount: input.amount,
+          branchid: input.branchId,
+          paymentsource: input.paymentSourceId,
+          category: canonicalCategory,
+          date: txDate,
+          description: input.notes || "",
+          recipient: input.recipient || null,
+        },
+      },
+    ];
+
+    let inserted = false;
+    let lastError: any = null;
+    let usedPayload: Record<string, any> | undefined;
+
+    for (const attempt of payloadAttempts) {
+      const res = await insertWithSchemaFallback(attempt.table, attempt.payload);
+      if (res.ok) {
+        inserted = true;
+        usedPayload = res.usedPayload;
+        break;
+      }
+      lastError = res.error;
+      console.warn("[CashTx] Insert attempt failed", {
+        table: attempt.table,
+        error: res.error,
+      });
     }
 
-    if (error || !data)
+    if (!inserted) {
       return failure({
         code: "supabase",
         message: "Ghi sổ quỹ thất bại",
-        cause: error,
+        cause: lastError,
       });
+    }
 
-    // Map lowercase DB columns to camelCase for TypeScript interface
     const created: CashTransaction = {
-      ...data,
-      branchId: data.branchid || data.branchId,
-      paymentSourceId:
-        data.paymentsource ||
-        data.paymentSource ||
-        data.paymentSourceId ||
-        "cash",
-    };
+      id: txId,
+      type: input.type,
+      date: txDate,
+      amount: input.amount,
+      notes: input.notes || "",
+      paymentSourceId: input.paymentSourceId,
+      branchId: input.branchId,
+      category: canonicalCategory as any,
+      saleId: input.saleId,
+      workOrderId: input.workOrderId,
+      recipient: input.recipient,
+      ...(usedPayload || {}),
+    } as CashTransaction;
 
     // Best-effort audit: manual cash entry (exclude those tied to sale/debt if category already specific?)
     try {
       // Determine if this is manual: no saleId/workOrderId/payrollRecordId/loanPaymentId
       const isManual =
-        !payload.saleId &&
-        !payload.workOrderId &&
-        !payload.payrollRecordId &&
-        !payload.loanPaymentId;
+        !input.saleId &&
+        !input.workOrderId &&
+        !input.payrollRecordId &&
+        !input.loanPaymentId;
       if (isManual) {
         const { data: userRes } = await supabase.auth.getUser();
         const userId = userRes?.user?.id || null;

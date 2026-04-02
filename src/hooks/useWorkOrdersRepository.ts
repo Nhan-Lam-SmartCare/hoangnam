@@ -140,6 +140,11 @@ export const useRefundWorkOrderRepo = () => {
       refundReason: string;
     }) => refundWorkOrder(orderId, refundReason),
     onSuccess: (result) => {
+      if (!result.ok) {
+        showToast.error(result.error.message || "Không thể hủy đơn sửa chữa");
+        return;
+      }
+
       qc.invalidateQueries({ queryKey: ["workOrdersRepo"] });
       qc.invalidateQueries({ queryKey: ["workOrdersFiltered"] }); // Invalidate filtered queries
       qc.invalidateQueries({ queryKey: ["partsRepo"] }); // Refresh for restored stock
@@ -148,7 +153,7 @@ export const useRefundWorkOrderRepo = () => {
       qc.invalidateQueries({ queryKey: ["cashTransactions"] });
       qc.invalidateQueries({ queryKey: ["paymentSources"] });
       showToast.success("Đã hoàn tiền phiếu sửa chữa");
-      if (result.ok && (result.data as any).refundAmount) {
+      if ((result.data as any).refundAmount) {
         showToast.info(
           `Hoàn tiền: ${new Intl.NumberFormat("vi-VN").format(
             (result.data as any).refundAmount

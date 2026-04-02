@@ -40,7 +40,14 @@ import { ScannerModal } from "../common/ScannerModal";
 import { AndroidPatternLock } from "../common/AndroidPatternLock";
 import { formatCurrency, formatWorkOrderId, normalizeSearchText } from "../../utils/format";
 import { getCategoryColor } from "../../utils/categoryColors";
-import type { WorkOrder, Part, Customer, Vehicle, Employee } from "../../types";
+import type {
+  Employee,
+  ServiceConfig,
+  WorkOrder,
+  Part,
+  Customer,
+  Vehicle,
+} from "../../types";
 import {
   checkVehicleMaintenance,
   formatKm,
@@ -52,6 +59,12 @@ import { NumberInput } from "../common/NumberInput";
 import { showToast } from "../../utils/toast";
 import { supabase } from "../../supabaseClient";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useServiceConfigs } from "../../hooks/useRepairLabor";
+import {
+  buildDefaultWorkerSplit,
+  calculateLabor,
+  splitWorkerAmount,
+} from "../../lib/services/repairLaborService";
 
 interface WorkOrderMobileModalProps {
   isOpen: boolean;
@@ -66,6 +79,45 @@ interface WorkOrderMobileModalProps {
   viewMode?: boolean; // true = xem chi tiết, false = chỉnh sửa
   onSwitchToEdit?: () => void; // callback khi bấm nút chỉnh sửa từ view mode
 }
+
+interface RepairServiceDraftWorker {
+  worker_id: string;
+  worker_name?: string;
+  share_percent: number;
+}
+
+interface RepairServiceDraft {
+  id: string;
+  serviceId?: string;
+  serviceName: string;
+  laborCalcType: ServiceConfig["laborCalcType"];
+  laborFixedAmount: number;
+  laborPercentOfCost: number;
+  minimumLaborAmount: number;
+  defaultWorkerSharePercent: number;
+  manualLabor: number;
+  relatedItemIds: string[];
+  workers: RepairServiceDraftWorker[];
+  isBillable: boolean;
+  isPayableToWorker: boolean;
+  note: string;
+}
+
+const createEmptyRepairServiceDraft = (): RepairServiceDraft => ({
+  id: `mobile-labor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  serviceName: "",
+  laborCalcType: "fixed",
+  laborFixedAmount: 0,
+  laborPercentOfCost: 0,
+  minimumLaborAmount: 0,
+  defaultWorkerSharePercent: 30,
+  manualLabor: 0,
+  relatedItemIds: [],
+  workers: [],
+  isBillable: true,
+  isPayableToWorker: true,
+  note: "",
+});
 
 // Local type for status options if needed, or just use the one from constants
 type LocalWorkOrderStatus = "Tiếp nhận" | "Đang sửa" | "Đã sửa xong" | "Trả máy";
@@ -83,6 +135,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   viewMode = false,
   onSwitchToEdit,
 }) => {
+  const { data: serviceConfigs = [] } = useServiceConfigs();
   // Popular electronic devices for repair
   const POPULAR_DEVICES = [
     // === ĐIỆN THOẠI (PHONES) ===
@@ -251,7 +304,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
   // Update selectedCustomer and selectedVehicle when workOrder changes
-  useEffect(() => {
+  React.useEffect(() => {
     console.log("[WorkOrderMobileModal] workOrder:", workOrder);
     console.log("[WorkOrderMobileModal] initialCustomer:", initialCustomer);
     console.log("[WorkOrderMobileModal] initialVehicle:", initialVehicle);
@@ -295,6 +348,15 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         setDepositAmount(0);
         setIsDeposit(false);
       }
+
+      // Sync additional payment from existing order (desktop parity)
+      if (workOrder.additionalPayment && workOrder.additionalPayment > 0) {
+        setPartialAmount(workOrder.additionalPayment);
+        setShowPaymentInput(true);
+      } else {
+        setPartialAmount(0);
+        setShowPaymentInput(false);
+      }
     } else {
       setSelectedCustomer(null);
       setSelectedVehicle(null);
@@ -302,6 +364,8 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       setShowCustomerSearch(true);
       setDepositAmount(0);
       setIsDeposit(false);
+      setPartialAmount(0);
+      setShowPaymentInput(false);
     }
   }, [workOrder, initialCustomer, initialVehicle]);
 
@@ -348,6 +412,31 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       costPrice: s.costPrice || 0,
       sellingPrice: s.price || 0,
     })) || []
+  );
+  const [repairServices, setRepairServices] = useState<RepairServiceDraft[]>(
+    workOrder?.repairServices?.map((service) => ({
+      id: service.id,
+      serviceId: service.serviceId,
+      serviceName: service.serviceName,
+      laborCalcType: service.laborCalcType,
+      laborFixedAmount: service.laborFixedAmount,
+      laborPercentOfCost: service.laborPercentOfCost,
+      minimumLaborAmount: service.minimumLaborAmount,
+      defaultWorkerSharePercent: service.workerSharePercent || 30,
+      manualLabor: service.laborCalcType === "manual" ? service.laborAmount : 0,
+      relatedItemIds: (service.relatedItems || []).map((item) => item.partId),
+      workers: (service.workers || []).map((worker) => ({
+        worker_id: worker.workerId,
+        worker_name: worker.workerName || "",
+        share_percent: worker.sharePercent,
+      })),
+      isBillable: service.isBillable,
+      isPayableToWorker: service.isPayableToWorker,
+      note: service.note || "",
+    })) || []
+  );
+  const [newRepairServiceDraft, setNewRepairServiceDraft] = useState<RepairServiceDraft>(
+    createEmptyRepairServiceDraft()
   );
   const [laborCost, setLaborCost] = useState(workOrder?.laborCost || 0);
   const [discount, setDiscount] = useState(workOrder?.discount || 0);
@@ -439,6 +528,44 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
   // Tabs state for mobile form
   const [activeSection, setActiveSection] = useState<"info" | "issue" | "parts" | "payment">("info");
+
+  const getSelectedPartCost = (partId: string) => {
+    const part = selectedParts.find((item) => item.partId === partId);
+    if (!part) return 0;
+    return Number(part.costPrice || 0) * Number(part.quantity || 0);
+  };
+
+  const getRepairServiceLaborAmount = (service: RepairServiceDraft) =>
+    calculateLabor(
+      {
+        labor_calc_type: service.laborCalcType,
+        labor_fixed_amount: service.laborFixedAmount,
+        labor_percent_of_cost: service.laborPercentOfCost,
+        minimum_labor_amount: service.minimumLaborAmount,
+      },
+      service.relatedItemIds.reduce((sum, partId) => sum + getSelectedPartCost(partId), 0),
+      service.manualLabor
+    );
+
+  const getRepairServiceWorkers = (service: RepairServiceDraft) => {
+    if (service.workers.length > 0) return service.workers;
+    const mainTechnician = employees.find((employee) => employee.id === selectedTechnicianId)?.name;
+    return buildDefaultWorkerSplit(
+      employees,
+      mainTechnician,
+      service.defaultWorkerSharePercent
+    );
+  };
+
+  const repairLaborTotal = useMemo(
+    () =>
+      repairServices.reduce(
+        (sum, service) =>
+          sum + (service.isBillable ? getRepairServiceLaborAmount(service) : 0),
+        0
+      ),
+    [repairServices, selectedParts]
+  );
 
   // Combined fetch function
   const fetchCustomers = async (page: number, searchTerm: string, isLoadMore = false) => {
@@ -599,8 +726,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const servicesTotal = useMemo(() => {
     return additionalServices.reduce((sum, s) => sum + s.sellingPrice * s.quantity, 0);
   }, [additionalServices]);
+  const effectiveLaborCost = laborCost;
 
-  const subtotal = partsTotal + servicesTotal + laborCost;
+  const subtotal = partsTotal + servicesTotal + effectiveLaborCost;
 
   const discountAmount = useMemo(() => {
     if (discountType === "percent") {
@@ -610,6 +738,37 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   }, [subtotal, discount, discountType]);
 
   const total = Math.max(0, subtotal - discountAmount);
+  const additionalPaymentPreview =
+    status === "Trả máy" && showPaymentInput ? partialAmount : 0;
+  const remainingPreview = Math.max(
+    0,
+    total - (isDeposit ? depositAmount : 0) - additionalPaymentPreview
+  );
+
+  useEffect(() => {
+    if (status !== "Trả máy") {
+      if (showPaymentInput) setShowPaymentInput(false);
+      if (partialAmount !== 0) setPartialAmount(0);
+      return;
+    }
+
+    if (!workOrder) return;
+
+    const hasExistingAdditional = Number(workOrder.additionalPayment || 0) > 0;
+    if (hasExistingAdditional) return;
+
+    const fullAmount = Math.max(0, total - (isDeposit ? depositAmount : 0));
+    if (!showPaymentInput) setShowPaymentInput(true);
+    if (partialAmount !== fullAmount) setPartialAmount(fullAmount);
+  }, [
+    status,
+    workOrder,
+    total,
+    isDeposit,
+    depositAmount,
+    showPaymentInput,
+    partialAmount,
+  ]);
 
   // Handlers
   const handleSelectCustomer = (customer: Customer) => {
@@ -844,7 +1003,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     setCustomerSearchTerm("");
   };
 
-  const handleSave = async () => {
+  const handleSave = async (forceFullPayment = false) => {
     // Prevent duplicate submissions
     if (isSubmitting) return;
 
@@ -856,11 +1015,18 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     // Set submitting state to disable buttons
     setIsSubmitting(true);
 
-    // Calculate total paid and remaining based on showPaymentInput (similar to desktop logic)
+    // Desktop parity: additional payment only applies when status is "Trả máy"
     const totalDeposit = isDeposit ? depositAmount : 0;
-    const additionalPayment = showPaymentInput ? partialAmount : 0;
+    const additionalPayment =
+      status === "Trả máy"
+        ? forceFullPayment
+          ? Math.max(0, total - totalDeposit)
+          : showPaymentInput
+            ? partialAmount
+            : 0
+        : 0;
     const totalPaid = totalDeposit + additionalPayment;
-    const remainingAmount = total - totalPaid;
+    const remainingAmount = Math.max(0, total - totalPaid);
 
     // Transform parts to use 'price' field (as expected by SQL/types)
     const transformedParts = selectedParts.map((p) => ({
@@ -883,6 +1049,48 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       costPrice: s.costPrice,
     }));
 
+    const transformedRepairServices = repairServices.map((service) => {
+      const laborAmount = getRepairServiceLaborAmount(service);
+      const workerSplits = splitWorkerAmount(
+        laborAmount,
+        getRepairServiceWorkers(service)
+      );
+
+      return {
+        service_id: service.serviceId,
+        service_name: service.serviceName,
+        labor_calc_type: service.laborCalcType,
+        labor_fixed_amount: service.laborFixedAmount,
+        labor_percent_of_cost: service.laborPercentOfCost,
+        minimum_labor_amount: service.minimumLaborAmount,
+        related_product_cost: service.relatedItemIds.reduce(
+          (sum, partId) => sum + getSelectedPartCost(partId),
+          0
+        ),
+        labor_amount: laborAmount,
+        worker_share_percent:
+          workerSplits.length === 1
+            ? Number(workerSplits[0].share_percent || 0)
+            : Number(service.defaultWorkerSharePercent || 0),
+        worker_amount:
+          workerSplits.length === 1 ? Number(workerSplits[0].worker_amount || 0) : 0,
+        is_billable: service.isBillable,
+        is_payable_to_worker: service.isPayableToWorker,
+        note: service.note,
+        workers: workerSplits,
+        related_items: service.relatedItemIds.map((partId) => {
+          const selectedPart = selectedParts.find((part) => part.partId === partId);
+          return {
+            part_id: partId,
+            part_name: selectedPart?.partName || "",
+            quantity: Number(selectedPart?.quantity || 0),
+            unit_cost: Number(selectedPart?.costPrice || 0),
+            line_cost: getSelectedPartCost(partId),
+          };
+        }),
+      };
+    });
+
     const workOrderData = {
       status,
       technicianId: selectedTechnicianId,
@@ -896,15 +1104,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         : issueDescription,
       parts: transformedParts,
       additionalServices: transformedServices,
-      laborCost,
+      repairServices: transformedRepairServices,
+      laborCost: effectiveLaborCost,
       discount: discountAmount,
       total: total,
       depositAmount: totalDeposit,
       paymentMethod,
-      // ⚠️ FIX: Không gửi totalPaid/remainingAmount khi tạo mới
-      // Thanh toán khi trả xe phải dùng function riêng work_order_complete_payment
-      totalPaid: undefined,
-      remainingAmount: undefined,
+      totalPaid: totalPaid > 0 ? totalPaid : 0,
+      remainingAmount,
     };
 
     console.log(
@@ -962,6 +1169,13 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       alert(errorMessage + "\n\nDữ liệu đã được lưu tạm. Bạn có thể thử lại hoặc chụp màn hình.");
       // onClose(); // Don't close so user can retry
     }
+  };
+
+  const handlePayFull = async () => {
+    const remainingToPay = Math.max(0, total - (isDeposit ? depositAmount : 0));
+    setShowPaymentInput(true);
+    setPartialAmount(remainingToPay);
+    await handleSave(true);
   };
   const getStatusColor = (s: WorkOrderStatus) => {
     switch (s) {
@@ -1231,6 +1445,59 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                 </div>
               )}
 
+            {workOrder.repairServices && workOrder.repairServices.length > 0 && (
+              <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+                <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5" />
+                  CONG SUA ({workOrder.repairServices.length})
+                </h3>
+                <div className="space-y-2">
+                  {workOrder.repairServices.map((service) => (
+                    <div
+                      key={service.id}
+                      className="bg-white dark:bg-[#1e1e2d] rounded-xl p-3 border border-slate-200 dark:border-transparent"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm text-slate-900 dark:text-white font-medium truncate">
+                            {service.serviceName}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {service.laborCalcType}
+                          </div>
+                          {(service.workers || []).length > 0 && (
+                            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              {(service.workers || [])
+                                .map(
+                                  (worker) =>
+                                    `${worker.workerName || worker.workerId}: ${worker.sharePercent}%`
+                                )
+                                .join(", ")}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(service.laborAmount)}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Tho: {formatCurrency(
+                              (service.workers || []).length > 0
+                                ? (service.workers || []).reduce(
+                                  (sum, worker) => sum + Number(worker.workerAmount || 0),
+                                  0
+                                )
+                                : Number(service.workerAmount || 0)
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
 
 
             {/* Tổng tiền */}
@@ -1256,6 +1523,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                         0
                       ) || 0
                     )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-500 dark:text-slate-400 text-xs">Tiền công sửa</span>
+                  <span className="text-slate-900 dark:text-white font-medium text-sm">
+                    {formatCurrency(workOrder.laborTotal || workOrder.laborCost || 0)}
                   </span>
                 </div>
                 {(workOrder.discount || 0) > 0 && (
@@ -1738,6 +2011,180 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             </div>
                           </div>
                         </div>
+                        {false && (
+                        <div className="px-4 pb-4 space-y-3">
+                          <div className="flex items-center justify-between ml-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                              Cong sua / luong tho
+                            </label>
+                            {repairServices.length > 0 && (
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
+                                {repairServices.length} muc
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              value={newRepairServiceDraft.serviceId || ""}
+                              onChange={(e) => {
+                                const selectedService = serviceConfigs.find((service) => service.id === e.target.value);
+                                if (!selectedService) {
+                                  setNewRepairServiceDraft(createEmptyRepairServiceDraft());
+                                  return;
+                                }
+                                const technicianName =
+                                  employees.find((employee) => employee.id === selectedTechnicianId)?.name;
+                                setNewRepairServiceDraft({
+                                  ...createEmptyRepairServiceDraft(),
+                                  serviceId: selectedService.id,
+                                  serviceName: selectedService.name,
+                                  laborCalcType: selectedService.laborCalcType,
+                                  laborFixedAmount: selectedService.laborFixedAmount,
+                                  laborPercentOfCost: selectedService.laborPercentOfCost,
+                                  minimumLaborAmount: selectedService.minimumLaborAmount,
+                                  defaultWorkerSharePercent: selectedService.defaultWorkerSharePercent,
+                                  manualLabor:
+                                    selectedService.laborCalcType === "manual"
+                                      ? selectedService.laborFixedAmount
+                                      : 0,
+                                  workers: buildDefaultWorkerSplit(
+                                    employees,
+                                    technicianName,
+                                    selectedService.defaultWorkerSharePercent
+                                  ),
+                                });
+                              }}
+                              className="px-3 py-3 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-700/40 rounded-xl text-xs text-slate-900 dark:text-white"
+                            >
+                              <option value="">Chon mau DV</option>
+                              {serviceConfigs.map((service) => (
+                                <option key={service.id} value={service.id}>
+                                  {service.name}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              type="text"
+                              value={newRepairServiceDraft.serviceName}
+                              onChange={(e) =>
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  serviceName: e.target.value,
+                                })
+                              }
+                              placeholder="Ten cong sua"
+                              className="px-3 py-3 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/30 rounded-xl text-xs text-slate-900 dark:text-white"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              value={formatNumberWithDots(newRepairServiceDraft.laborFixedAmount)}
+                              onChange={(e) =>
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  laborFixedAmount: parseFormattedNumber(e.target.value),
+                                })
+                              }
+                              placeholder="Co dinh"
+                              className="px-3 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                            />
+                            <input
+                              type="text"
+                              value={formatNumberWithDots(newRepairServiceDraft.laborPercentOfCost)}
+                              onChange={(e) =>
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  laborPercentOfCost: parseFormattedNumber(e.target.value),
+                                })
+                              }
+                              placeholder="% gia nhap"
+                              className="px-3 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                            />
+                            <input
+                              type="text"
+                              value={formatNumberWithDots(
+                                newRepairServiceDraft.laborCalcType === "manual"
+                                  ? newRepairServiceDraft.manualLabor
+                                  : newRepairServiceDraft.minimumLaborAmount
+                              )}
+                              onChange={(e) => {
+                                const value = parseFormattedNumber(e.target.value);
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  manualLabor:
+                                    newRepairServiceDraft.laborCalcType === "manual"
+                                      ? value
+                                      : newRepairServiceDraft.manualLabor,
+                                  minimumLaborAmount:
+                                    newRepairServiceDraft.laborCalcType === "manual"
+                                      ? newRepairServiceDraft.minimumLaborAmount
+                                      : value,
+                                });
+                              }}
+                              placeholder="Min / tay"
+                              className="px-3 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!newRepairServiceDraft.serviceName.trim()) {
+                                showToast.error("Vui long nhap ten cong sua");
+                                return;
+                              }
+                              setRepairServices([...repairServices, newRepairServiceDraft]);
+                              setNewRepairServiceDraft(createEmptyRepairServiceDraft());
+                            }}
+                            className="w-full py-3.5 bg-emerald-600/10 border border-emerald-500/30 hover:bg-emerald-600/20 rounded-2xl text-emerald-400 transition-all flex items-center justify-center gap-2 text-xs font-bold active:scale-[0.98]"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Them cong sua
+                          </button>
+                          {repairServices.length > 0 && (
+                            <div className="space-y-2.5">
+                              {repairServices.map((service) => {
+                                const laborAmount = getRepairServiceLaborAmount(service);
+                                const workerSplits = splitWorkerAmount(
+                                  laborAmount,
+                                  getRepairServiceWorkers(service)
+                                );
+                                return (
+                                  <div
+                                    key={service.id}
+                                    className="p-4 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/30 rounded-2xl shadow-sm"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">
+                                          {service.serviceName}
+                                        </div>
+                                        <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                          {service.laborCalcType} • {formatCurrency(laborAmount)}
+                                        </div>
+                                        <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                          {workerSplits.length === 0
+                                            ? "Chua gan tho"
+                                            : workerSplits
+                                              .map((worker) => `${worker.worker_name || worker.worker_id}: ${worker.share_percent}%`)
+                                              .join(", ")}
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() =>
+                                          setRepairServices(repairServices.filter((item) => item.id !== service.id))
+                                        }
+                                        className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-red-400 active:scale-95 transition-all"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        )}
                         <button
                           onClick={() => {
                             // Set as warranty claim - just set labor to 0
@@ -2294,6 +2741,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                     setShowPaymentInput(newValue);
                                     if (!newValue) {
                                       setPartialAmount(0);
+                                    } else {
+                                      const fullAmount = Math.max(
+                                        0,
+                                        total - (isDeposit ? depositAmount : 0)
+                                      );
+                                      setPartialAmount(fullAmount);
                                     }
                                   }}
                                   className={`relative w-12 h-6 rounded-full transition-colors ${showPaymentInput
@@ -2395,7 +2848,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-slate-500 dark:text-slate-400">Phí dịch vụ:</span>
                               <span className="text-xs font-bold text-slate-900 dark:text-white">
-                                {formatCurrency(laborCost)}
+                                {formatCurrency(effectiveLaborCost)}
                               </span>
                             </div>
                             <div className="flex justify-between items-center">
@@ -2408,6 +2861,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                               <span className="text-xs text-slate-500 dark:text-slate-400">Gia công/Đặt hàng:</span>
                               <span className="text-xs font-bold text-slate-900 dark:text-white">
                                 {formatCurrency(servicesTotal)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">Công sửa:</span>
+                              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                {formatCurrency(effectiveLaborCost)}
                               </span>
                             </div>
 
@@ -2481,7 +2940,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                   {formatCurrency(total)}
                                 </span>
                               </div>
-                              {total - (isDeposit ? depositAmount : 0) - (showPaymentInput ? partialAmount : 0) <= 0 && (
+                              {remainingPreview <= 0 && (
                                 <div className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full flex items-center gap-1.5 mb-1">
                                   <CheckCircle className="w-3 h-3 text-emerald-400" />
                                   <span className="text-[10px] font-bold text-emerald-400 uppercase">Đã trả đủ</span>
@@ -2490,7 +2949,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             </div>
 
                             {/* Payment breakdown */}
-                            {((isDeposit && depositAmount > 0) || (showPaymentInput && partialAmount > 0)) && (
+                            {((isDeposit && depositAmount > 0) || additionalPaymentPreview > 0) && (
                               <div className="p-3 bg-slate-50 dark:bg-[#151521] rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-2">
                                 {isDeposit && depositAmount > 0 && (
                                   <div className="flex justify-between items-center">
@@ -2500,22 +2959,22 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                     </span>
                                   </div>
                                 )}
-                                {showPaymentInput && partialAmount > 0 && (
+                                {additionalPaymentPreview > 0 && (
                                   <div className="flex justify-between items-center">
                                     <span className="text-[10px] font-bold text-blue-400 uppercase">Thanh toán thêm</span>
                                     <span className="text-xs font-bold text-blue-400">
-                                      -{formatCurrency(partialAmount)}
+                                      -{formatCurrency(additionalPaymentPreview)}
                                     </span>
                                   </div>
                                 )}
 
                                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50 flex justify-between items-center">
                                   <span className="text-xs font-bold text-slate-900 dark:text-white">Còn lại:</span>
-                                  <span className={`text-lg font-black ${total - (isDeposit ? depositAmount : 0) - (showPaymentInput ? partialAmount : 0) > 0
+                                  <span className={`text-lg font-black ${remainingPreview > 0
                                     ? "text-amber-400"
                                     : "text-green-400"
                                     }`}>
-                                    {formatCurrency(Math.max(0, total - (isDeposit ? depositAmount : 0) - (showPaymentInput ? partialAmount : 0)))}
+                                    {formatCurrency(remainingPreview)}
                                   </span>
                                 </div>
                               </div>
@@ -2601,7 +3060,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
             {/* Nút Thanh toán - chỉ hiển thị khi trạng thái Trả máy */}
             {status === "Trả máy" && (
               <button
-                onClick={handleSave}
+                onClick={handlePayFull}
                 disabled={isSubmitting}
                 className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg font-medium text-white transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >

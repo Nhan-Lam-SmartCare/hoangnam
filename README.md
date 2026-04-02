@@ -59,7 +59,7 @@ Hệ thống quản lý toàn diện cho cửa hàng xe máy, hỗ trợ bán h�
 - Tạo phiếu sửa chữa với biển số xe
 - Quản lý phụ tùng + dịch vụ trong một phiếu
 - Đặt cọc, thanh toán từng phần
-- Mã phiếu tự động: `SC-YYYYMMDD-XXX`
+- Mã phiếu tự động: `SC-XXXXXX`
 - Theo dõi trạng thái: Đang sửa → Hoàn thành
 - Hoàn tiền với khôi phục tồn kho atomic
 - Lịch sử sửa chữa theo biển số xe

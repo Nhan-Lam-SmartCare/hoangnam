@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
+import { useAppContext } from "../../contexts/AppContext";
+import { supabase } from "../../supabaseClient";
 import NotificationDropdown from "../common/NotificationDropdown";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { NavLink, MobileDrawerLink } from "./index";
@@ -12,6 +14,7 @@ import {
   ShoppingCart as Cart,
   Boxes,
   Users,
+  UserRoundPlus,
   BriefcaseBusiness,
   Landmark,
   HandCoins,
@@ -35,8 +38,12 @@ import {
 export function Nav() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [branchOptions, setBranchOptions] = useState<
+    Array<{ id: string; name: string }>
+  >([{ id: "CN1", name: "Chi nhánh 1" }]);
   const { theme, toggleTheme } = useTheme();
   const { profile, user, signOut } = useAuth();
+  const { currentBranchId, setCurrentBranchId } = useAppContext();
   const role = profile?.role;
   const preferredName =
     profile?.name?.trim() ||
@@ -60,15 +67,80 @@ export function Nav() {
     viewPayroll: false,
     viewAnalytics: false,
     viewDebt: false,
-    viewEmployees: false,
+    viewEmployees: isOwnerOrManager,
     viewSettings: isOwnerOrManager,
     viewInventory: isOwnerOrManager,
     viewDashboard: isOwnerOrManager,
     viewReports: false,
   } as const;
 
+  useEffect(() => {
+    const mergeBranches = (
+      ...lists: Array<Array<{ id: string; name?: string }> | undefined>
+    ) => {
+      const merged = new Map<string, { id: string; name: string }>();
+
+      lists
+        .flatMap((list) => list || [])
+        .forEach((branch) => {
+          const id = String(branch?.id || "").trim();
+          if (!id) return;
+          merged.set(id, {
+            id,
+            name: String(branch?.name || id).trim() || id,
+          });
+        });
+
+      if (!merged.has("CN1")) {
+        merged.set("CN1", { id: "CN1", name: "Chi nhánh 1" });
+      }
+
+      if (currentBranchId && !merged.has(currentBranchId)) {
+        merged.set(currentBranchId, {
+          id: currentBranchId,
+          name: currentBranchId === "CN1" ? "Chi nhánh 1" : currentBranchId,
+        });
+      }
+
+      return Array.from(merged.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, "vi", { sensitivity: "base" })
+      );
+    };
+
+    const loadBranches = async () => {
+      let localOverrides: Array<{ id: string; name: string }> = [];
+      try {
+        const raw = localStorage.getItem("branch_overrides_v1");
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) {
+          localOverrides = parsed;
+        }
+      } catch {
+        localOverrides = [];
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("branches")
+          .select("id, name")
+          .order("name");
+
+        if (!error && data) {
+          setBranchOptions(mergeBranches(data as Array<{ id: string; name: string }>, localOverrides));
+          return;
+        }
+      } catch {
+        // Fallback below
+      }
+
+      setBranchOptions(mergeBranches(localOverrides));
+    };
+
+    void loadBranches();
+  }, [currentBranchId]);
+
   return (
-    <nav className="hidden md:block bg-gradient-to-r from-red-600 via-red-500 to-yellow-500 border-b border-red-800/20 sticky top-0 z-50">
+    <nav className="hidden md:block bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 border-b border-blue-900/40 sticky top-0 z-50">
       <div className="max-w-[1600px] mx-auto px-2 md:px-4 py-1 md:py-1.5">
         <div className="flex items-center justify-between">
           {/* Left: Brand and Branch Selector */}
@@ -213,7 +285,20 @@ export function Nav() {
                 </>
               )}
             </div>
-            {/* Removed redundant brand title and branch selector as requested */}
+            <div className="hidden md:flex items-center gap-2 ml-1">
+              <select
+                value={currentBranchId || "CN1"}
+                onChange={(e) => setCurrentBranchId(e.target.value)}
+                className="h-8 min-w-[150px] px-2.5 rounded-lg border border-white/20 bg-white/10 text-white text-xs font-semibold backdrop-blur-sm"
+                title="Chọn chi nhánh làm việc"
+              >
+                {branchOptions.map((branch) => (
+                  <option key={branch.id} value={branch.id} className="text-slate-900">
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Center: Main Navigation - Hidden on mobile */}
@@ -253,6 +338,14 @@ export function Nav() {
               icon={<Users className="w-4 h-4" />}
               label="Khách hàng"
             />
+            {can.viewEmployees && (
+              <NavLink
+                to="/employees"
+                colorKey="indigo"
+                icon={<UserRoundPlus className="w-4 h-4" />}
+                label="Nhân viên"
+              />
+            )}
             {/* Removed unrelated links: Employees, Finance, Debt, Analytics, Reports, Promotions */}
           </div>
 

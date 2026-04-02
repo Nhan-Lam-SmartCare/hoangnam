@@ -46,6 +46,7 @@ interface AppContextType {
   customerDebts: CustomerDebt[];
   supplierDebts: SupplierDebt[];
   currentBranchId: string;
+  setCurrentBranchId: React.Dispatch<React.SetStateAction<string>>;
   // setters / mutators
   setParts: React.Dispatch<React.SetStateAction<Part[]>>;
   upsertPart: (part: Partial<Part> & { id?: string }) => void;
@@ -97,7 +98,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   // --- State ---
-  const [currentBranchId] = useState("CN1");
+  const [currentBranchId, setCurrentBranchId] = useState(() => {
+    try {
+      const storedBranchId = localStorage.getItem("motocare-current-branch");
+      return storedBranchId || "CN1";
+    } catch {
+      return "CN1";
+    }
+  });
 
   // Load from localStorage on init (once)
   const getInitialData = () => {
@@ -243,7 +251,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     supplierDebts,
   ]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("motocare-current-branch", currentBranchId || "CN1");
+    } catch {
+      // Ignore storage write errors
+    }
+  }, [currentBranchId]);
+
   // --- Helpers ---
+  const updateCustomerWithFallback = async (
+    customerId: string,
+    payloads: Array<Record<string, any>>
+  ) => {
+    let lastError: any = null;
+    for (const payload of payloads) {
+      const { error } = await supabase
+        .from("customers")
+        .update(payload)
+        .eq("id", customerId);
+      if (!error) return null;
+      lastError = error;
+    }
+    return lastError;
+  };
+
+  const insertCustomerWithFallback = async (
+    payloads: Array<Record<string, any>>
+  ) => {
+    let lastError: any = null;
+    for (const payload of payloads) {
+      const { error } = await supabase.from("customers").insert([payload]);
+      if (!error) return null;
+      lastError = error;
+    }
+    return lastError;
+  };
+
   const upsertPart = useCallback(
     (part: Partial<Part> & { id?: string }) => {
       setParts((prev) => {
@@ -368,9 +412,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
               }
 
-              const { error: updateError } = await supabase
-                .from("customers")
-                .update({
+              const updateError = await updateCustomerWithFallback(existingId, [
+                {
                   name: customer.name || duplicates[0].name || "Khách hàng",
                   vehiclemodel:
                     customer.vehicleModel || duplicates[0].vehiclemodel || null,
@@ -378,8 +421,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
                     customer.licensePlate || duplicates[0].licenseplate || null,
                   vehicles: updatedVehicles,
                   lastvisit: new Date().toISOString(),
-                })
-                .eq("id", existingId);
+                },
+                {
+                  name: customer.name || duplicates[0].name || "Khách hàng",
+                  vehiclemodel:
+                    customer.vehicleModel || duplicates[0].vehiclemodel || null,
+                  licenseplate:
+                    customer.licensePlate || duplicates[0].licenseplate || null,
+                  vehicles: updatedVehicles,
+                },
+                {
+                  name: customer.name || duplicates[0].name || "Khách hàng",
+                  vehicles: updatedVehicles,
+                },
+              ]);
 
               if (updateError) {
                 console.error("Lỗi cập nhật khách hàng:", updateError);
@@ -412,7 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           }
 
           // Thêm khách hàng mới vào Supabase
-          const { error } = await supabase.from("customers").insert([
+          const error = await insertCustomerWithFallback([
             {
               id: customerId,
               name: customer.name || "Khách hàng",
@@ -424,8 +479,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               segment: customer.segment || "New",
               loyaltypoints: customer.loyaltyPoints ?? 0,
               totalspent: customer.totalSpent ?? 0,
-              visitcount: customer.visitCount ?? 0, // Mặc định 0, sẽ tăng khi có phiếu sửa/bán hàng
-              lastvisit: customer.lastVisit || null, // Null nếu chưa có giao dịch
+              visitcount: customer.visitCount ?? 0,
+              lastvisit: customer.lastVisit || null,
+            },
+            {
+              id: customerId,
+              name: customer.name || "Khách hàng",
+              phone: customer.phone || null,
+              vehiclemodel: customer.vehicleModel || null,
+              licenseplate: customer.licensePlate || null,
+              vehicles: customer.vehicles || [],
+              totalspent: customer.totalSpent ?? 0,
+            },
+            {
+              id: customerId,
+              name: customer.name || "Khách hàng",
+              phone: customer.phone || null,
+              vehicles: customer.vehicles || [],
             },
           ]);
 
@@ -931,6 +1001,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         customerDebts,
         supplierDebts,
         currentBranchId,
+        setCurrentBranchId,
         setParts,
         upsertPart,
         deletePart,

@@ -58,6 +58,9 @@ const SettingsManager = lazyImport(() =>
     default: m.SettingsManager,
   }))
 );
+const EmployeesManager = lazyImport(
+  () => import("./components/employees/EmployeesManager")
+);
 const StaffDashboard = lazyImport(() =>
   import("./components/dashboard/StaffDashboard").then((m) => ({
     default: m.StaffDashboard,
@@ -132,6 +135,11 @@ const StaffDashboardPage = () => (
     <StaffDashboard />
   </Suspense>
 );
+const EmployeesPage = () => (
+  <Suspense fallback={<PageLoader />}>
+    <EmployeesManager />
+  </Suspense>
+);
 const MigrationPage = () => (
   <Suspense fallback={<PageLoader />}>
     <MigrationTool />
@@ -147,27 +155,27 @@ const WarrantyPage = () => (
 const MainLayout: React.FC = () => {
   const location = useLocation();
   const isShopPage = false; // Public shop pages removed
+  const isWidePage = [
+    "/service",
+    "/service-history",
+    "/inventory",
+    "/customers",
+    "/employees",
+    "/settings",
+    "/warranty",
+    "/categories",
+    "/lookup",
+  ].some((path) => location.pathname.startsWith(path));
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors pb-20 md:pb-0 relative overflow-hidden">
-      {/* Subtle background watermark logo - centered */}
-      {!isShopPage && (
-        <div
-          className="fixed inset-0 flex items-center justify-center pointer-events-none z-0"
-        >
-          <img
-            src="/logo-smartcare.png"
-            alt=""
-            className="w-[60vw] h-[60vh] max-w-[500px] max-h-[500px] object-contain opacity-[0.05] dark:opacity-[0.04]"
-            style={{
-              filter: 'grayscale(100%)',
-            }}
-          />
-        </div>
-      )}
       {!isShopPage && <Nav />}
       <main
-        className="max-w-[1600px] mx-auto p-0 md:p-6"
+        className={
+          isWidePage
+            ? "w-full px-0 md:px-4 lg:px-5"
+            : "max-w-[1600px] mx-auto p-0 md:p-6"
+        }
       >
         <Routes>
           <Route path="/" element={<RoleBasedRedirect />} />
@@ -202,6 +210,14 @@ const MainLayout: React.FC = () => {
           <Route path="/service-history" element={<ServiceHistoryPage />} />
           <Route path="/warranty" element={<WarrantyPage />} />
           <Route path="/customers" element={<Customers />} />
+          <Route
+            path="/employees"
+            element={
+              <ProtectedRoute requiredRoles={["owner", "manager"]}>
+                <EmployeesPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/settings"
             element={

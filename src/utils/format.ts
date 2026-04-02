@@ -97,11 +97,36 @@ export const formatDate = (
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
 };
 
+const WORK_ORDER_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+const normalizeWorkOrderPrefix = (prefix?: string) => {
+  const cleaned = String(prefix || "SC")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4);
+  return cleaned || "SC";
+};
+
+/**
+ * Generate compact work order ID.
+ * Format: PREFIX-XXXXXX (uppercase alphanumeric)
+ * Example: SC-A3K9M2
+ */
+export const generateWorkOrderId = (storePrefix?: string) => {
+  const prefix = normalizeWorkOrderPrefix(storePrefix);
+  let suffix = "";
+  for (let i = 0; i < 6; i += 1) {
+    const randomIndex = Math.floor(Math.random() * WORK_ORDER_CODE_CHARS.length);
+    suffix += WORK_ORDER_CODE_CHARS[randomIndex];
+  }
+  return `${prefix}-${suffix}`;
+};
+
 /**
  * Formats a work order ID for display
  *
- * Converts timestamp-based IDs (e.g., "WO-1705312245678") into
- * human-readable format (e.g., "SC-20240115-245678")
+ * Converts legacy timestamp-based IDs (e.g., "WO-1705312245678") into
+ * compact format (e.g., "SC-245678")
  *
  * @param id - The work order ID to format
  * @param storePrefix - Store prefix to use (default: "SC")
@@ -109,13 +134,19 @@ export const formatDate = (
  *
  * @example
  * ```typescript
- * formatWorkOrderId('WO-1705312245678', 'MTR') // "MTR-20240115-245678"
+ * formatWorkOrderId('WO-1705312245678', 'MTR') // "MTR-245678"
  * formatWorkOrderId('CUSTOM-123')               // "CUSTOM-123" (unchanged)
  * ```
  */
 export const formatWorkOrderId = (id?: string | null, storePrefix?: string) => {
   if (!id) return "";
-  const prefix = storePrefix || "SC";
+  const prefix = normalizeWorkOrderPrefix(storePrefix);
+
+  const compactMatch = id.match(/^([A-Z0-9]{1,6})-([A-Z0-9]{6})$/i);
+  if (compactMatch) {
+    return `${compactMatch[1].toUpperCase()}-${compactMatch[2].toUpperCase()}`;
+  }
+
   // If ID starts with prefix and has a numeric timestamp following it (e.g., SC-<timestamp>), capture it.
   let match = id.match(new RegExp(`^${prefix}-(\\d{10,})`, "i"));
 
@@ -123,18 +154,8 @@ export const formatWorkOrderId = (id?: string | null, storePrefix?: string) => {
   if (!match) match = id.match(/WO-(\d+)/i) || id.match(/(\d{10,})/);
   if (match && match[1]) {
     const ts = match[1];
-    const num = Number(ts);
-    if (!Number.isNaN(num)) {
-      const d = new Date(num);
-      if (!Number.isNaN(d.getTime())) {
-        const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(
-          2,
-          "0"
-        )}${String(d.getDate()).padStart(2, "0")}`;
-        const suffix = String(ts).slice(-6).padStart(6, "0");
-        return `${prefix}-${dateStr}-${suffix}`;
-      }
-    }
+    const suffix = String(ts).slice(-6).padStart(6, "0");
+    return `${prefix}-${suffix}`;
   }
   // Default: return original id
   return id;

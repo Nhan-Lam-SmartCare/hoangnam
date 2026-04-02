@@ -60,7 +60,7 @@ import { useWorkOrdersRepo, useUpdateWorkOrderRepo, useUpdateWorkOrderAtomicRepo
 import { useCategories, useCreateCategory } from "../../hooks/useCategories";
 import { useSuppliers } from "../../hooks/useSuppliers";
 import type { Part, InventoryTransaction, WorkOrder } from "../../types";
-import { fetchPartBySku, createPart } from "../../lib/repository/partsRepository";
+import { fetchPartBySku, createPart, updatePart } from "../../lib/repository/partsRepository";
 import { useSupplierDebtsRepo } from "../../hooks/useDebtsRepository";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
 import FormattedNumberInput from "../common/FormattedNumberInput";
@@ -150,6 +150,7 @@ const InventoryManagerNew: React.FC = () => {
   const { data: invTx = [] } = useInventoryTxRepo({
     branchId: currentBranchId,
   });
+  const { data: supplierDebts = [] } = useSupplierDebtsRepo();
   const [activeTab, setActiveTab] = useState("stock"); // stock, categories, lookup, history, purchase-orders
   const [showGoodsReceipt, setShowGoodsReceipt] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
@@ -536,6 +537,59 @@ const InventoryManagerNew: React.FC = () => {
     }, 0);
   }, [allPartsData, currentBranchId]);
 
+  const latestImportPriceByPart = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const tx of invTx || []) {
+      if (tx.type !== "Nhập kho") continue;
+      const partId = String((tx as any).partId || "").trim();
+      if (!partId) continue;
+      // use first non-zero import price from newest transactions
+      const unitPrice = Number((tx as any).unitPrice || 0);
+      if (unitPrice > 0 && map[partId] == null) {
+        map[partId] = unitPrice;
+      }
+    }
+    return map;
+  }, [invTx]);
+
+  const historyTransactions = useMemo<InventoryTransaction[]>(() => {
+    if ((invTx || []).length > 0) {
+      return invTx;
+    }
+
+    const receiptCodeRegex = /NH-\d{8}-\d{3}/i;
+    return (supplierDebts || [])
+      .filter((debt: any) => {
+        if (currentBranchId && debt?.branchId && debt.branchId !== currentBranchId) {
+          return false;
+        }
+        const description = String(debt?.description || "");
+        return receiptCodeRegex.test(description);
+      })
+      .map((debt: any) => {
+        const description = String(debt?.description || "");
+        const match = description.match(receiptCodeRegex);
+        const receiptCode = match?.[0]?.toUpperCase() || "NH-UNKNOWN";
+        const total = Number(debt?.totalAmount || 0);
+        const supplierName = String(debt?.supplierName || "Không xác định");
+        const debtId = String(debt?.id || "").trim();
+
+        return {
+          id: debtId ? `fallback-debt-${debtId}` : `fallback-debt-${receiptCode}`,
+          type: "Nhập kho",
+          partId: "",
+          partName: `Phiếu nhập ${receiptCode}`,
+          quantity: 1,
+          date: debt?.createdDate || new Date().toISOString(),
+          unitPrice: total,
+          totalPrice: total,
+          branchId: debt?.branchId || currentBranchId || "",
+          notes: `${receiptCode} | NCC: ${supplierName} | Fallback từ công nợ NCC`,
+        } as InventoryTransaction;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [invTx, supplierDebts, currentBranchId]);
+
   const queryClient = useQueryClient();
   const updatePartMutation = useUpdatePartRepo();
   const createPartMutation = useCreatePartRepo();
@@ -716,6 +770,49 @@ const InventoryManagerNew: React.FC = () => {
             } NCC:${supplierName}${note ? " | " + note : ""}`,
         });
 
+        // Keep branch pricing in parts table in sync with receipt lines so "Giá nhập" shows immediately.
+        await Promise.all(
+          processedItems.map(async (item) => {
+            if (!item.partId) return;
+
+            const existing = (allPartsData || []).find((p) => p.id === item.partId);
+            const currentCost = Number(existing?.costPrice?.[currentBranchId] || 0);
+            const currentRetail = Number(existing?.retailPrice?.[currentBranchId] || 0);
+            const currentWholesale = Number(existing?.wholesalePrice?.[currentBranchId] || 0);
+
+            const nextCost = Number(item.importPrice || 0) > 0 ? Number(item.importPrice) : currentCost;
+            const nextRetail = Number(item.sellingPrice || 0) > 0 ? Number(item.sellingPrice) : currentRetail;
+            const nextWholesale =
+              Number(item.wholesalePrice || 0) > 0 ? Number(item.wholesalePrice) : currentWholesale;
+
+            const updateRes = await updatePart(item.partId, {
+              costPrice: {
+                ...(existing?.costPrice || {}),
+                [currentBranchId]: nextCost,
+              },
+              retailPrice: {
+                ...(existing?.retailPrice || {}),
+                [currentBranchId]: nextRetail,
+              },
+              wholesalePrice: {
+                ...(existing?.wholesalePrice || {}),
+                [currentBranchId]: nextWholesale,
+              },
+            } as any);
+
+            if (!updateRes.ok) {
+              console.warn("[GoodsReceipt] Could not sync part pricing after receipt", {
+                partId: item.partId,
+                error: updateRes.error,
+              });
+            }
+          })
+        );
+
+        queryClient.invalidateQueries({ queryKey: ["partsRepo"] });
+        queryClient.invalidateQueries({ queryKey: ["partsRepoPaged"] });
+        queryClient.invalidateQueries({ queryKey: ["allPartsForTotals"] });
+
         // OPTIMIZATION: Run Cash Transaction and Debt Creation in parallel
         // Track failures for consolidated notification
         let paymentFailed = false;
@@ -725,8 +822,48 @@ const InventoryManagerNew: React.FC = () => {
           // 1. Ghi chi tiền vào sổ quỹ
           (async () => {
             if (paidAmount > 0 && paymentInfo) {
-              const paymentSourceId =
-                paymentInfo.paymentMethod === "bank" ? "bank" : "cash";
+              const resolvePaymentSourceId = async (
+                paymentMethod: "cash" | "bank"
+              ): Promise<string> => {
+                const preferred = paymentMethod === "bank" ? "bank" : "cash";
+                const tableCandidates = ["payment_sources", "paymentsources"];
+
+                for (const tableName of tableCandidates) {
+                  const { data, error } = await supabase
+                    .from(tableName)
+                    .select("id,type,name")
+                    .limit(100);
+
+                  if (error || !data || data.length === 0) continue;
+
+                  const normalized = data.map((row: any) => ({
+                    id: String(row?.id || ""),
+                    type: String(row?.type || "").toLowerCase(),
+                    name: String(row?.name || "").toLowerCase(),
+                  }));
+
+                  const exactById = normalized.find((row) => row.id === preferred);
+                  if (exactById?.id) return exactById.id;
+
+                  const byType = normalized.find((row) => row.type === preferred);
+                  if (byType?.id) return byType.id;
+
+                  const byName = normalized.find((row) =>
+                    preferred === "bank"
+                      ? row.name.includes("ngan hang") || row.name.includes("bank")
+                      : row.name.includes("tien mat") || row.name.includes("cash")
+                  );
+                  if (byName?.id) return byName.id;
+
+                  if (normalized[0]?.id) return normalized[0].id;
+                }
+
+                return preferred;
+              };
+
+              const paymentSourceId = await resolvePaymentSourceId(
+                paymentInfo.paymentMethod
+              );
               const cashTxResult = await createCashTransaction({
                 type: "expense",
                 amount: paidAmount,
@@ -1861,7 +1998,9 @@ const InventoryManagerNew: React.FC = () => {
                         const retailPrice = part.retailPrice?.[branchKey] || 0;
                         const wholesalePrice =
                           part.wholesalePrice?.[branchKey] || 0;
-                        const costPrice = part.costPrice?.[branchKey] || 0;
+                        const costPrice =
+                          Number(part.costPrice?.[branchKey] || 0) ||
+                          Number(latestImportPriceByPart[part.id] || 0);
                         const value = available * retailPrice; // ✅ Use available for value calculation
                         const isSelected = selectedItems.includes(part.id);
                         const isDuplicate = hasDuplicateSku(part.sku || "");
@@ -2127,12 +2266,12 @@ const InventoryManagerNew: React.FC = () => {
           <>
             {/* Desktop Version */}
             <div className="hidden sm:block">
-              <InventoryHistorySection transactions={invTx} />
+              <InventoryHistorySection transactions={historyTransactions} />
             </div>
             {/* Mobile Version */}
             <div className="sm:hidden">
               <InventoryHistorySectionMobile
-                transactions={invTx}
+                transactions={historyTransactions}
                 onEdit={(receipt) => {
                   // Reconstruct the receipt object for editing
                   // We need to find the original transaction or construct a compatible object

@@ -16,6 +16,8 @@ export const useInventoryTxRepo = (params?: {
 }) => {
   return useQuery({
     queryKey: ["inventoryTxRepo", params],
+    retry: false,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const res = await fetchInventoryTransactions(params);
       if (!res.ok) throw res.error;

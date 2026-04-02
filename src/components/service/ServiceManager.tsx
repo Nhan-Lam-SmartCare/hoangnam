@@ -37,8 +37,10 @@ import {
   formatCurrency,
   formatDate,
   formatWorkOrderId,
+  generateWorkOrderId,
 } from "../../utils/format";
 import { completeWorkOrderPayment } from "../../lib/repository/workOrdersRepository";
+import { syncRepairOrderServices } from "../../lib/repository/repairLaborRepository";
 import { getCategoryColor } from "../../utils/categoryColors";
 import {
   useCreateWorkOrderAtomicRepo,
@@ -183,7 +185,8 @@ export default function ServiceManager() {
   // Fallback to fetchedParts if context is empty
   const parts = contextParts.length > 0 ? contextParts : (fetchedParts || []);
   const displayCustomers = customers;
-  const displayEmployees = fetchedEmployees || employees;
+  const displayEmployees =
+    fetchedEmployees && fetchedEmployees.length > 0 ? fetchedEmployees : employees;
   const displayWorkOrders = fetchedWorkOrders || workOrders;
 
   // Sync fetched work orders to context
@@ -405,7 +408,11 @@ export default function ServiceManager() {
   }, [rowActionMenuId]);
 
   const filteredOrders = useMemo(() => {
-    let filtered = displayWorkOrders.filter((o) => !o.refunded);
+    let filtered = displayWorkOrders.filter(
+      (o) => !o.refunded && o.status !== "Đã hủy"
+    );
+    const normalizedQuery = debouncedSearchQuery.toLowerCase().trim();
+    const normalizedPhoneQuery = normalizedQuery.replace(/\D/g, "");
 
     // Apply status filter based on active tab ONLY if not searching
     // If searching, we want to look through ALL history (Global Search)
@@ -428,9 +435,12 @@ export default function ServiceManager() {
     if (debouncedSearchQuery) {
       filtered = filtered.filter(
         (o) =>
-          o.customerName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          o.vehicleModel?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          o.licensePlate?.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+          o.customerName.toLowerCase().includes(normalizedQuery) ||
+          o.vehicleModel?.toLowerCase().includes(normalizedQuery) ||
+          o.licensePlate?.toLowerCase().includes(normalizedQuery) ||
+          o.id?.toLowerCase().includes(normalizedQuery) ||
+          (!!normalizedPhoneQuery &&
+            (o.customerPhone || "").replace(/\D/g, "").includes(normalizedPhoneQuery))
       );
     }
 
@@ -551,7 +561,9 @@ export default function ServiceManager() {
   // quickStatusFilters and statusSnapshotCards moved to components
   const quickStatusFilters = getQuickStatusFilters(
     stats,
-    dateFilteredOrders.filter((o) => o.status !== "Trả máy" && !o.refunded).length
+    dateFilteredOrders.filter(
+      (o) => o.status !== "Trả máy" && o.status !== "Đã hủy" && !o.refunded
+    ).length
   );
   const statusSnapshotCards = getStatusSnapshotCards(stats);
 
@@ -774,10 +786,10 @@ export default function ServiceManager() {
         "Khách vãng lai";
 
       // Tạo nội dung chi tiết từ phiếu sửa chữa
-      const workOrderNumber =
-        formatWorkOrderId(workOrder.id, storeSettings?.work_order_prefix)
-          .split("-")
-          .pop() || "";
+      const workOrderNumber = formatWorkOrderId(
+        workOrder.id,
+        storeSettings?.work_order_prefix
+      );
 
       let description = `${workOrder.vehicleModel || "Xe"
         } (Phiếu sửa chữa #${workOrderNumber})`;
@@ -887,6 +899,7 @@ export default function ServiceManager() {
         technicianId,
         parts = [],
         additionalServices = [],
+        repairServices = [],
         laborCost = 0,
         discount = 0,
         total = 0,
@@ -1062,8 +1075,11 @@ export default function ServiceManager() {
           technicianName: technicianName,
           status: status,
           laborCost: laborCost,
+          laborTotal: laborCost,
           discount: discount,
           partsUsed: parts,
+          repairServices:
+            repairServices.length > 0 ? repairServices : undefined,
           additionalServices:
             additionalServices.length > 0 ? additionalServices : undefined,
           total: total,
@@ -1145,8 +1161,11 @@ export default function ServiceManager() {
           technicianName: technicianName,
           status: status,
           laborCost: laborCost,
+          laborTotal: laborCost,
           discount: discount,
           partsUsed: parts,
+          repairServices:
+            repairServices.length > 0 ? repairServices : undefined,
           additionalServices:
             additionalServices.length > 0 ? additionalServices : undefined,
           total: total,
@@ -1164,6 +1183,39 @@ export default function ServiceManager() {
       // but we wrap in try-catch to ensure no unhandled promise rejections if we wanted to
       // or just trust the individual error handling.
       if (finalOrderData) {
+        if (repairServices.length > 0) {
+          const laborSyncResult = await syncRepairOrderServices(
+            finalOrderId,
+            repairServices
+          );
+
+          if (laborSyncResult.ok) {
+            finalOrderData.repairServices = laborSyncResult.data;
+            finalOrderData.laborTotal = laborSyncResult.data.reduce(
+              (sum, service) => sum + Number(service.laborAmount || 0),
+              0
+            );
+            finalOrderData.workerTotal = laborSyncResult.data.reduce(
+              (sum, service) =>
+                sum +
+                (service.workers && service.workers.length > 0
+                  ? service.workers.reduce(
+                    (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
+                    0
+                  )
+                  : Number(service.workerAmount || 0)),
+              0
+            );
+            finalOrderData.laborCost =
+              finalOrderData.laborTotal || finalOrderData.laborCost;
+          } else {
+            showToast.warning(
+              "Da luu phieu nhung chua dong bo duoc cong sua: " +
+              (laborSyncResult as { error: any }).error.message
+            );
+          }
+        }
+
         const orderForAsync = finalOrderData; // Capture for closure
 
         // Execute auxiliary tasks in parallel
@@ -1331,14 +1383,12 @@ export default function ServiceManager() {
             category: "refund",
             amount: -refundAmount,
             date: new Date().toISOString(),
-            description: `Hoàn tiền hủy phiếu #${(
+            description: `Hoàn tiền hủy phiếu ${
               formatWorkOrderId(
                 refundingOrder.id,
                 storeSettings?.work_order_prefix
               ) || ""
-            )
-              .split("-")
-              .pop()} - ${refundReason}`,
+            } - ${refundReason}`,
             branchId: currentBranchId,
             paymentSource: refundingOrder.paymentMethod,
             reference: refundingOrder.id,
@@ -1365,9 +1415,10 @@ export default function ServiceManager() {
       }
 
       // Update work orders state
+      const refundedOrderId = (result as any)?.id || refundingOrder.id;
       setWorkOrders((prev) =>
         prev.map((wo) =>
-          wo.id === refundingOrder.id
+          wo.id === refundingOrder.id || wo.id === refundedOrderId
             ? { ...wo, refunded: true, status: "Đã hủy" as any }
             : wo
         )
@@ -1484,24 +1535,33 @@ export default function ServiceManager() {
           setDateRangeDays={setDateRangeDays}
         />
 
-        {/* Mobile Modal */}
-        {showMobileModal && (
-          <WorkOrderMobileModal
-            isOpen={showMobileModal}
+        {/* Mobile Modal - unified with desktop layout */}
+        {showMobileModal && editingOrder && (
+          <WorkOrderModal
+            order={editingOrder}
             onClose={() => {
               setShowMobileModal(false);
               setEditingOrder(undefined);
               setMobileModalViewMode(false);
             }}
-            onSave={handleMobileSave}
-            workOrder={editingOrder}
+            onSave={() => {
+              setShowMobileModal(false);
+              setEditingOrder(undefined);
+              setMobileModalViewMode(false);
+            }}
+            parts={parts}
+            partsLoading={partsLoading}
             customers={displayCustomers}
-            parts={fetchedParts || []}
             employees={displayEmployees}
-            currentBranchId={currentBranchId}
             upsertCustomer={upsertCustomer}
-            viewMode={mobileModalViewMode}
-            onSwitchToEdit={() => setMobileModalViewMode(false)}
+            setCashTransactions={setCashTransactions}
+            setPaymentSources={setPaymentSources}
+            paymentSources={paymentSources}
+            currentBranchId={currentBranchId}
+            storeSettings={storeSettings}
+            invalidateWorkOrders={() =>
+              queryClient.invalidateQueries({ queryKey: ["workOrdersRepo"] })
+            }
           />
         )}
 
@@ -1526,7 +1586,7 @@ export default function ServiceManager() {
           onApplyTemplate={(template) => {
             // Convert and apply template to current work order for mobile
             const newOrder: WorkOrder = {
-              id: `WO-${Date.now()}`,
+                id: generateWorkOrderId(storeSettings?.work_order_prefix),
               customerName: "",
               customerPhone: "",
               vehicleModel: "",
@@ -1559,7 +1619,7 @@ export default function ServiceManager() {
   }
 
   return (
-    <div className="space-y-3 container mx-auto">
+    <div className="space-y-3 mx-auto w-full max-w-[1800px] px-3 sm:px-4 xl:px-6 2xl:px-8">
       {/* Desktop insight cards */}
       <div className="grid gap-3 lg:grid-cols-[2fr,1fr]">
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
@@ -1698,12 +1758,12 @@ export default function ServiceManager() {
 
       {/* Action Bar - Single row on desktop */}
       <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-slate-200 dark:border-slate-700">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 xl:gap-2.5">
           {/* Search */}
-          <div className="relative flex-1 min-w-[180px] max-w-[280px]">
+          <div className="relative flex-[2_1_340px] min-w-[220px] xl:min-w-[280px]">
             <input
               type="text"
-              placeholder="Mã phiếu, tên khách..."
+              placeholder="Mã phiếu, tên khách, SĐT..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400"
@@ -1718,7 +1778,7 @@ export default function ServiceManager() {
           < select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg"
+            className="flex-1 min-w-[118px] xl:flex-none px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg"
           >
             <option value="today">Hôm nay</option>
             <option value="week">7 ngày qua</option>
@@ -1728,7 +1788,7 @@ export default function ServiceManager() {
           <select
             value={technicianFilter}
             onChange={(e) => setTechnicianFilter(e.target.value)}
-            className="px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg"
+            className="flex-1 min-w-[138px] xl:flex-none px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg"
           >
             <option value="all">Tất cả KTV</option>
             {employees.map((emp) => (
@@ -1740,7 +1800,7 @@ export default function ServiceManager() {
           <select
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
-            className="px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg"
+            className="flex-1 min-w-[118px] xl:flex-none px-2 py-1.5 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg"
           >
             <option value="all">Thanh toán</option>
             <option value="paid">Đã TT</option>
@@ -1749,7 +1809,7 @@ export default function ServiceManager() {
           </select>
 
           {/* Spacer */}
-          <div className="flex-1"></div>
+          <div className="hidden xl:block flex-1"></div>
 
           {/* Action Buttons */}
           <button
@@ -1834,7 +1894,14 @@ export default function ServiceManager() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full table-fixed min-w-[980px] xl:min-w-[1120px] 2xl:min-w-0">
+            <colgroup>
+              <col className="w-[17%]" />
+              <col className="w-[30%]" />
+              <col className="w-[24%]" />
+              <col className="w-[19%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -1846,7 +1913,7 @@ export default function ServiceManager() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300">
                   Chi tiết
                 </th>
-                <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300">
+                <th className="hidden xl:table-cell px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-300">
                   Thanh toán & trạng thái
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -2121,7 +2188,7 @@ export default function ServiceManager() {
 
                       {/* Column 3: Chi tiết - Compact format */}
                       <td className="px-4 py-4 align-top">
-                        <div className="space-y-1.5 max-w-[220px]">
+                        <div className="space-y-1.5 max-w-none">
                           {servicesSummary && (
                             <div
                               className="text-xs flex items-start gap-1.5"
@@ -2171,7 +2238,7 @@ export default function ServiceManager() {
                           )}
 
                           {/* Status badges for tablet/mobile - show when payment column hidden */}
-                          <div className="lg:hidden flex flex-wrap items-center gap-1.5 pt-1">
+                          <div className="xl:hidden flex flex-wrap items-center gap-1.5 pt-1">
                             <StatusBadge
                               status={order.status as WorkOrderStatus}
                             />
@@ -2189,8 +2256,8 @@ export default function ServiceManager() {
                       </td>
 
                       {/* Column 4: Thanh toán & trạng thái - Clean layout - Hidden on tablet */}
-                      <td className="hidden lg:table-cell px-4 py-4 align-top">
-                        <div className="space-y-2 min-w-[200px]">
+                      <td className="hidden xl:table-cell px-4 py-4 align-top">
+                        <div className="space-y-2 min-w-0">
                           {/* Tổng tiền */}
                           <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                             {formatCurrency(totalAmount)}
@@ -2469,7 +2536,7 @@ export default function ServiceManager() {
         onApplyTemplate={(template) => {
           // Convert and apply template to current work order
           const newOrder: WorkOrder = {
-            id: `WO-${Date.now()}`,
+            id: generateWorkOrderId(storeSettings?.work_order_prefix),
             customerName: "",
             customerPhone: "",
             vehicleModel: "",
@@ -2606,40 +2673,13 @@ export default function ServiceManager() {
                   ref={invoicePreviewRef}
                   className="bg-white shadow-lg mx-auto relative !bg-white !text-black"
                   style={{
-                    width: "148mm",
-                    minHeight: "210mm",
+                    width: "80mm",
+                    minHeight: "auto",
                     color: "#000000",
                     backgroundColor: "#ffffff"
                   }}
                 >
-                  {/* Watermark Logo for Print - DESKTOP VERSION */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "50%",
-                      transform: "translate(-50%, -50%)",
-                      width: "60%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      pointerEvents: "none",
-                      zIndex: 0,
-                    }}
-                  >
-                    <img
-                      src={storeSettings?.logo_url || "/logo-smartcare.png"}
-                      alt="watermark"
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        objectFit: "contain",
-                        opacity: 0.1,
-                        filter: "grayscale(100%)",
-                      }}
-                    />
-                  </div>
-                  <div style={{ padding: "10mm", position: "relative", zIndex: 1 }}>
+                  <div style={{ padding: "4mm", position: "relative", zIndex: 1 }}>
                     {/* Store Info Header - Compact Layout */}
                     <div
                       style={{
@@ -2667,7 +2707,7 @@ export default function ServiceManager() {
 
                       {/* Center: Store Info */}
                       <div
-                        style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1 }}
+                        style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1, textAlign: "center" }}
                       >
                         <div
                           style={{
@@ -2675,15 +2715,17 @@ export default function ServiceManager() {
                             fontSize: "11pt",
                             marginBottom: "1mm",
                             color: "#1e40af",
+                            letterSpacing: "0.2mm",
                           }}
                         >
-                          {storeSettings?.store_name || "Sơn Nam"}
+                          {storeSettings?.store_name || "SƠN NAM"}
                         </div>
                         <div
                           style={{
                             color: "#000",
                             display: "flex",
                             alignItems: "center",
+                            justifyContent: "center",
                             gap: "1mm",
                           }}
                         >
@@ -2708,6 +2750,7 @@ export default function ServiceManager() {
                             color: "#000",
                             display: "flex",
                             alignItems: "center",
+                            justifyContent: "center",
                             gap: "1mm",
                           }}
                         >
@@ -2832,11 +2875,12 @@ export default function ServiceManager() {
                       <div style={{ textAlign: "center", marginBottom: "2mm" }}>
                         <h1
                           style={{
-                            fontSize: "16pt",
+                            fontSize: "13pt",
                             fontWeight: "bold",
                             margin: "0",
                             textTransform: "uppercase",
                             color: "#1e40af",
+                            lineHeight: 1.25,
                           }}
                         >
                           PHIẾU DỊCH VỤ SỬA CHỮA
@@ -2846,7 +2890,9 @@ export default function ServiceManager() {
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          fontSize: "9pt",
+                          alignItems: "flex-start",
+                          gap: "2mm",
+                          fontSize: "8.5pt",
                           color: "#666",
                         }}
                       >
@@ -2884,31 +2930,17 @@ export default function ServiceManager() {
                         fontSize: "9pt",
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "4mm",
-                          marginBottom: "1.5mm",
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontWeight: "bold" }}>Khách hàng:</span>{" "}
-                          {printOrder.customerName}
-                        </div>
-                        <div style={{ flex: "0 0 auto" }}>
-                          <span style={{ fontWeight: "bold" }}>SĐT:</span>{" "}
-                          {printOrder.customerPhone}
-                        </div>
+                      <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                        <span style={{ fontWeight: "bold" }}>Khách hàng:</span> {printOrder.customerName}
                       </div>
-                      <div style={{ display: "flex", gap: "4mm" }}>
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontWeight: "bold" }}>Tên thiết bị:</span>{" "}
-                          {printOrder.vehicleModel}
-                        </div>
-                        <div style={{ flex: "0 0 auto" }}>
-                          <span style={{ fontWeight: "bold" }}>Serial/IMEI:</span>{" "}
-                          {printOrder.licensePlate}
-                        </div>
+                      <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                        <span style={{ fontWeight: "bold" }}>SĐT:</span> {printOrder.customerPhone}
+                      </div>
+                      <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                        <span style={{ fontWeight: "bold" }}>Tên thiết bị:</span> {printOrder.vehicleModel}
+                      </div>
+                      <div style={{ wordBreak: "break-word" }}>
+                        <span style={{ fontWeight: "bold" }}>Serial/IMEI:</span> {printOrder.licensePlate}
                       </div>
                     </div>
 
@@ -2916,25 +2948,17 @@ export default function ServiceManager() {
                     <div
                       style={{
                         border: "1px solid #ddd",
-                        padding: "4mm",
+                        padding: "3mm",
                         marginBottom: "4mm",
                         borderRadius: "2mm",
                         color: "#000",
                       }}
                     >
-                      <div style={{ display: "flex", gap: "3mm" }}>
-                        <div
-                          style={{
-                            fontWeight: "bold",
-                            minWidth: "20%",
-                            flexShrink: 0,
-                          }}
-                        >
-                          Mô tả sự cố:
-                        </div>
-                        <div style={{ flex: 1, whiteSpace: "pre-wrap" }}>
-                          {printOrder.issueDescription || "Không có mô tả"}
-                        </div>
+                      <div style={{ fontWeight: "bold", marginBottom: "1.5mm" }}>
+                        Mô tả sự cố:
+                      </div>
+                      <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {printOrder.issueDescription || "Không có mô tả"}
                       </div>
                     </div>
 
@@ -2948,111 +2972,49 @@ export default function ServiceManager() {
                             fontSize: "11pt",
                           }}
                         >
-                          Phụ tùng sử dụng:
+                          Linh kiện:
                         </p>
-                        <table
-                          style={{
-                            width: "100%",
-                            borderCollapse: "collapse",
-                            border: "1px solid #ddd",
-                          }}
-                        >
-                          <thead>
-                            <tr style={{ backgroundColor: "#f5f5f5" }}>
-                              <th
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2mm" }}>
+                          {printOrder.partsUsed.map((part: WorkOrderPart, idx: number) => (
+                            <div
+                              key={idx}
+                              style={{
+                                border: "1px solid #ddd",
+                                borderRadius: "2mm",
+                                padding: "2.5mm",
+                                backgroundColor: "#fff",
+                              }}
+                            >
+                              <div
                                 style={{
-                                  border: "1px solid #ddd",
-                                  padding: "2mm",
-                                  textAlign: "left",
                                   fontSize: "10pt",
+                                  fontWeight: "bold",
+                                  marginBottom: "1mm",
+                                  wordBreak: "break-word",
                                 }}
                               >
-                                Tên phụ tùng
-                              </th>
-                              <th
+                                {part.partName}
+                              </div>
+                              <div
                                 style={{
-                                  border: "1px solid #ddd",
-                                  padding: "2mm",
-                                  textAlign: "center",
-                                  fontSize: "10pt",
-                                  width: "15%",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "baseline",
+                                  gap: "2mm",
+                                  fontSize: "9pt",
+                                  color: "#374151",
                                 }}
                               >
-                                SL
-                              </th>
-                              <th
-                                style={{
-                                  border: "1px solid #ddd",
-                                  padding: "2mm",
-                                  textAlign: "right",
-                                  fontSize: "10pt",
-                                  width: "25%",
-                                }}
-                              >
-                                Đơn giá
-                              </th>
-                              <th
-                                style={{
-                                  border: "1px solid #ddd",
-                                  padding: "2mm",
-                                  textAlign: "right",
-                                  fontSize: "10pt",
-                                  width: "25%",
-                                }}
-                              >
-                                Thành tiền
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {printOrder.partsUsed.map(
-                              (part: WorkOrderPart, idx: number) => (
-                                <tr key={idx}>
-                                  <td
-                                    style={{
-                                      border: "1px solid #ddd",
-                                      padding: "2mm",
-                                      fontSize: "10pt",
-                                    }}
-                                  >
-                                    {part.partName}
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #ddd",
-                                      padding: "2mm",
-                                      textAlign: "center",
-                                      fontSize: "10pt",
-                                    }}
-                                  >
-                                    {part.quantity}
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #ddd",
-                                      padding: "2mm",
-                                      textAlign: "right",
-                                      fontSize: "10pt",
-                                    }}
-                                  >
-                                    {formatCurrency(part.price)}
-                                  </td>
-                                  <td
-                                    style={{
-                                      border: "1px solid #ddd",
-                                      padding: "2mm",
-                                      textAlign: "right",
-                                      fontSize: "10pt",
-                                      fontWeight: "bold",
-                                    }}
-                                  >
-                                    {formatCurrency(part.price * part.quantity)}
-                                  </td>
-                                </tr>
-                              )
-                            )}
-                          </tbody>
-                        </table>
+                                <div>
+                                  SL: {part.quantity} x {formatCurrency(part.price)}
+                                </div>
+                                <div style={{ fontWeight: "bold", color: "#111827", whiteSpace: "nowrap" }}>
+                                  {formatCurrency(part.price * part.quantity)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -3193,29 +3155,11 @@ export default function ServiceManager() {
                         }}
                       >
                         <tbody>
-                          {/* Tiền phụ tùng - chỉ hiển thị khi != 0 */}
-                          {(() => {
-                            const partsTotal = printOrder.partsUsed?.reduce(
-                              (sum: number, p: WorkOrderPart) => sum + p.price * p.quantity,
-                              0
-                            ) || 0;
-                            return partsTotal !== 0 && (
-                              <tr>
-                                <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                                  Tiền phụ tùng:
-                                </td>
-                                <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
-                                  {formatCurrency(partsTotal)}
-                                </td>
-                              </tr>
-                            );
-                          })()}
-
-                          {/* Phí dịch vụ (laborCost) - chỉ hiển thị khi != 0 */}
+                          {/* Tiền công - chỉ hiển thị khi != 0 */}
                           {(printOrder.laborCost ?? 0) !== 0 && (
                             <tr>
                               <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                                Phí dịch vụ:
+                                Tiền công:
                               </td>
                               <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
                                 {formatCurrency(printOrder.laborCost || 0)}
@@ -3510,42 +3454,15 @@ export default function ServiceManager() {
             className="hidden print:block"
             style={{
               position: "relative",
-              width: "148mm",
+              width: "80mm",
               margin: "0 auto",
-              padding: "10mm",
+              padding: "3mm",
               fontFamily: "Arial, sans-serif",
-              fontSize: "11pt",
+              fontSize: "9pt",
               color: "#000",
               backgroundColor: "#fff",
             }}
           >
-            {/* Watermark Logo for Print Output */}
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: "60%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: "none",
-                zIndex: 0,
-              }}
-            >
-              <img
-                src={storeSettings?.logo_url || "/logo-smartcare.png"}
-                alt=""
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  objectFit: "contain",
-                  opacity: 0.03,
-                  filter: "grayscale(100%)",
-                }}
-              />
-            </div>
             {/* Header with Logo, Store Info and Bank Info */}
             <div
               style={{
@@ -3574,22 +3491,24 @@ export default function ServiceManager() {
               )}
 
               {/* Center: Store Info */}
-              <div style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1 }}>
+              <div style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1, textAlign: "center" }}>
                 <div
                   style={{
                     fontWeight: "bold",
                     fontSize: "11pt",
                     marginBottom: "1mm",
                     color: "#1e40af",
+                    letterSpacing: "0.2mm",
                   }}
                 >
-                  {storeSettings?.store_name || "Sơn Nam"}
+                  {storeSettings?.store_name || "SƠN NAM"}
                 </div>
                 <div
                   style={{
                     color: "#000",
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: "1mm",
                   }}
                 >
@@ -3610,6 +3529,7 @@ export default function ServiceManager() {
                     color: "#000",
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: "1mm",
                   }}
                 >
@@ -3726,11 +3646,12 @@ export default function ServiceManager() {
               <div style={{ textAlign: "center", marginBottom: "2mm" }}>
                 <h1
                   style={{
-                    fontSize: "16pt",
+                    fontSize: "13pt",
                     fontWeight: "bold",
                     margin: "0",
                     textTransform: "uppercase",
                     color: "#1e40af",
+                    lineHeight: 1.25,
                   }}
                 >
                   PHIẾU DỊCH VỤ SỬA CHỮA
@@ -3740,7 +3661,9 @@ export default function ServiceManager() {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  fontSize: "9pt",
+                  alignItems: "flex-start",
+                  gap: "2mm",
+                  fontSize: "8.5pt",
                   color: "#666",
                 }}
               >
@@ -3767,87 +3690,39 @@ export default function ServiceManager() {
             <div
               style={{
                 border: "1px solid #ddd",
-                padding: "4mm",
+                padding: "3mm",
                 marginBottom: "4mm",
                 borderRadius: "2mm",
               }}
             >
-              <table style={{ width: "100%", borderSpacing: "0" }}>
-                <tbody>
-                  <tr>
-                    <td
-                      style={{
-                        fontWeight: "bold",
-                        width: "20%",
-                        paddingBottom: "2mm",
-                      }}
-                    >
-                      Khách hàng:
-                    </td>
-                    <td style={{ paddingBottom: "2mm", width: "30%" }}>
-                      {printOrder.customerName}
-                    </td>
-                    <td
-                      style={{
-                        fontWeight: "bold",
-                        width: "15%",
-                        paddingBottom: "2mm",
-                        paddingLeft: "3mm",
-                      }}
-                    >
-                      SĐT:
-                    </td>
-                    <td style={{ paddingBottom: "2mm" }}>
-                      {printOrder.customerPhone}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td
-                      style={{
-                        fontWeight: "bold",
-                        paddingBottom: "2mm",
-                      }}
-                    >
-                      Tên thiết bị:
-                    </td>
-                    <td style={{ paddingBottom: "2mm" }}>
-                      {printOrder.vehicleModel}
-                    </td>
-                    <td
-                      style={{
-                        fontWeight: "bold",
-                        paddingBottom: "2mm",
-                        paddingLeft: "3mm",
-                      }}
-                    >
-                      Serial/IMEI:
-                    </td>
-                    <td style={{ paddingBottom: "2mm" }}>
-                      {printOrder.licensePlate}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                <span style={{ fontWeight: "bold" }}>Khách hàng:</span> {printOrder.customerName}
+              </div>
+              <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                <span style={{ fontWeight: "bold" }}>SĐT:</span> {printOrder.customerPhone}
+              </div>
+              <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
+                <span style={{ fontWeight: "bold" }}>Tên thiết bị:</span> {printOrder.vehicleModel}
+              </div>
+              <div style={{ wordBreak: "break-word" }}>
+                <span style={{ fontWeight: "bold" }}>Serial/IMEI:</span> {printOrder.licensePlate}
+              </div>
             </div>
 
             {/* Issue Description */}
             <div
               style={{
                 border: "1px solid #ddd",
-                padding: "4mm",
+                padding: "3mm",
                 marginBottom: "4mm",
                 borderRadius: "2mm",
               }}
             >
-              <div style={{ display: "flex", gap: "3mm" }}>
-                <div
-                  style={{ fontWeight: "bold", minWidth: "20%", flexShrink: 0 }}
-                >
-                  Mô tả sự cố:
-                </div>
-                <div style={{ flex: 1, whiteSpace: "pre-wrap" }}>
-                  {printOrder.issueDescription || "Không có mô tả"}
-                </div>
+              <div style={{ fontWeight: "bold", marginBottom: "1.5mm" }}>
+                Mô tả sự cố:
+              </div>
+              <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {printOrder.issueDescription || "Không có mô tả"}
               </div>
             </div>
 
@@ -3861,111 +3736,49 @@ export default function ServiceManager() {
                     fontSize: "11pt",
                   }}
                 >
-                  Phụ tùng sử dụng:
+                  Linh kiện:
                 </p>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: "#f5f5f5" }}>
-                      <th
+                <div style={{ display: "flex", flexDirection: "column", gap: "2mm" }}>
+                  {printOrder.partsUsed.map((part: WorkOrderPart, idx: number) => (
+                    <div
+                      key={idx}
+                      style={{
+                        border: "1px solid #ddd",
+                        borderRadius: "2mm",
+                        padding: "2.5mm",
+                        backgroundColor: "#fff",
+                      }}
+                    >
+                      <div
                         style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "left",
                           fontSize: "10pt",
+                          fontWeight: "bold",
+                          marginBottom: "1mm",
+                          wordBreak: "break-word",
                         }}
                       >
-                        Tên phụ tùng
-                      </th>
-                      <th
+                        {part.partName}
+                      </div>
+                      <div
                         style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "center",
-                          fontSize: "10pt",
-                          width: "15%",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          gap: "2mm",
+                          fontSize: "9pt",
+                          color: "#374151",
                         }}
                       >
-                        SL
-                      </th>
-                      <th
-                        style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "right",
-                          fontSize: "10pt",
-                          width: "25%",
-                        }}
-                      >
-                        Đơn giá
-                      </th>
-                      <th
-                        style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "right",
-                          fontSize: "10pt",
-                          width: "25%",
-                        }}
-                      >
-                        Thành tiền
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printOrder.partsUsed.map(
-                      (part: WorkOrderPart, idx: number) => (
-                        <tr key={idx}>
-                          <td
-                            style={{
-                              border: "1px solid #ddd",
-                              padding: "2mm",
-                              fontSize: "10pt",
-                            }}
-                          >
-                            {part.partName}
-                          </td>
-                          <td
-                            style={{
-                              border: "1px solid #ddd",
-                              padding: "2mm",
-                              textAlign: "center",
-                              fontSize: "10pt",
-                            }}
-                          >
-                            {part.quantity}
-                          </td>
-                          <td
-                            style={{
-                              border: "1px solid #ddd",
-                              padding: "2mm",
-                              textAlign: "right",
-                              fontSize: "10pt",
-                            }}
-                          >
-                            {formatCurrency(part.price)}
-                          </td>
-                          <td
-                            style={{
-                              border: "1px solid #ddd",
-                              padding: "2mm",
-                              textAlign: "right",
-                              fontSize: "10pt",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {formatCurrency(part.price * part.quantity)}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
+                        <div>
+                          SL: {part.quantity} x {formatCurrency(part.price)}
+                        </div>
+                        <div style={{ fontWeight: "bold", color: "#111827", whiteSpace: "nowrap" }}>
+                          {formatCurrency(part.price * part.quantity)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -4077,29 +3890,11 @@ export default function ServiceManager() {
             >
               <table style={{ width: "100%", borderSpacing: "0" }}>
                 <tbody>
-                  {/* Tiền phụ tùng - chỉ hiển thị khi > 0 */}
-                  {(() => {
-                    const partsTotal = printOrder.partsUsed?.reduce(
-                      (sum: number, p: WorkOrderPart) => sum + p.price * p.quantity,
-                      0
-                    ) || 0;
-                    return partsTotal > 0 && (
-                      <tr>
-                        <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                          Tiền phụ tùng:
-                        </td>
-                        <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
-                          {formatCurrency(partsTotal)}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-
-                  {/* Phí dịch vụ (laborCost) - chỉ hiển thị khi > 0 */}
+                  {/* Tiền công - chỉ hiển thị khi > 0 */}
                   {(printOrder.laborCost ?? 0) > 0 && (
                     <tr>
                       <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                        Phí dịch vụ:
+                        Tiền công:
                       </td>
                       <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
                         {formatCurrency(printOrder.laborCost || 0)}
@@ -4399,13 +4194,10 @@ export default function ServiceManager() {
                       Phiếu:
                     </span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      #
                       {formatWorkOrderId(
                         refundingOrder.id,
                         storeSettings?.work_order_prefix
-                      )
-                        .split("-")
-                        .pop()}
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between">

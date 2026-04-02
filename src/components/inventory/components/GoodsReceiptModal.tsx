@@ -6,6 +6,7 @@ import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import { getCategoryColor } from "../../../utils/categoryColors";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
+import { generateSKU } from "../../../utils/sku";
 import { fetchPartBySku } from "../../../lib/repository/partsRepository";
 import AddProductModal from "./AddProductModal";
 import type { Part } from "../../../types";
@@ -301,8 +302,9 @@ const GoodsReceiptModal: React.FC<{
     // Tạo sản phẩm mới với stock = 0, stock sẽ được cập nhật khi hoàn tất phiếu nhập
     (async () => {
       try {
-        // Nếu người dùng nhập mã (Honda/Yamaha) thì dùng, không thì tự sinh PT-xxx
-        const productSku = productData.barcode?.trim() || `PT-${Date.now()}`;
+        // Nếu người dùng nhập mã thì dùng, không thì tự sinh SKU ngắn gọn thống nhất.
+        const productSku =
+          productData.barcode?.trim() || productData.sku?.trim() || generateSKU();
         const createRes = await createPartMutation.mutateAsync({
           name: productData.name,
           sku: productSku,

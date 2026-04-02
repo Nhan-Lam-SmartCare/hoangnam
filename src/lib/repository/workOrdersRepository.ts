@@ -1,9 +1,154 @@
 import { supabase } from "../../supabaseClient";
 import type { WorkOrder, StockWarning } from "../../types";
 import { RepoResult, success, failure } from "./types";
+import { formatWorkOrderId } from "../../utils/format";
 // import { safeAudit } from "./auditLogsRepository";
 
 const WORK_ORDERS_TABLE = "work_orders";
+
+async function resolveRefundTargetWorkOrder(
+  orderId: string
+): Promise<{ id: string; row: any } | null> {
+  const { data: exactRow } = await supabase
+    .from(WORK_ORDERS_TABLE)
+    .select("*")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (exactRow?.id) {
+    return { id: String(exactRow.id), row: exactRow };
+  }
+
+  const normalizedInput = formatWorkOrderId(orderId);
+  if (!normalizedInput) return null;
+
+  const suffix = normalizedInput.split("-").pop() || "";
+  let candidates: any[] = [];
+
+  if (suffix) {
+    const { data } = await supabase
+      .from(WORK_ORDERS_TABLE)
+      .select("*")
+      .ilike("id", `%${suffix}`)
+      .limit(30);
+    candidates = data || [];
+  }
+
+  if (candidates.length === 0) {
+    const { data } = await supabase
+      .from(WORK_ORDERS_TABLE)
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(500);
+    candidates = data || [];
+  }
+
+  const matched = candidates.find(
+    (row) => formatWorkOrderId(String(row?.id || "")) === normalizedInput
+  );
+
+  if (!matched?.id) return null;
+  return { id: String(matched.id), row: matched };
+}
+
+async function clearWorkerCompensationForCanceledOrder(orderId: string): Promise<void> {
+  try {
+    let serviceIds: string[] = [];
+
+    const serviceIdQueries = [
+      supabase
+        .from("repair_order_services")
+        .select("id")
+        .eq("repair_order_id", orderId),
+      supabase
+        .from("repair_order_services")
+        .select("id")
+        .eq("repairOrderId", orderId),
+    ];
+
+    for (const query of serviceIdQueries) {
+      const { data, error } = await query;
+      if (!error && data) {
+        serviceIds = data.map((row: any) => String(row.id)).filter(Boolean);
+        if (serviceIds.length > 0) break;
+      }
+    }
+
+    if (serviceIds.length > 0) {
+      await supabase
+        .from("repair_order_service_workers")
+        .update({ worker_amount: 0 })
+        .in("repair_order_service_id", serviceIds);
+
+      const servicePayloads: Array<Record<string, any>> = [
+        {
+          worker_amount: 0,
+          worker_share_percent: 0,
+          is_payable_to_worker: false,
+        },
+        {
+          workerAmount: 0,
+          workerSharePercent: 0,
+          isPayableToWorker: false,
+        },
+      ];
+
+      for (const payload of servicePayloads) {
+        const { error } = await supabase
+          .from("repair_order_services")
+          .update(payload)
+          .in("id", serviceIds);
+        if (!error) break;
+      }
+    }
+
+    const orderPayloads: Array<Record<string, any>> = [
+      { worker_total: 0 },
+      { workerTotal: 0 },
+      { worker_total: 0, workerTotal: 0 },
+    ];
+
+    for (const payload of orderPayloads) {
+      const { error } = await supabase
+        .from(WORK_ORDERS_TABLE)
+        .update(payload)
+        .eq("id", orderId);
+      if (!error) break;
+    }
+  } catch (error) {
+    console.warn("[refundWorkOrder] Failed clearing worker compensation for canceled order", {
+      orderId,
+      error,
+    });
+  }
+}
+
+// Some deployments use camelCase columns, others use lowercase columns.
+// This helper writes technician/labor with multiple key variants so data is persisted reliably.
+async function syncTechnicianAndLaborFallback(
+  orderId: string,
+  technicianName: string,
+  laborCost: number
+): Promise<void> {
+  const payloads: Array<Record<string, any>> = [
+    {
+      technicianname: technicianName,
+      laborcost: laborCost,
+    },
+    {
+      technicianName: technicianName,
+      laborCost: laborCost,
+    },
+  ];
+
+  for (const payload of payloads) {
+    const { error } = await supabase
+      .from(WORK_ORDERS_TABLE)
+      .update(payload)
+      .eq("id", orderId);
+    if (!error) return;
+  }
+}
 
 // Helper: Convert snake_case DB response to camelCase TypeScript
 function normalizeWorkOrder(row: any): WorkOrder {
@@ -31,11 +176,13 @@ function normalizeWorkOrder(row: any): WorkOrder {
     technicianName: row.technicianname || row.technicianName,
     status: row.status,
     laborCost: row.laborcost || row.laborCost || 0,
+    laborTotal: row.labor_total || row.laborTotal || row.laborcost || row.laborCost || 0,
     discount: row.discount,
     partsUsed: row.partsused || row.partsUsed,
     additionalServices: row.additionalservices || row.additionalServices,
     notes: row.notes || "",
     total: row.total,
+    workerTotal: row.worker_total || row.workerTotal || 0,
     branchId: row.branchid || row.branchId,
     depositAmount: row.depositamount || row.depositAmount,
     depositDate: row.depositdate || row.depositDate,
@@ -47,11 +194,77 @@ function normalizeWorkOrder(row: any): WorkOrder {
     remainingAmount: row.remainingamount || row.remainingAmount,
     paymentDate: row.paymentdate || row.paymentDate,
     cashTransactionId: row.cashtransactionid || row.cashTransactionId,
-    refunded: row.refunded,
+    refunded:
+      row.refunded === true ||
+      row.status === "Đã hủy" ||
+      row.status === "Da huy",
     refunded_at: row.refunded_at || row.refundedAt,
     refund_transaction_id: row.refund_transaction_id || row.refundTransactionId,
     refund_reason: row.refund_reason || row.refundReason,
   };
+}
+
+async function attachRepairServices(workOrders: WorkOrder[]): Promise<WorkOrder[]> {
+  if (workOrders.length === 0) return workOrders;
+
+  const orderIds = workOrders.map((order) => order.id);
+  const { data, error } = await supabase
+    .from("repair_order_services")
+    .select("*, repair_order_service_workers(*), repair_order_service_items(*)")
+    .in("repair_order_id", orderIds);
+
+  if (error || !data) {
+    return workOrders;
+  }
+
+  const serviceMap = new Map<string, any[]>();
+  for (const row of data) {
+    const existing = serviceMap.get(row.repair_order_id) || [];
+    existing.push({
+      id: row.id,
+      repairOrderId: row.repair_order_id,
+      serviceId: row.service_id || undefined,
+      serviceName: row.service_name,
+      laborCalcType: row.labor_calc_type || "fixed",
+      laborFixedAmount: Number(row.labor_fixed_amount || 0),
+      laborPercentOfCost: Number(row.labor_percent_of_cost || 0),
+      minimumLaborAmount: Number(row.minimum_labor_amount || 0),
+      relatedProductCost: Number(row.related_product_cost || 0),
+      laborAmount: Number(row.labor_amount || 0),
+      workerSharePercent: Number(row.worker_share_percent || 0),
+      workerAmount: Number(row.worker_amount || 0),
+      isBillable: row.is_billable ?? true,
+      isPayableToWorker: row.is_payable_to_worker ?? true,
+      note: row.note || "",
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      workers: (row.repair_order_service_workers || []).map((worker: any) => ({
+        id: worker.id,
+        repairOrderServiceId: worker.repair_order_service_id,
+        workerId: worker.worker_id,
+        workerName: worker.worker_name || "",
+        sharePercent: Number(worker.share_percent || 0),
+        workerAmount: Number(worker.worker_amount || 0),
+        createdAt: worker.created_at,
+      })),
+      relatedItems: (row.repair_order_service_items || []).map((item: any) => ({
+        id: item.id,
+        repairOrderServiceId: item.repair_order_service_id,
+        partId: item.part_id,
+        partName: item.part_name || "",
+        quantity: Number(item.quantity || 0),
+        unitCost: Number(item.unit_cost || 0),
+        lineCost: Number(item.line_cost || 0),
+        createdAt: item.created_at,
+      })),
+    });
+    serviceMap.set(row.repair_order_id, existing);
+  }
+
+  return workOrders.map((order) => ({
+    ...order,
+    repairServices: serviceMap.get(order.id) || [],
+  }));
 }
 
 export async function fetchWorkOrders(): Promise<RepoResult<WorkOrder[]>> {
@@ -74,7 +287,8 @@ export async function fetchWorkOrders(): Promise<RepoResult<WorkOrder[]>> {
         message: "Không thể tải danh sách phiếu sửa chữa",
         cause: error,
       });
-    return success((data || []).map(normalizeWorkOrder));
+    const normalized = (data || []).map(normalizeWorkOrder);
+    return success(await attachRepairServices(normalized));
   } catch (e: any) {
     return failure({
       code: "network",
@@ -136,7 +350,8 @@ export async function fetchWorkOrdersFiltered(options?: {
         message: "Không thể tải danh sách phiếu sửa chữa",
         cause: error,
       });
-    return success((data || []).map(normalizeWorkOrder));
+    const normalized = (data || []).map(normalizeWorkOrder);
+    return success(await attachRepairServices(normalized));
   } catch (e: any) {
     return failure({
       code: "network",
@@ -209,6 +424,12 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         cause: error,
       });
     }
+
+    await syncTechnicianAndLaborFallback(
+      input.id,
+      String(input.technicianName || ""),
+      Number(input.laborCost || 0)
+    );
 
     return success({
       ...normalizeWorkOrder(data),
@@ -287,6 +508,12 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         cause: error,
       });
     }
+
+    await syncTechnicianAndLaborFallback(
+      input.id,
+      String(input.technicianName || ""),
+      Number(input.laborCost || 0)
+    );
 
     return success({
       ...normalizeWorkOrder(data),
@@ -386,23 +613,348 @@ export async function refundWorkOrder(
   >
 > {
   try {
+    const resolvedOrder = await resolveRefundTargetWorkOrder(orderId);
+    const refundTargetOrderId = resolvedOrder?.id || orderId;
+
+    const isMissingRefundRpcSignature = (err: any) => {
+      const code = String(err?.code || "").toUpperCase();
+      const message = String(err?.message || "").toLowerCase();
+      const details = String(err?.details || "").toLowerCase();
+      return (
+        code === "PGRST202" &&
+        (message.includes("work_order_refund_atomic") ||
+          details.includes("work_order_refund_atomic"))
+      );
+    };
+
+    const runFallbackDirectRefundUpdate = async () => {
+      let existingRow = resolvedOrder?.row;
+      let existingError: any = null;
+
+      if (!existingRow) {
+        const fallbackFetch = await supabase
+          .from(WORK_ORDERS_TABLE)
+          .select("*")
+          .eq("id", refundTargetOrderId)
+          .single();
+        existingRow = fallbackFetch.data;
+        existingError = fallbackFetch.error;
+      }
+
+      if (existingError || !existingRow) {
+        return failure({
+          code: "supabase",
+          message: "Không tìm thấy phiếu sửa chữa để hoàn tiền",
+          cause: existingError,
+        });
+      }
+
+      const currentOrder = normalizeWorkOrder(existingRow);
+      if (currentOrder.refunded) {
+        return failure({
+          code: "validation",
+          message: "Phiếu này đã được hoàn tiền rồi",
+        });
+      }
+
+      const branchId = currentOrder.branchId || "CN1";
+      const refundAmount = Math.max(0, Number(currentOrder.totalPaid || 0));
+      const nowIso = new Date().toISOString();
+
+      // 1) Restore stock for used parts (best effort each item)
+      const partsUsed = (currentOrder.partsUsed || []) as any[];
+      for (const part of partsUsed) {
+        const partId = String(part?.partId || "").trim();
+        const qty = Math.max(0, Number(part?.quantity || 0));
+        if (!partId || qty <= 0) continue;
+
+        const { data: partRow, error: partFetchError } = await supabase
+          .from("parts")
+          .select("id,name,stock")
+          .eq("id", partId)
+          .single();
+
+        if (partFetchError || !partRow) {
+          console.warn("[refundWorkOrder:fallback] Skip restore stock: part not found", {
+            partId,
+            partFetchError,
+          });
+          continue;
+        }
+
+        const currentStock = (partRow as any).stock || {};
+        const nextStock = {
+          ...currentStock,
+          [branchId]: Number(currentStock?.[branchId] || 0) + qty,
+        };
+
+        const { error: partUpdateError } = await supabase
+          .from("parts")
+          .update({ stock: nextStock })
+          .eq("id", partId);
+
+        if (partUpdateError) {
+          console.warn("[refundWorkOrder:fallback] Failed restoring part stock", {
+            partId,
+            partUpdateError,
+          });
+          continue;
+        }
+
+        // Best-effort inventory history line
+        await supabase.from("inventory_transactions").insert([
+          {
+            id:
+              typeof crypto !== "undefined" && (crypto as any).randomUUID
+                ? (crypto as any).randomUUID()
+                : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+            type: "Nhập kho",
+            partId,
+            partName: String(part?.partName || (partRow as any).name || "Phụ tùng"),
+            quantity: qty,
+            date: nowIso,
+            branchId,
+            notes: `Hoàn kho do hủy phiếu ${refundTargetOrderId}`,
+            workOrderId: refundTargetOrderId,
+          },
+        ]);
+      }
+
+      // 2) Create refund cash transaction + adjust payment source balance (if any)
+      let refundTransactionId: string | undefined;
+      if (refundAmount > 0 && currentOrder.paymentMethod) {
+        refundTransactionId =
+          typeof crypto !== "undefined" && (crypto as any).randomUUID
+            ? (crypto as any).randomUUID()
+            : `${Math.random().toString(36).slice(2)}-${Date.now()}`;
+
+        const cashTxAttempts: Array<{ table: string; payload: any }> = [
+          {
+            table: "cash_transactions",
+            payload: {
+              id: refundTransactionId,
+              type: "expense",
+              category: "refund",
+              amount: refundAmount,
+              date: nowIso,
+              description: `Hoàn tiền hủy phiếu ${refundTargetOrderId} - ${refundReason}`,
+              branchid: branchId,
+              paymentsource: currentOrder.paymentMethod,
+              reference: refundTargetOrderId,
+            },
+          },
+          {
+            table: "cash_transactions",
+            payload: {
+              id: refundTransactionId,
+              type: "expense",
+              category: "refund",
+              amount: refundAmount,
+              date: nowIso,
+              description: `Hoàn tiền hủy phiếu ${refundTargetOrderId} - ${refundReason}`,
+              branchId,
+              paymentSource: currentOrder.paymentMethod,
+              reference: refundTargetOrderId,
+            },
+          },
+          {
+            table: "cashtransactions",
+            payload: {
+              id: refundTransactionId,
+              type: "expense",
+              category: "refund",
+              amount: refundAmount,
+              date: nowIso,
+              description: `Hoàn tiền hủy phiếu ${refundTargetOrderId} - ${refundReason}`,
+              branchid: branchId,
+              paymentsource: currentOrder.paymentMethod,
+              reference: refundTargetOrderId,
+            },
+          },
+        ];
+
+        let cashTxInserted = false;
+        for (const attempt of cashTxAttempts) {
+          const { error: cashTxError } = await supabase
+            .from(attempt.table)
+            .insert([attempt.payload]);
+          if (!cashTxError) {
+            cashTxInserted = true;
+            break;
+          }
+          console.warn("[refundWorkOrder:fallback] Failed creating cash transaction", {
+            table: attempt.table,
+            cashTxError,
+          });
+        }
+
+        if (!cashTxInserted) {
+          refundTransactionId = undefined;
+        }
+
+        if (cashTxInserted) {
+          const paymentSourceTables = ["payment_sources", "paymentsources"];
+          for (const tableName of paymentSourceTables) {
+            const { data: sourceRow, error: sourceFetchError } = await supabase
+              .from(tableName)
+              .select("id,balance")
+              .eq("id", currentOrder.paymentMethod)
+              .single();
+
+            if (sourceFetchError || !sourceRow) {
+              continue;
+            }
+
+            const currentBalance = (sourceRow as any).balance || {};
+            const nextBalance = {
+              ...currentBalance,
+              [branchId]: Number(currentBalance?.[branchId] || 0) - refundAmount,
+            };
+
+            const updateAttempts = [
+              { balance: nextBalance },
+              { balance: nextBalance, updated_at: nowIso },
+            ];
+
+            for (const payload of updateAttempts) {
+              const { error: sourceUpdateError } = await supabase
+                .from(tableName)
+                .update(payload)
+                .eq("id", currentOrder.paymentMethod);
+              if (!sourceUpdateError) {
+                break;
+              }
+              console.warn("[refundWorkOrder:fallback] Failed updating payment source balance", {
+                tableName,
+                sourceUpdateError,
+              });
+            }
+            break;
+          }
+        }
+      }
+
+      // 3) Mark work order as refunded/canceled
+      const updateCandidates: Array<Record<string, any>> = [
+        {
+          refunded: true,
+          status: "Đã hủy",
+          refund_reason: refundReason,
+          refunded_at: nowIso,
+          refund_transaction_id: refundTransactionId,
+        },
+        {
+          refunded: true,
+          status: "Đã hủy",
+          refundReason: refundReason,
+          refundedAt: nowIso,
+          refundTransactionId: refundTransactionId,
+        },
+        {
+          refunded: true,
+          status: "Đã hủy",
+        },
+        {
+          status: "Đã hủy",
+        },
+      ];
+
+      let updateError: any = null;
+      let updated = false;
+      for (const candidate of updateCandidates) {
+        const payload = Object.fromEntries(
+          Object.entries(candidate).filter(([, value]) => value !== undefined)
+        );
+        const res = await supabase
+          .from(WORK_ORDERS_TABLE)
+          .update(payload)
+          .eq("id", refundTargetOrderId);
+        if (!res.error) {
+          updated = true;
+          break;
+        }
+        updateError = res.error;
+      }
+
+      if (!updated) {
+        return failure({
+          code: "supabase",
+          message: "Không thể cập nhật phiếu sau khi hoàn tiền",
+          cause: updateError,
+        });
+      }
+
+      await clearWorkerCompensationForCanceledOrder(refundTargetOrderId);
+
+      let updatedRow: any = null;
+      const { data: refreshedRow } = await supabase
+        .from(WORK_ORDERS_TABLE)
+        .select("*")
+        .eq("id", refundTargetOrderId)
+        .single();
+      updatedRow = refreshedRow || { ...existingRow, status: "Đã hủy", refunded: true };
+
+      console.warn(
+        "[refundWorkOrder] RPC work_order_refund_atomic chưa tồn tại, đã dùng fallback xử lý trực tiếp"
+      );
+
+      return success({
+        ...normalizeWorkOrder(updatedRow),
+        refund_transaction_id: refundTransactionId,
+        refundAmount,
+      });
+    };
+
     let userId: string | null = null;
     try {
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
 
-    const { data, error } = await supabase.rpc("work_order_refund_atomic", {
-      p_order_id: orderId,
-      p_refund_reason: refundReason,
-      p_user_id: userId || "unknown",
-    });
+    const rpcAttempts: Array<Record<string, any>> = [
+      {
+        p_order_id: refundTargetOrderId,
+        p_refund_reason: refundReason,
+        p_user_id: userId || "unknown",
+      },
+      {
+        p_order_id: refundTargetOrderId,
+        p_refund_reason: refundReason,
+      },
+      {
+        order_id: refundTargetOrderId,
+        refund_reason: refundReason,
+      },
+    ];
+
+    let data: any = null;
+    let error: any = null;
+
+    for (let i = 0; i < rpcAttempts.length; i++) {
+      const attempt = rpcAttempts[i];
+      const res = await supabase.rpc("work_order_refund_atomic", attempt);
+      data = res.data;
+      error = res.error;
+
+      if (!error) {
+        break;
+      }
+
+      // If this is not a signature mismatch, don't continue trying other shapes.
+      if (!isMissingRefundRpcSignature(error)) {
+        break;
+      }
+    }
 
     if (error || !data) {
       console.error("[refundWorkOrder] RPC error:", error);
       console.error("[refundWorkOrder] Error code:", error?.code);
       console.error("[refundWorkOrder] Error message:", error?.message);
       console.error("[refundWorkOrder] Error details:", error?.details);
+
+      if (error && isMissingRefundRpcSignature(error)) {
+        return await runFallbackDirectRefundUpdate();
+      }
 
       const rawDetails = error?.details || error?.message || "";
       const upper = rawDetails.toUpperCase();
@@ -448,6 +1000,8 @@ export async function refundWorkOrder(
       return failure({ code: "unknown", message: "Kết quả RPC không hợp lệ" });
     }
 
+    await clearWorkerCompensationForCanceledOrder(refundTargetOrderId);
+
     // Audit removed
 
     return success({
@@ -484,6 +1038,80 @@ export async function completeWorkOrderPayment(
   >
 > {
   try {
+    const isMissingCompletePaymentRpc = (err: any) => {
+      const code = String(err?.code || "").toUpperCase();
+      const message = String(err?.message || "").toLowerCase();
+      const details = String(err?.details || "").toLowerCase();
+      return (
+        code === "PGRST202" ||
+        message.includes("work_order_complete_payment") ||
+        details.includes("work_order_complete_payment")
+      );
+    };
+
+    const runFallbackDirectPaymentUpdate = async () => {
+      const { data: existingRow, error: existingError } = await supabase
+        .from(WORK_ORDERS_TABLE)
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (existingError || !existingRow) {
+        return failure({
+          code: "supabase",
+          message: "Không tìm thấy phiếu sửa chữa để thanh toán",
+          cause: existingError,
+        });
+      }
+
+      const currentOrder = normalizeWorkOrder(existingRow);
+      const currentTotal = Number(currentOrder.total || 0);
+      const currentPaid = Number(currentOrder.totalPaid || 0);
+      const addPaid = Math.max(0, Number(paymentAmount || 0));
+      const nextPaid = currentPaid + addPaid;
+      const remainingAmount = Math.max(0, currentTotal - nextPaid);
+      const nextStatus =
+        remainingAmount <= 0 ? "paid" : nextPaid > 0 ? "partial" : "unpaid";
+
+      const updates: any = {
+        paymentStatus: nextStatus,
+        paymentMethod: paymentMethod || currentOrder.paymentMethod || null,
+        additionalPayment: addPaid,
+        totalPaid: nextPaid,
+        remainingAmount,
+      };
+
+      if (nextStatus === "paid") {
+        updates.paymentDate = new Date().toISOString();
+      }
+
+      const { data: updatedRow, error: updateError } = await supabase
+        .from(WORK_ORDERS_TABLE)
+        .update(updates)
+        .eq("id", orderId)
+        .select("*")
+        .single();
+
+      if (updateError || !updatedRow) {
+        return failure({
+          code: "supabase",
+          message: "Thanh toán thất bại (fallback)",
+          cause: updateError,
+        });
+      }
+
+      console.warn(
+        "[completeWorkOrderPayment] RPC work_order_complete_payment chưa tồn tại, đã dùng fallback update trực tiếp"
+      );
+
+      return success({
+        ...normalizeWorkOrder(updatedRow),
+        paymentTransactionId: undefined,
+        newPaymentStatus: nextStatus,
+        inventoryDeducted: false,
+      });
+    };
+
     let userId: string | null = null;
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -498,6 +1126,10 @@ export async function completeWorkOrderPayment(
     });
 
     if (error || !data) {
+      if (isMissingCompletePaymentRpc(error)) {
+        return await runFallbackDirectPaymentUpdate();
+      }
+
       console.error("[completeWorkOrderPayment] RPC error:", error);
 
       const rawDetails = error?.details || error?.message || "";

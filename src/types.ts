@@ -147,6 +147,77 @@ export interface WorkOrderPart {
   costPrice?: number; // Cost price for profit calculation
 }
 
+export type LaborCalcType = "fixed" | "percent_of_cost" | "manual";
+
+export interface ServiceConfig {
+  id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  laborCalcType: LaborCalcType;
+  laborFixedAmount: number;
+  laborPercentOfCost: number;
+  minimumLaborAmount: number;
+  defaultWorkerSharePercent: number;
+  isActive?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RepairOrderServiceWorker {
+  id: string;
+  repairOrderServiceId: string;
+  workerId: string;
+  workerName?: string;
+  sharePercent: number;
+  workerAmount: number;
+  createdAt?: string;
+}
+
+export interface RepairOrderServiceItem {
+  id: string;
+  repairOrderServiceId: string;
+  partId: string;
+  partName?: string;
+  quantity: number;
+  unitCost: number;
+  lineCost: number;
+  createdAt?: string;
+}
+
+export interface RepairOrderService {
+  id: string;
+  repairOrderId: string;
+  serviceId?: string;
+  serviceName: string;
+  laborCalcType: LaborCalcType;
+  laborFixedAmount: number;
+  laborPercentOfCost: number;
+  minimumLaborAmount: number;
+  relatedProductCost: number;
+  laborAmount: number;
+  workerSharePercent: number;
+  workerAmount: number;
+  isBillable: boolean;
+  isPayableToWorker: boolean;
+  note?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  workers?: RepairOrderServiceWorker[];
+  relatedItems?: RepairOrderServiceItem[];
+}
+
+export interface WorkerMonthlySalary {
+  workerId: string;
+  workerName: string;
+  totalServiceCount: number;
+  totalWorkerAmount: number;
+  baseSalary: number;
+  bonus: number;
+  penalty: number;
+  finalSalary: number;
+}
+
 export interface WorkOrder {
   id: string;
   creationDate: string; // ISO
@@ -160,8 +231,11 @@ export interface WorkOrder {
   technicianName?: string;
   status: "Tiếp nhận" | "Đang sửa" | "Đã sửa xong" | "Trả máy" | "\u0110\u00E3 h\u1EE7y";
   laborCost: number;
+  laborTotal?: number;
+  workerTotal?: number;
   discount?: number; // Order level discount
   partsUsed?: WorkOrderPart[];
+  repairServices?: RepairOrderService[];
   additionalServices?: Array<{
     id: string;
     description: string;
