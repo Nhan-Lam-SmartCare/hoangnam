@@ -1,10 +1,20 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
-import type { WorkOrder, Part, WorkOrderPart, Vehicle } from "../../../types";
+import type {
+  Employee,
+  RepairOrderService,
+  ServiceConfig,
+  WorkOrder,
+  Part,
+  WorkOrderPart,
+  Vehicle,
+} from "../../../types";
 import { formatCurrency, formatWorkOrderId, normalizeSearchText } from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";
 import { getCategoryColor } from "../../../utils/categoryColors";
+import { AndroidPatternLock } from "../../common/AndroidPatternLock";
+import { Lock, Grid3x3, CheckCircle } from "lucide-react";
 import {
   useCreateWorkOrderAtomicRepo,
   useUpdateWorkOrderAtomicRepo,
@@ -19,6 +29,13 @@ import {
 } from "../../../utils/validation";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { useCreateCustomerDebtRepo } from "../../../hooks/useDebtsRepository";
+import { useServiceConfigs } from "../../../hooks/useRepairLabor";
+import { syncRepairOrderServices } from "../../../lib/repository/repairLaborRepository";
+import {
+  buildDefaultWorkerSplit,
+  calculateLabor,
+  splitWorkerAmount,
+} from "../../../lib/services/repairLaborService";
 
 export interface StoreSettings {
   store_name?: string;
@@ -33,6 +50,66 @@ export interface StoreSettings {
   bank_branch?: string;
   work_order_prefix?: string;
 }
+
+interface RepairServiceDraftWorker {
+  worker_id: string;
+  worker_name?: string;
+  share_percent: number;
+}
+
+interface RepairServiceDraft {
+  id: string;
+  serviceId?: string;
+  serviceName: string;
+  laborCalcType: ServiceConfig["laborCalcType"];
+  laborFixedAmount: number;
+  laborPercentOfCost: number;
+  minimumLaborAmount: number;
+  defaultWorkerSharePercent: number;
+  manualLabor: number;
+  relatedItemIds: string[];
+  workers: RepairServiceDraftWorker[];
+  isBillable: boolean;
+  isPayableToWorker: boolean;
+  note: string;
+}
+
+const createEmptyRepairServiceDraft = (): RepairServiceDraft => ({
+  id: `labor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  serviceName: "",
+  laborCalcType: "fixed",
+  laborFixedAmount: 0,
+  laborPercentOfCost: 0,
+  minimumLaborAmount: 0,
+  defaultWorkerSharePercent: 30,
+  manualLabor: 0,
+  relatedItemIds: [],
+  workers: [],
+  isBillable: true,
+  isPayableToWorker: true,
+  note: "",
+});
+
+const mapRepairServiceToDraft = (service: RepairOrderService): RepairServiceDraft => ({
+  id: service.id,
+  serviceId: service.serviceId,
+  serviceName: service.serviceName,
+  laborCalcType: service.laborCalcType,
+  laborFixedAmount: service.laborFixedAmount,
+  laborPercentOfCost: service.laborPercentOfCost,
+  minimumLaborAmount: service.minimumLaborAmount,
+  defaultWorkerSharePercent: service.workerSharePercent || 30,
+  manualLabor: service.laborCalcType === "manual" ? service.laborAmount : service.laborFixedAmount,
+  relatedItemIds: (service.relatedItems || []).map((item) => item.partId),
+  workers: (service.workers || []).map((worker) => ({
+    worker_id: worker.workerId,
+    worker_name: worker.workerName || "",
+    share_percent: worker.sharePercent,
+  })),
+  isBillable: service.isBillable,
+  isPayableToWorker: service.isPayableToWorker,
+  note: service.note || "",
+});
 
 const WorkOrderModal: React.FC<{
   order: WorkOrder;
@@ -155,6 +232,8 @@ const WorkOrderModal: React.FC<{
       useCreateWorkOrderAtomicRepo();
     const { mutateAsync: updateWorkOrderAtomicAsync } =
       useUpdateWorkOrderAtomicRepo();
+    const { data: serviceConfigs = [] } = useServiceConfigs();
+    const employeeOptions = employees as Employee[];
 
     const [formData, setFormData] = useState<Partial<WorkOrder>>(() => {
       if (order?.id) return order;
@@ -181,6 +260,7 @@ const WorkOrderModal: React.FC<{
 
     const [searchPart, setSearchPart] = useState("");
     const [devicePassword, setDevicePassword] = useState("");
+    const [isPatternMode, setIsPatternMode] = useState(false);
     const [selectedParts, setSelectedParts] = useState<WorkOrderPart[]>([]);
     const [showPartSearch, setShowPartSearch] = useState(false);
     const [partialPayment, setPartialPayment] = useState(0);
@@ -279,6 +359,12 @@ const WorkOrderModal: React.FC<{
       price: 0,
       costPrice: 0,
     });
+    const [repairServices, setRepairServices] = useState<RepairServiceDraft[]>(
+      order?.repairServices?.map(mapRepairServiceToDraft) || []
+    );
+    const [newRepairServiceDraft, setNewRepairServiceDraft] = useState<RepairServiceDraft>(
+      createEmptyRepairServiceDraft()
+    );
 
     // Sync selectedParts and deposit with formData on order change
     useEffect(() => {
@@ -303,6 +389,13 @@ const WorkOrderModal: React.FC<{
         console.log('[WorkOrderModal] Setting additionalServices to empty array');
         setAdditionalServices([]);
       }
+
+      if (order?.repairServices && Array.isArray(order.repairServices) && order.repairServices.length > 0) {
+        setRepairServices(order.repairServices.map(mapRepairServiceToDraft));
+      } else {
+        setRepairServices([]);
+      }
+      setNewRepairServiceDraft(createEmptyRepairServiceDraft());
 
       // Sync deposit amount
       if (order?.depositAmount) {
@@ -400,12 +493,16 @@ const WorkOrderModal: React.FC<{
       if (order?.issueDescription) {
         const match = order.issueDescription.match(/\[MK: (.+?)\]/);
         if (match) {
-          setDevicePassword(match[1]);
+          const pass = match[1];
+          setDevicePassword(pass);
+          setIsPatternMode(pass.startsWith("Pattern:"));
         } else {
           setDevicePassword("");
+          setIsPatternMode(false);
         }
       } else {
         setDevicePassword("");
+        setIsPatternMode(false);
       }
     }, [order]);
 
@@ -508,7 +605,7 @@ const WorkOrderModal: React.FC<{
       // Reset and close modal
       setNewVehicle({ model: "", licensePlate: "" });
       setShowAddVehicleModal(false);
-      showToast.success("Đã thêm xe mới");
+      showToast.success("Đã thêm thiết bị mới");
     };
 
     // Handler: Save edited customer info
@@ -588,22 +685,111 @@ const WorkOrderModal: React.FC<{
       }
     };
 
+    const getSelectedPartCost = (partId: string) => {
+      const part = selectedParts.find((item) => item.partId === partId);
+      if (!part) return 0;
+      return Number(part.costPrice || 0) * Number(part.quantity || 0);
+    };
+
+    const getRepairServiceLaborAmount = (service: RepairServiceDraft) =>
+      calculateLabor(
+        {
+          labor_calc_type: service.laborCalcType,
+          labor_fixed_amount: service.laborFixedAmount,
+          labor_percent_of_cost: service.laborPercentOfCost,
+          minimum_labor_amount: service.minimumLaborAmount,
+        },
+        service.relatedItemIds.reduce((sum, partId) => sum + getSelectedPartCost(partId), 0),
+        service.manualLabor
+      );
+
+    const getRepairServiceWorkers = (service: RepairServiceDraft) => {
+      if (service.workers.length > 0) return service.workers;
+      return buildDefaultWorkerSplit(
+        employeeOptions,
+        formData.technicianName,
+        service.defaultWorkerSharePercent
+      );
+    };
+
+    const buildRepairServicePayloads = () =>
+      repairServices.map((service) => {
+        const laborAmount = getRepairServiceLaborAmount(service);
+        const effectiveWorkers = getRepairServiceWorkers(service);
+        const workerSplits = splitWorkerAmount(laborAmount, effectiveWorkers);
+
+        return {
+          service_id: service.serviceId,
+          service_name: service.serviceName,
+          labor_calc_type: service.laborCalcType,
+          labor_fixed_amount: service.laborFixedAmount,
+          labor_percent_of_cost: service.laborPercentOfCost,
+          minimum_labor_amount: service.minimumLaborAmount,
+          related_product_cost: service.relatedItemIds.reduce(
+            (sum, partId) => sum + getSelectedPartCost(partId),
+            0
+          ),
+          labor_amount: laborAmount,
+          worker_share_percent:
+            workerSplits.length === 1
+              ? Number(workerSplits[0].share_percent || 0)
+              : Number(service.defaultWorkerSharePercent || 0),
+          worker_amount:
+            workerSplits.length === 1 ? Number(workerSplits[0].worker_amount || 0) : 0,
+          is_billable: service.isBillable,
+          is_payable_to_worker: service.isPayableToWorker,
+          note: service.note,
+          workers: workerSplits,
+          related_items: service.relatedItemIds.map((partId) => {
+            const selectedPart = selectedParts.find((part) => part.partId === partId);
+            const lineCost = getSelectedPartCost(partId);
+
+            return {
+              part_id: partId,
+              part_name: selectedPart?.partName || "",
+              quantity: Number(selectedPart?.quantity || 0),
+              unit_cost: Number(selectedPart?.costPrice || 0),
+              line_cost: lineCost,
+            };
+          }),
+        };
+      });
+
+    const syncRepairServicesForOrder = async (repairOrderId: string) => {
+      const payloads = buildRepairServicePayloads().filter(
+        (service) => service.service_name.trim().length > 0
+      );
+
+      const result = await syncRepairOrderServices(repairOrderId, payloads);
+      if ("ok" in result && !result.ok) {
+        throw (result as { error: any }).error;
+      }
+
+      return result.data;
+    };
+
     // Calculate totals
     const partsTotal = selectedParts.reduce(
       (sum, p) => sum + (p.price || 0) * (p.quantity || 0),
+      0
+    );
+    const repairLaborTotal = repairServices.reduce(
+      (sum, service) => sum + (service.isBillable ? getRepairServiceLaborAmount(service) : 0),
       0
     );
     const servicesTotal = additionalServices.reduce(
       (sum, s) => sum + (s.price || 0) * (s.quantity || 0),
       0
     );
-    const subtotal = (formData.laborCost || 0) + partsTotal + servicesTotal;
+    const effectiveLaborCost = Number(formData.laborCost || 0);
+    const subtotal = effectiveLaborCost + partsTotal + servicesTotal;
     const discount = formData.discount || 0;
     const total = Math.max(0, subtotal - discount);
 
     // Debug log
     console.log("Tinh toan:", {
-      laborCost: formData.laborCost,
+      laborCost: effectiveLaborCost,
+      repairLaborTotal,
       partsTotal,
       servicesTotal,
       subtotal,
@@ -731,6 +917,161 @@ const WorkOrderModal: React.FC<{
       }
     };
 
+    const parseMissingWorkOrderColumn = (error: any): string | null => {
+      if (!error || String(error.code || "").toUpperCase() !== "PGRST204") {
+        return null;
+      }
+      const message = String(error.message || "");
+      const match = message.match(/'([^']+)'\s+column\s+of\s+'work_orders'/i);
+      return match?.[1] || null;
+    };
+
+    const normalizeColumnKey = (key: string): string =>
+      String(key || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s-]/g, "");
+
+    const removeMissingColumnFromPayload = (
+      payload: Record<string, any>,
+      missingColumn: string
+    ): { nextPayload: Record<string, any>; removedCount: number } => {
+      const nextPayload = { ...payload };
+
+      // 1. Try exact match first
+      if (Object.prototype.hasOwnProperty.call(nextPayload, missingColumn)) {
+        delete nextPayload[missingColumn];
+        return { nextPayload, removedCount: 1 };
+      }
+
+      // 2. Case-insensitive fallback (only delete ONE key to avoid destroying both camelCase and lowercase variants of a required column)
+      const target = normalizeColumnKey(missingColumn);
+      const keyToDelete = Object.keys(nextPayload).find(
+        (key) => normalizeColumnKey(key) === target
+      );
+
+      if (keyToDelete) {
+        delete nextPayload[keyToDelete];
+        return { nextPayload, removedCount: 1 };
+      }
+
+      return { nextPayload, removedCount: 0 };
+    };
+
+    const parseNotNullColumn = (error: any): string | null => {
+      if (!error || String(error.code || "") !== "23502") {
+        return null;
+      }
+      const message = String(error.message || "");
+      const match = message.match(/null\s+value\s+in\s+column\s+"([^"]+)"/i);
+      return match?.[1] || null;
+    };
+
+    const insertWorkOrderWithSchemaFallback = async (payload: Record<string, any>) => {
+      let attemptPayload: Record<string, any> = { ...payload };
+      let lastError: any = null;
+
+      for (let i = 0; i < 20; i++) {
+        const { data, error } = await supabase
+          .from("work_orders")
+          .insert(attemptPayload)
+          .select();
+
+        if (!error) {
+          return { data, error: null, payload: attemptPayload };
+        }
+
+        lastError = error;
+
+        const notNullColumn = parseNotNullColumn(error);
+        if (notNullColumn && normalizeColumnKey(notNullColumn) === normalizeColumnKey("creationDate")) {
+          // Keep retrying by force-filling creationDate variants if an earlier fallback removed one.
+          attemptPayload = {
+            ...attemptPayload,
+            creationDate:
+              attemptPayload.creationDate ||
+              attemptPayload.creationdate ||
+              new Date().toISOString(),
+          };
+          if (!Object.prototype.hasOwnProperty.call(attemptPayload, "creationdate")) {
+            attemptPayload.creationdate = attemptPayload.creationDate;
+          }
+          continue;
+        }
+
+        const missingColumn = parseMissingWorkOrderColumn(error);
+        if (!missingColumn) {
+          break;
+        }
+
+        const { nextPayload, removedCount } = removeMissingColumnFromPayload(
+          attemptPayload,
+          missingColumn
+        );
+        if (removedCount === 0) {
+          break;
+        }
+
+        attemptPayload = nextPayload;
+      }
+
+      return { data: null, error: lastError, payload: attemptPayload };
+    };
+
+    const updateWorkOrderWithSchemaFallback = async (
+      orderId: string,
+      payload: Record<string, any>
+    ) => {
+      let attemptPayload: Record<string, any> = { ...payload };
+      let lastError: any = null;
+
+      for (let i = 0; i < 20; i++) {
+        const { data, error } = await supabase
+          .from("work_orders")
+          .update(attemptPayload)
+          .eq("id", orderId)
+          .select();
+
+        if (!error) {
+          return { data, error: null, payload: attemptPayload };
+        }
+
+        lastError = error;
+
+        const notNullColumn = parseNotNullColumn(error);
+        if (notNullColumn && normalizeColumnKey(notNullColumn) === normalizeColumnKey("creationDate")) {
+          attemptPayload = {
+            ...attemptPayload,
+            creationDate:
+              attemptPayload.creationDate ||
+              attemptPayload.creationdate ||
+              new Date().toISOString(),
+          };
+          if (!Object.prototype.hasOwnProperty.call(attemptPayload, "creationdate")) {
+            attemptPayload.creationdate = attemptPayload.creationDate;
+          }
+          continue;
+        }
+
+        const missingColumn = parseMissingWorkOrderColumn(error);
+        if (!missingColumn) {
+          break;
+        }
+
+        const { nextPayload, removedCount } = removeMissingColumnFromPayload(
+          attemptPayload,
+          missingColumn
+        );
+        if (removedCount === 0) {
+          break;
+        }
+
+        attemptPayload = nextPayload;
+      }
+
+      return { data: null, error: lastError, payload: attemptPayload };
+    };
+
     // 🔹 Function to handle deposit (Đặt cọc để đặt hàng)
     const handleDeposit = async () => {
       // Validation
@@ -784,9 +1125,11 @@ const WorkOrderModal: React.FC<{
           issueDescription: formData.issueDescription || "",
           technicianName: formData.technicianName || "",
           status: formData.status || "Tiếp nhận",
-          laborCost: formData.laborCost || 0,
+          laborCost: effectiveLaborCost,
+          laborTotal: effectiveLaborCost,
           discount: discount,
           partsUsed: selectedParts,
+          repairServices: undefined,
           additionalServices:
             additionalServices.length > 0 ? additionalServices : undefined,
           total: total,
@@ -803,9 +1146,7 @@ const WorkOrderModal: React.FC<{
         // Save to database using Supabase
         if (formData.id) {
           // Update existing work order
-          await supabase
-            .from("work_orders")
-            .update({
+          await updateWorkOrderWithSchemaFallback(formData.id, {
               customername: workOrderData.customerName,
               customerphone: workOrderData.customerPhone,
               vehicleid: workOrderData.vehicleId,
@@ -825,11 +1166,10 @@ const WorkOrderModal: React.FC<{
               paymentmethod: workOrderData.paymentMethod,
               totalpaid: workOrderData.totalPaid,
               remainingamount: workOrderData.remainingAmount,
-            })
-            .eq("id", formData.id);
+            });
         } else {
           // Insert new work order
-          await supabase.from("work_orders").insert({
+          await insertWorkOrderWithSchemaFallback({
             id: workOrderData.id,
             customername: workOrderData.customerName,
             customerphone: workOrderData.customerPhone,
@@ -854,6 +1194,24 @@ const WorkOrderModal: React.FC<{
             creationDate: workOrderData.creationDate,
           });
         }
+
+        const syncedRepairServices = await syncRepairServicesForOrder(orderId);
+        workOrderData.repairServices = syncedRepairServices;
+        workOrderData.laborTotal = syncedRepairServices.reduce(
+          (sum, service) => sum + Number(service.laborAmount || 0),
+          0
+        );
+        workOrderData.workerTotal = syncedRepairServices.reduce(
+          (sum, service) =>
+            sum +
+            (service.workers && service.workers.length > 0
+              ? service.workers.reduce(
+                (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
+                0
+              )
+              : Number(service.workerAmount || 0)),
+          0
+        );
 
         // Create deposit cash transaction (Thu tiền cọc vào quỹ)
         const depositTxId = `TX-${Date.now()}-${Math.random()
@@ -991,40 +1349,61 @@ const WorkOrderModal: React.FC<{
           order?.id ||
           `${storeSettings?.work_order_prefix || "SC"}-${Date.now()}`;
 
+        const resolvedCreationDate =
+          order?.creationDate || new Date().toISOString();
+
         const workOrderData = {
           id: orderId,
+          customerName: formData.customerName || "",
           customername: formData.customerName || "",
+          customerPhone: formData.customerPhone || "",
           customerphone: formData.customerPhone || "",
+          vehicleId: formData.vehicleId,
           vehicleid: formData.vehicleId,
+          vehicleModel: formData.vehicleModel || "",
           vehiclemodel: formData.vehicleModel || "",
+          licensePlate: formData.licensePlate || "",
           licenseplate: formData.licensePlate || "",
+          currentKm: formData.currentKm,
           currentkm: formData.currentKm,
+          issueDescription: formData.issueDescription || "",
           issuedescription: formData.issueDescription || "",
+          technicianName: formData.technicianName || "",
           technicianname: formData.technicianName || "",
           status: formData.status || "Tiếp nhận",
-          laborcost: formData.laborCost || 0,
+          laborCost: effectiveLaborCost,
+          laborcost: effectiveLaborCost,
           discount: discount,
+          partsUsed: selectedParts,
           partsused: selectedParts,
+          additionalServices:
+            additionalServices.length > 0 ? additionalServices : undefined,
           additionalservices:
             additionalServices.length > 0 ? additionalServices : undefined,
           total: total,
+          branchId: currentBranchId,
           branchid: currentBranchId,
+          paymentStatus: paymentStatus,
           paymentstatus: paymentStatus,
+          paymentMethod: formData.paymentMethod || null,
           paymentmethod: formData.paymentMethod || null,
+          depositAmount: order?.depositAmount || null,
           depositamount: order?.depositAmount || null,
+          totalPaid: existingPaid > 0 ? existingPaid : null,
           totalpaid: existingPaid > 0 ? existingPaid : null,
+          remainingAmount: total - existingPaid,
           remainingamount: total - existingPaid,
-          creationdate: order?.creationDate || new Date().toISOString(),
+          creationDate: resolvedCreationDate,
+          creationdate: resolvedCreationDate,
         };
 
         // Save to Supabase database
         if (order?.id) {
           // Update existing
-          const { data, error } = await supabase
-            .from("work_orders")
-            .update(workOrderData)
-            .eq("id", order.id)
-            .select();
+          const { data, error } = await updateWorkOrderWithSchemaFallback(
+            order.id,
+            workOrderData
+          );
 
           if (error) {
             console.error("[UPDATE ERROR]", error);
@@ -1097,10 +1476,9 @@ const WorkOrderModal: React.FC<{
         } else {
           // Insert new
           console.log("[INSERT] Attempting to insert:", workOrderData);
-          const { data, error } = await supabase
-            .from("work_orders")
-            .insert(workOrderData)
-            .select();
+          const { data, error } = await insertWorkOrderWithSchemaFallback(
+            workOrderData
+          );
 
           if (error) {
             console.error("[INSERT ERROR]", error);
@@ -1183,6 +1561,24 @@ const WorkOrderModal: React.FC<{
             );
           }
         }
+
+        const syncedRepairServices = await syncRepairServicesForOrder(orderId);
+        (workOrderData as any).repairServices = syncedRepairServices;
+        (workOrderData as any).laborTotal = syncedRepairServices.reduce(
+          (sum, service) => sum + Number(service.laborAmount || 0),
+          0
+        );
+        (workOrderData as any).workerTotal = syncedRepairServices.reduce(
+          (sum, service) =>
+            sum +
+            (service.workers && service.workers.length > 0
+              ? service.workers.reduce(
+                (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
+                0
+              )
+              : Number(service.workerAmount || 0)),
+          0
+        );
 
         // Invalidate queries to refresh the list
         if (invalidateWorkOrders) {
@@ -1333,7 +1729,7 @@ const WorkOrderModal: React.FC<{
               issueDescription: finalIssueDescription, // Use modified description
               technicianName: formData.technicianName || "",
               status: formData.status || "Tiếp nhận",
-              laborCost: formData.laborCost || 0,
+              laborCost: effectiveLaborCost,
               discount: discount,
               partsUsed: selectedParts,
               additionalServices:
@@ -1350,6 +1746,8 @@ const WorkOrderModal: React.FC<{
               creationDate: new Date().toISOString(),
             } as any);
 
+            const syncedRepairServices = await syncRepairServicesForOrder(orderId);
+
             // Extract transaction IDs from response
             const depositTxId = responseData?.depositTransactionId;
             const paymentTxId = responseData?.paymentTransactionId;
@@ -1365,9 +1763,25 @@ const WorkOrderModal: React.FC<{
               issueDescription: formData.issueDescription || "",
               technicianName: formData.technicianName || "",
               status: formData.status || "Tiếp nhận",
-              laborCost: formData.laborCost || 0,
+              laborCost: effectiveLaborCost,
+              laborTotal: syncedRepairServices.reduce(
+                (sum, service) => sum + Number(service.laborAmount || 0),
+                0
+              ),
+              workerTotal: syncedRepairServices.reduce(
+                (sum, service) =>
+                  sum +
+                  (service.workers && service.workers.length > 0
+                    ? service.workers.reduce(
+                      (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
+                      0
+                    )
+                    : Number(service.workerAmount || 0)),
+                0
+              ),
               discount: discount,
               partsUsed: selectedParts,
+              repairServices: syncedRepairServices,
               additionalServices:
                 additionalServices.length > 0 ? additionalServices : undefined,
               total: total,
@@ -1780,10 +2194,10 @@ const WorkOrderModal: React.FC<{
                   formData.paymentMethod || "cash",
                   0 // Số tiền = 0 vì đã thanh toán hết rồi, chỉ cần trừ kho
                 );
-                if (!result.ok) {
+                if ("ok" in result && !result.ok) {
                   showToast.warning(
                     "Đã lưu phiếu nhưng có lỗi khi trừ kho: " +
-                    (result.error.message || "Lỗi không xác định")
+                    ((((result as { error: any }).error)?.message) || "Lỗi không xác định")
                   );
                 }
               } catch (error: any) {
@@ -1848,7 +2262,7 @@ const WorkOrderModal: React.FC<{
               issueDescription: finalIssueDescription, // Use modified description
               technicianName: formData.technicianName || "",
               status: formData.status || "Tiếp nhận",
-              laborCost: formData.laborCost || 0,
+              laborCost: effectiveLaborCost,
               discount: discount,
               partsUsed: selectedParts,
               additionalServices:
@@ -1865,6 +2279,7 @@ const WorkOrderModal: React.FC<{
             } as any);
 
             const workOrderRow = (responseData as any).workOrder;
+            const syncedRepairServices = await syncRepairServicesForOrder(order.id);
             const depositTxId = responseData?.depositTransactionId;
             const paymentTxId = responseData?.paymentTransactionId;
 
@@ -1897,22 +2312,46 @@ const WorkOrderModal: React.FC<{
                 technicianName:
                   (workOrderRow as any).technicianname ||
                   (workOrderRow as any).technicianName ||
+                  formData.technicianName ||
                   order.technicianName ||
                   "",
                 status: (workOrderRow as any).status || order.status,
                 laborCost:
                   (workOrderRow as any).laborcost ||
                   (workOrderRow as any).laborCost ||
-                  order.laborCost ||
+                  Number(formData.laborCost || 0) ||
+                  effectiveLaborCost ||
                   0,
+                laborTotal:
+                  (workOrderRow as any).labor_total ||
+                  (workOrderRow as any).laborTotal ||
+                  syncedRepairServices.reduce(
+                    (sum, service) => sum + Number(service.laborAmount || 0),
+                    0
+                  ),
+                workerTotal:
+                  (workOrderRow as any).worker_total ||
+                  (workOrderRow as any).workerTotal ||
+                  syncedRepairServices.reduce(
+                    (sum, service) =>
+                      sum +
+                      (service.workers && service.workers.length > 0
+                        ? service.workers.reduce(
+                          (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
+                          0
+                        )
+                        : Number(service.workerAmount || 0)),
+                    0
+                  ),
                 discount: (workOrderRow as any).discount || order.discount || 0,
                 partsUsed:
                   (workOrderRow as any).partsused ||
                   (workOrderRow as any).partsUsed ||
                   order.partsUsed ||
                   [],
+                repairServices: syncedRepairServices,
                 additionalServices:
-                  additionalServices.length > 0 ? additionalServices : null,
+                  additionalServices.length > 0 ? additionalServices : undefined,
                 total: (workOrderRow as any).total || order.total,
                 branchId:
                   (workOrderRow as any).branchid ||
@@ -1968,11 +2407,27 @@ const WorkOrderModal: React.FC<{
                   formData.issueDescription || order.issueDescription,
                 technicianName: formData.technicianName || order.technicianName,
                 status: formData.status || order.status,
-                laborCost: formData.laborCost || order.laborCost,
+                laborCost: effectiveLaborCost,
+                laborTotal: syncedRepairServices.reduce(
+                  (sum, service) => sum + Number(service.laborAmount || 0),
+                  0
+                ),
+                workerTotal: syncedRepairServices.reduce(
+                  (sum, service) =>
+                    sum +
+                    (service.workers && service.workers.length > 0
+                      ? service.workers.reduce(
+                        (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
+                        0
+                      )
+                      : Number(service.workerAmount || 0)),
+                  0
+                ),
                 discount: discount,
                 partsUsed: selectedParts,
+                repairServices: syncedRepairServices,
                 additionalServices:
-                  additionalServices.length > 0 ? additionalServices : null,
+                  additionalServices.length > 0 ? additionalServices : undefined,
                 total: total,
                 depositAmount: depositAmount,
                 depositTransactionId: depositTxId || order.depositTransactionId,
@@ -2144,10 +2599,10 @@ const WorkOrderModal: React.FC<{
                   formData.paymentMethod || "cash",
                   0 // Số tiền = 0 vì đã thanh toán hết rồi, chỉ cần trừ kho
                 );
-                if (!result.ok) {
+                if ("ok" in result && !result.ok) {
                   showToast.warning(
                     "Đã cập nhật phiếu nhưng có lỗi khi trừ kho: " +
-                    (result.error.message || "Lỗi không xác định")
+                    ((((result as { error: any }).error)?.message) || "Lỗi không xác định")
                   );
                 }
               } catch (error: any) {
@@ -2642,11 +3097,11 @@ const WorkOrderModal: React.FC<{
                       <div className="flex items-center justify-between">
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                           {customerVehicles.length > 0
-                            ? "Chọn xe"
-                            : "Xe của khách hàng"}
+                            ? "Chọn thiết bị"
+                            : "Thiết bị của khách hàng"}
                           {customerVehicles.length > 0 && (
                             <span className="text-xs text-slate-500 ml-1">
-                              ({customerVehicles.length} xe)
+                              ({customerVehicles.length} thiết bị)
                             </span>
                           )}
                         </label>
@@ -2654,9 +3109,9 @@ const WorkOrderModal: React.FC<{
                           type="button"
                           onClick={() => setShowAddVehicleModal(true)}
                           className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                          title="Thêm xe mới"
+                          title="Thêm thiết bị mới"
                         >
-                          + Thêm xe
+                          + Thêm thiết bị
                         </button>
                       </div>
 
@@ -2808,7 +3263,7 @@ const WorkOrderModal: React.FC<{
                       ) : (
                         <div className="text-center py-4 px-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
                           <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Chưa có xe nào. Nhấn "+ Thêm xe" để thêm.
+                            Chưa có thiết bị nào. Nhấn "+ Thêm thiết bị" để thêm.
                           </p>
                         </div>
                       )}
@@ -2816,17 +3271,66 @@ const WorkOrderModal: React.FC<{
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Mật khẩu màn hình
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Nhập mật khẩu / Pattern..."
-                    value={devicePassword}
-                    onChange={(e) => setDevicePassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 font-mono text-red-600 dark:text-red-400 font-bold"
-                  />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-0">
+                      Mật khẩu màn hình
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (devicePassword.startsWith("Pattern:")) {
+                          setDevicePassword("");
+                        }
+                        setIsPatternMode(!isPatternMode);
+                      }}
+                      className="text-sm font-bold text-blue-500 hover:text-blue-600 flex items-center gap-1 active:scale-95 transition-transform"
+                    >
+                      {isPatternMode ? (
+                        <>
+                          <Lock className="w-4 h-4" /> Nhập số/chữ
+                        </>
+                      ) : (
+                        <>
+                          <Grid3x3 className="w-4 h-4" /> Vẽ hình (Android)
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {isPatternMode ? (
+                    <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center">
+                      <div className="mb-2 text-sm font-medium text-slate-500">Vẽ mật khẩu mở khóa</div>
+                      <div className="bg-white dark:bg-slate-900 p-2 rounded-xl shadow-sm">
+                        <AndroidPatternLock
+                          initialValue={devicePassword.startsWith("Pattern:") ? devicePassword.replace("Pattern:", "").trim() : ""}
+                          onPatternComplete={(pattern) => {
+                            if (pattern) {
+                              setDevicePassword(`Pattern: ${pattern}`);
+                              if (navigator.vibrate) navigator.vibrate(50);
+                            }
+                          }}
+                        />
+                      </div>
+                      {devicePassword.startsWith("Pattern:") ? (
+                        <div className="mt-3 text-sm font-mono text-emerald-500 font-bold flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                          <CheckCircle className="w-4 h-4" /> Đã lưu hình vẽ
+                        </div>
+                      ) : (
+                        <div className="mt-3 text-sm text-slate-400 italic">
+                          Vẽ hình để lưu mật khẩu
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Nhập mật khẩu (VD: 123456...)"
+                      value={devicePassword}
+                      onChange={(e) => setDevicePassword(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 font-mono text-red-600 dark:text-red-400 font-bold focus:border-blue-500 focus:outline-none"
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -2917,12 +3421,7 @@ const WorkOrderModal: React.FC<{
                     >
                       <option value="">-- Chọn kỹ thuật viên --</option>
                       {employees
-                        .filter(
-                          (emp) =>
-                            emp.status === "active" &&
-                            (emp.department?.toLowerCase().includes("kỹ thuật") ||
-                              emp.position?.toLowerCase().includes("kỹ thuật"))
-                        )
+                        .filter((emp) => emp.status === "active")
                         .map((emp) => (
                           <option key={emp.id} value={emp.name}>
                             {emp.name}
@@ -2966,6 +3465,430 @@ const WorkOrderModal: React.FC<{
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none"
                   />
                 </div>
+                {false && (
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        Dich vu / Cong sua
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Tinh tien cong rieng voi tien phu tung. Luong tho chi lay tu phan nay.
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Tong cong khach tra</div>
+                      <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(repairLaborTotal)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        Mau dich vu
+                      </label>
+                      <select
+                        value={newRepairServiceDraft.serviceId || ""}
+                        onChange={(e) => {
+                          const selectedService = serviceConfigs.find((service) => service.id === e.target.value);
+                          if (!selectedService) {
+                            setNewRepairServiceDraft(createEmptyRepairServiceDraft());
+                            return;
+                          }
+
+                          setNewRepairServiceDraft({
+                            ...createEmptyRepairServiceDraft(),
+                            serviceId: selectedService.id,
+                            serviceName: selectedService.name,
+                            laborCalcType: selectedService.laborCalcType,
+                            laborFixedAmount: selectedService.laborFixedAmount,
+                            laborPercentOfCost: selectedService.laborPercentOfCost,
+                            minimumLaborAmount: selectedService.minimumLaborAmount,
+                            defaultWorkerSharePercent: selectedService.defaultWorkerSharePercent,
+                            manualLabor:
+                              selectedService.laborCalcType === "manual"
+                                ? selectedService.laborFixedAmount
+                                : 0,
+                            workers: buildDefaultWorkerSplit(
+                              employeeOptions,
+                              formData.technicianName,
+                              selectedService.defaultWorkerSharePercent
+                            ),
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="">-- Chon dich vu --</option>
+                        {serviceConfigs.map((service) => (
+                          <option key={service.id} value={service.id}>
+                            {service.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        Kieu tinh cong
+                      </label>
+                      <select
+                        value={newRepairServiceDraft.laborCalcType}
+                        onChange={(e) =>
+                          setNewRepairServiceDraft({
+                            ...newRepairServiceDraft,
+                            laborCalcType: e.target.value as RepairServiceDraft["laborCalcType"],
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="fixed">fixed</option>
+                        <option value="percent_of_cost">percent_of_cost</option>
+                        <option value="manual">manual</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        Ten dich vu
+                      </label>
+                      <input
+                        type="text"
+                        value={newRepairServiceDraft.serviceName}
+                        onChange={(e) =>
+                          setNewRepairServiceDraft({
+                            ...newRepairServiceDraft,
+                            serviceName: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        Cong co dinh
+                      </label>
+                      <NumberInput
+                        value={newRepairServiceDraft.laborFixedAmount}
+                        onChange={(value) =>
+                          setNewRepairServiceDraft({
+                            ...newRepairServiceDraft,
+                            laborFixedAmount: value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        % theo gia nhap
+                      </label>
+                      <NumberInput
+                        value={newRepairServiceDraft.laborPercentOfCost}
+                        onChange={(value) =>
+                          setNewRepairServiceDraft({
+                            ...newRepairServiceDraft,
+                            laborPercentOfCost: value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        Cong toi thieu / cong tay
+                      </label>
+                      <NumberInput
+                        value={
+                          newRepairServiceDraft.laborCalcType === "manual"
+                            ? newRepairServiceDraft.manualLabor
+                            : newRepairServiceDraft.minimumLaborAmount
+                        }
+                        onChange={(value) =>
+                          setNewRepairServiceDraft({
+                            ...newRepairServiceDraft,
+                            manualLabor:
+                              newRepairServiceDraft.laborCalcType === "manual"
+                                ? value
+                                : newRepairServiceDraft.manualLabor,
+                            minimumLaborAmount:
+                              newRepairServiceDraft.laborCalcType === "manual"
+                                ? newRepairServiceDraft.minimumLaborAmount
+                                : value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                      <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">
+                        Phu tung lien quan
+                      </div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {selectedParts.length === 0 && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            Hay them phu tung o phan duoi truoc khi gan cho dich vu % gia nhap.
+                          </div>
+                        )}
+                        {selectedParts.map((part) => {
+                          const checked = newRepairServiceDraft.relatedItemIds.includes(part.partId);
+                          return (
+                            <label
+                              key={part.partId}
+                              className="flex items-center justify-between gap-3 text-xs text-slate-700 dark:text-slate-200"
+                            >
+                              <span className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) =>
+                                    setNewRepairServiceDraft({
+                                      ...newRepairServiceDraft,
+                                      relatedItemIds: e.target.checked
+                                        ? [...newRepairServiceDraft.relatedItemIds, part.partId]
+                                        : newRepairServiceDraft.relatedItemIds.filter((id) => id !== part.partId),
+                                    })
+                                  }
+                                />
+                                <span>{part.partName}</span>
+                              </span>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                {formatCurrency((part.costPrice || 0) * (part.quantity || 0))}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          Gan tho va chia %
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewRepairServiceDraft({
+                              ...newRepairServiceDraft,
+                              workers: [
+                                ...newRepairServiceDraft.workers,
+                                { worker_id: "", worker_name: "", share_percent: 0 },
+                              ],
+                            })
+                          }
+                          className="text-xs px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded"
+                        >
+                          + Tho
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {newRepairServiceDraft.workers.length === 0 && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            Neu chua gan, he thong se dung ky thuat vien chinh va % mac dinh cua dich vu.
+                          </div>
+                        )}
+                        {newRepairServiceDraft.workers.map((worker, index) => (
+                          <div key={`${worker.worker_id}-${index}`} className="grid grid-cols-[1fr,120px,32px] gap-2">
+                            <select
+                              value={worker.worker_id}
+                              onChange={(e) => {
+                                const selectedEmployee = employeeOptions.find((employee) => employee.id === e.target.value);
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  workers: newRepairServiceDraft.workers.map((item, itemIndex) =>
+                                    itemIndex === index
+                                      ? {
+                                        ...item,
+                                        worker_id: e.target.value,
+                                        worker_name: selectedEmployee?.name || "",
+                                      }
+                                      : item
+                                  ),
+                                });
+                              }}
+                              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                            >
+                              <option value="">-- Chon tho --</option>
+                              {employeeOptions
+                                .filter((employee) => employee.status === "active")
+                                .map((employee) => (
+                                  <option key={employee.id} value={employee.id}>
+                                    {employee.name}
+                                  </option>
+                                ))}
+                            </select>
+                            <NumberInput
+                              value={worker.share_percent}
+                              onChange={(value) =>
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  workers: newRepairServiceDraft.workers.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, share_percent: value } : item
+                                  ),
+                                })
+                              }
+                              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-slate-100"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewRepairServiceDraft({
+                                  ...newRepairServiceDraft,
+                                  workers: newRepairServiceDraft.workers.filter((_, itemIndex) => itemIndex !== index),
+                                })
+                              }
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr,160px] gap-3 items-end">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                        Ghi chu / co tinh luong
+                      </label>
+                      <input
+                        type="text"
+                        value={newRepairServiceDraft.note}
+                        onChange={(e) =>
+                          setNewRepairServiceDraft({
+                            ...newRepairServiceDraft,
+                            note: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                        placeholder="Bao hanh, hau mai, chu tu lam..."
+                      />
+                      <div className="mt-2 flex gap-4 text-xs text-slate-600 dark:text-slate-300">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={newRepairServiceDraft.isBillable}
+                            onChange={(e) =>
+                              setNewRepairServiceDraft({
+                                ...newRepairServiceDraft,
+                                isBillable: e.target.checked,
+                              })
+                            }
+                          />
+                          Tinh bill khach
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={newRepairServiceDraft.isPayableToWorker}
+                            onChange={(e) =>
+                              setNewRepairServiceDraft({
+                                ...newRepairServiceDraft,
+                                isPayableToWorker: e.target.checked,
+                              })
+                            }
+                          />
+                          Tinh luong tho
+                        </label>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newRepairServiceDraft.serviceName.trim()) {
+                          showToast.error("Vui long nhap ten dich vu cong sua");
+                          return;
+                        }
+
+                        setRepairServices([...repairServices, newRepairServiceDraft]);
+                        setNewRepairServiceDraft(createEmptyRepairServiceDraft());
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium"
+                    >
+                      Them cong sua
+                    </button>
+                  </div>
+
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-slate-50 dark:bg-slate-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Dich vu</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Gia nhap lien quan</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Cong khach tra</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Chia tho</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium text-slate-500 dark:text-slate-400"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                        {repairServices.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                              Chua co cong sua nao trong phieu.
+                            </td>
+                          </tr>
+                        )}
+                        {repairServices.map((service) => {
+                          const relatedCost = service.relatedItemIds.reduce(
+                            (sum, partId) => sum + getSelectedPartCost(partId),
+                            0
+                          );
+                          const laborAmount = getRepairServiceLaborAmount(service);
+                          const workers = getRepairServiceWorkers(service);
+                          const workerSplits = splitWorkerAmount(laborAmount, workers);
+
+                          return (
+                            <tr key={service.id} className="bg-white dark:bg-slate-900/30">
+                              <td className="px-3 py-2 text-sm text-slate-800 dark:text-slate-200">
+                                <div className="font-medium">{service.serviceName}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                  {service.laborCalcType}
+                                  {service.note ? ` | ${service.note}` : ""}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
+                                {formatCurrency(relatedCost)}
+                              </td>
+                              <td className="px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                {formatCurrency(laborAmount)}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+                                {workerSplits.length === 0
+                                  ? "Chua gan"
+                                  : workerSplits
+                                    .map((worker) => `${worker.worker_name || worker.worker_id}: ${worker.share_percent}% (${formatCurrency(worker.worker_amount)})`)
+                                    .join(", ")}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setRepairServices(repairServices.filter((item) => item.id !== service.id))
+                                  }
+                                  className="text-red-500 hover:text-red-700 text-sm"
+                                >
+                                  Xoa
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                )}
               </div>
             </div>
 
@@ -3630,7 +4553,7 @@ const WorkOrderModal: React.FC<{
                       Phí dịch vụ:
                     </span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatCurrency(formData.laborCost || 0)}
+                      {formatCurrency(effectiveLaborCost)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -4164,7 +5087,7 @@ const WorkOrderModal: React.FC<{
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-slate-800 rounded-xl max-w-md w-full p-6">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                Thêm xe cho {currentCustomer.name}
+                Thêm thiết bị cho {currentCustomer.name}
               </h3>
 
               <div className="space-y-4 mb-6">
