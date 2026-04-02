@@ -104,32 +104,98 @@ export default async function handler(req, res) {
     const { adminClient } = await assertOwner(accessToken, env);
     const body = await readJsonBody(req);
     const userId = String(body?.id || "").trim();
+    const email = String(body?.email || "").trim().toLowerCase();
 
-    if (!userId) return sendJson(res, 400, { error: "Missing staff id" });
+    if (!userId && !email) {
+      return sendJson(res, 400, { error: "Missing staff id or email" });
+    }
 
-    const { data: targetProfile, error: targetProfileError } = await adminClient
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .maybeSingle();
+    let targetProfile = null;
 
-    if (targetProfileError) throw targetProfileError;
+    if (userId) {
+      const { data, error } = await adminClient
+        .from("profiles")
+        .select("id, email, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      targetProfile = data || null;
+    }
+
+    if (!targetProfile && email) {
+      const { data, error } = await adminClient
+        .from("profiles")
+        .select("id, email, role")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (error) throw error;
+      targetProfile = data || null;
+    }
+
+    const targetAuthUserId = targetProfile?.id || userId;
+    const targetEmail = targetProfile?.email || email;
+
     if (targetProfile?.role === "owner") {
       return sendJson(res, 400, { error: "Cannot delete owner account" });
     }
 
-    const { error: deleteEmployeeError } = await adminClient
-      .from("employees")
-      .delete()
-      .eq("id", userId);
+    if (userId) {
+      const { error: deleteEmployeeByIdError } = await adminClient
+        .from("employees")
+        .delete()
+        .eq("id", userId);
 
-    if (deleteEmployeeError) throw deleteEmployeeError;
+      if (deleteEmployeeByIdError) throw deleteEmployeeByIdError;
+    }
 
-    const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(userId);
-    if (deleteUserError) {
-      return sendJson(res, 400, {
-        error: deleteUserError.message || "Could not delete account",
-      });
+    if (targetAuthUserId && targetAuthUserId !== userId) {
+      const { error: deleteEmployeeByResolvedIdError } = await adminClient
+        .from("employees")
+        .delete()
+        .eq("id", targetAuthUserId);
+
+      if (deleteEmployeeByResolvedIdError) throw deleteEmployeeByResolvedIdError;
+    }
+
+    if (targetEmail) {
+      const { error: deleteEmployeeByEmailError } = await adminClient
+        .from("employees")
+        .delete()
+        .eq("email", targetEmail);
+
+      if (deleteEmployeeByEmailError) throw deleteEmployeeByEmailError;
+    }
+
+    if (targetProfile?.id) {
+      const { error: deleteProfileByIdError } = await adminClient
+        .from("profiles")
+        .delete()
+        .eq("id", targetProfile.id);
+
+      if (deleteProfileByIdError) throw deleteProfileByIdError;
+    } else if (targetEmail) {
+      const { error: deleteProfileByEmailError } = await adminClient
+        .from("profiles")
+        .delete()
+        .eq("email", targetEmail);
+
+      if (deleteProfileByEmailError) throw deleteProfileByEmailError;
+    }
+
+    if (targetAuthUserId) {
+      const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(
+        targetAuthUserId
+      );
+      if (deleteUserError) {
+        const message = String(deleteUserError.message || "").toLowerCase();
+        if (!message.includes("user not found")) {
+          return sendJson(res, 400, {
+            error: deleteUserError.message || "Could not delete account",
+          });
+        }
+      }
     }
 
     return sendJson(res, 200, { success: true });

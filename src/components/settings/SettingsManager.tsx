@@ -619,7 +619,7 @@ export const SettingsManager = ({
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ id: staff.id }),
+        body: JSON.stringify({ id: staff.id, email: staff.email }),
       });
 
       const result = await response.json().catch(() => null);

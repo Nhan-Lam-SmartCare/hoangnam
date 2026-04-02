@@ -33,27 +33,69 @@ export async function createCategory(
   try {
     if (!input.name)
       return failure({ code: "validation", message: "Thiếu tên danh mục" });
-    const payload: any = {
-      id:
-        typeof crypto !== "undefined" && (crypto as any).randomUUID
-          ? (crypto as any).randomUUID()
-          : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
-      name: input.name,
-      icon: input.icon,
-      color: input.color,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    const { data, error } = await supabase
-      .from(CATEGORIES_TABLE)
-      .insert([payload])
-      .select()
-      .single();
-    if (error || !data)
+    const id =
+      typeof crypto !== "undefined" && (crypto as any).randomUUID
+        ? (crypto as any).randomUUID()
+        : `${Math.random().toString(36).slice(2)}-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    const createPayloadCandidates: any[] = [
+      {
+        id,
+        name: input.name,
+        icon: input.icon,
+        color: input.color,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id,
+        name: input.name,
+        icon: input.icon,
+        color: input.color,
+        created_at: now,
+      },
+      {
+        id,
+        name: input.name,
+        icon: input.icon,
+        color: input.color,
+      },
+      {
+        id,
+        name: input.name,
+        created_at: now,
+      },
+      {
+        id,
+        name: input.name,
+      },
+    ];
+
+    let createdRow: Category | null = null;
+    let lastError: any = null;
+
+    for (const payload of createPayloadCandidates) {
+      const { data, error } = await supabase
+        .from(CATEGORIES_TABLE)
+        .insert([payload])
+        .select()
+        .single();
+
+      if (!error && data) {
+        createdRow = data as Category;
+        lastError = null;
+        break;
+      }
+
+      lastError = error;
+    }
+
+    if (!createdRow)
       return failure({
         code: "supabase",
         message: "Tạo danh mục thất bại",
-        cause: error,
+        cause: lastError,
       });
     let userId: string | null = null;
     try {
@@ -61,7 +103,7 @@ export async function createCategory(
       userId = userData?.user?.id || null;
     } catch { }
     // Audit removed
-    return success(data as Category);
+    return success(createdRow);
   } catch (e: any) {
     return failure({
       code: "network",
@@ -86,12 +128,72 @@ export async function updateCategory(
       oldRow = resp?.data ?? null;
     } catch { }
     // Không có oldRow vẫn tiếp tục (audit oldData: null)
-    const { data, error } = await supabase
-      .from(CATEGORIES_TABLE)
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
+    const now = new Date().toISOString();
+    const hasName = typeof updates.name === "string";
+    const hasIcon = typeof updates.icon === "string";
+    const hasColor = typeof updates.color === "string";
+
+    const fullUpdate: any = {
+      ...updates,
+      updated_at: now,
+    };
+    const noTimestampUpdate: any = {
+      ...updates,
+    };
+
+    const nameOnlyUpdate: any = hasName
+      ? {
+          name: updates.name,
+          updated_at: now,
+        }
+      : null;
+    const nameOnlyNoTimestamp: any = hasName
+      ? {
+          name: updates.name,
+        }
+      : null;
+    const iconColorOnlyUpdate: any =
+      hasIcon || hasColor
+        ? {
+            ...(hasIcon ? { icon: updates.icon } : {}),
+            ...(hasColor ? { color: updates.color } : {}),
+            updated_at: now,
+          }
+        : null;
+    const iconColorOnlyNoTimestamp: any =
+      hasIcon || hasColor
+        ? {
+            ...(hasIcon ? { icon: updates.icon } : {}),
+            ...(hasColor ? { color: updates.color } : {}),
+          }
+        : null;
+
+    const updateCandidates = [
+      fullUpdate,
+      noTimestampUpdate,
+      nameOnlyUpdate,
+      nameOnlyNoTimestamp,
+      iconColorOnlyUpdate,
+      iconColorOnlyNoTimestamp,
+    ].filter(Boolean);
+
+    let data: any = null;
+    let error: any = null;
+
+    for (const updatePayload of updateCandidates) {
+      const response = await supabase
+        .from(CATEGORIES_TABLE)
+        .update(updatePayload)
+        .eq("id", id)
+        .select()
+        .single();
+
+      data = response.data;
+      error = response.error;
+
+      if (!error) break;
+    }
+
     let resultRow: any = data;
     if ((!data || error) && !error) {
       // No data returned but also no supabase error => synthesize row (mock case)
