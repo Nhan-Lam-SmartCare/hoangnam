@@ -134,6 +134,11 @@ export const SettingsManager = ({
   const [newStaffPosition, setNewStaffPosition] = useState("");
   const [newStaffBaseSalary, setNewStaffBaseSalary] = useState("0");
   const [newStaffPassword, setNewStaffPassword] = useState("");
+  const [resettingStaff, setResettingStaff] = useState(false);
+  const [resetTargetStaff, setResetTargetStaff] = useState<StaffMember | null>(
+    null
+  );
+  const [resetStaffPassword, setResetStaffPassword] = useState("");
   const [savingStaff, setSavingStaff] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [staffDepartmentFilter, setStaffDepartmentFilter] = useState("all");
@@ -737,6 +742,81 @@ export const SettingsManager = ({
     }
   };
 
+  const generateTemporaryPassword = () => {
+    const characters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#";
+    let generated = "";
+
+    for (let i = 0; i < 10; i += 1) {
+      generated += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+
+    return generated;
+  };
+
+  const openResetStaffDialog = (staff: StaffMember) => {
+    if (staff.role === "owner") {
+      showToast.error("Không thể đặt lại mật khẩu cho tài khoản chủ cửa hàng");
+      return;
+    }
+
+    setResetTargetStaff(staff);
+    setResetStaffPassword(generateTemporaryPassword());
+  };
+
+  const closeResetStaffDialog = () => {
+    setResetTargetStaff(null);
+    setResetStaffPassword("");
+  };
+
+  const handleResetStaffPassword = async () => {
+    if (!resetTargetStaff) return;
+
+    const password = resetStaffPassword.trim();
+    if (password.length < 6) {
+      showToast.error("Mật khẩu tạm phải từ 6 ký tự");
+      return;
+    }
+
+    setResettingStaff(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+      }
+
+      const response = await fetch("/api/staff/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: resetTargetStaff.id,
+          email: resetTargetStaff.email,
+          password,
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || "Không thể đặt lại mật khẩu");
+      }
+
+      showToast.success(
+        `Đã đặt lại mật khẩu tạm cho ${resetTargetStaff.name || resetTargetStaff.email}`
+      );
+      closeResetStaffDialog();
+    } catch (error: any) {
+      console.error("Error resetting staff password:", error);
+      showToast.error(error.message || "Không thể đặt lại mật khẩu");
+    } finally {
+      setResettingStaff(false);
+    }
+  };
+
   const resetNewStaffForm = () => {
     setNewStaffEmail("");
     setNewStaffName("");
@@ -1037,6 +1117,7 @@ export const SettingsManager = ({
         if (!normalized.address && normalized.storeAddress) normalized.address = normalized.storeAddress;
         if (!normalized.phone && normalized.storePhone) normalized.phone = normalized.storePhone;
         if (!normalized.email && normalized.storeEmail) normalized.email = normalized.storeEmail;
+        if (!normalized.logo_url && normalized.logoUrl) normalized.logo_url = normalized.logoUrl;
         if (!normalized.bank_name && normalized.bankName) normalized.bank_name = normalized.bankName;
         if (!normalized.bank_account_number && normalized.bankAccount) normalized.bank_account_number = normalized.bankAccount;
         if (!normalized.bank_account_holder && normalized.bankAccountName) normalized.bank_account_holder = normalized.bankAccountName;
@@ -1114,6 +1195,7 @@ export const SettingsManager = ({
       ["address", "storeAddress"],
       ["phone", "storePhone"],
       ["email", "storeEmail"],
+      ["logo_url", "logoUrl"],
       ["bank_name", "bankName"],
       ["bank_account_number", "bankAccount"],
       ["bank_account_holder", "bankAccountName"],
@@ -1808,6 +1890,16 @@ export const SettingsManager = ({
                   placeholder="https://..."
                   className="w-full px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
                 />
+                {isOwner && settings.logo_url && (
+                  <button
+                    type="button"
+                    onClick={() => updateField("logo_url", "")}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Xóa logo
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2409,6 +2501,82 @@ export const SettingsManager = ({
               </div>
             )}
 
+            {resetTargetStaff && (
+              <div className="overflow-hidden rounded-[28px] border border-amber-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(245,158,11,0.16),_transparent_32%),linear-gradient(145deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82))] p-5 md:p-6">
+                <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-300" />
+                  Đặt lại mật khẩu nhân viên
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium text-slate-300 mb-1.5">
+                      Nhân viên
+                    </label>
+                    <input
+                      type="text"
+                      value={resetTargetStaff.name || resetTargetStaff.email}
+                      disabled
+                      className="w-full px-4 py-2.5 text-sm border border-white/10 rounded-lg bg-white/5 text-slate-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium text-slate-300 mb-1.5">
+                      Email
+                    </label>
+                    <input
+                      type="text"
+                      value={resetTargetStaff.email}
+                      disabled
+                      className="w-full px-4 py-2.5 text-sm border border-white/10 rounded-lg bg-white/5 text-slate-300"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs md:text-sm font-medium text-slate-300 mb-1.5">
+                      Mật khẩu tạm mới *
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        value={resetStaffPassword}
+                        onChange={(e) => setResetStaffPassword(e.target.value)}
+                        placeholder="Nhập mật khẩu tạm mới (>= 6 ký tự)"
+                        className="w-full px-4 py-2.5 text-sm border border-white/10 rounded-lg bg-white/5 text-white placeholder:text-slate-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setResetStaffPassword(generateTemporaryPassword())}
+                        className="px-3.5 py-2 rounded-lg border border-amber-300/30 text-amber-200 hover:bg-amber-500/10 text-sm font-medium"
+                      >
+                        Tạo nhanh
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeResetStaffDialog}
+                    disabled={resettingStaff}
+                    className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-slate-300 hover:text-white disabled:opacity-70"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetStaffPassword}
+                    disabled={resettingStaff || resetStaffPassword.trim().length < 6}
+                    className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-500 text-white rounded-lg text-sm font-medium inline-flex items-center justify-center gap-2"
+                  >
+                    {resettingStaff ? "Đang xử lý..." : "Xác nhận đặt lại"}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-3">
+                  Sau khi đặt lại, nhân viên đăng nhập bằng mật khẩu tạm mới và nên đổi lại mật khẩu riêng.
+                </p>
+              </div>
+            )}
+
             {/* Staff List */}
             {loadingStaff ? (
               <div className="flex items-center justify-center py-12">
@@ -2704,6 +2872,16 @@ export const SettingsManager = ({
                                 )}
                                 {staff.role !== "owner" && (
                                   <button
+                                    onClick={() => openResetStaffDialog(staff)}
+                                    disabled={savingStaff || resettingStaff}
+                                    className="p-2 text-amber-300 hover:bg-amber-500/10 rounded-xl disabled:opacity-60"
+                                    title="Đặt lại mật khẩu"
+                                  >
+                                    <Lock className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {staff.role !== "owner" && (
+                                  <button
                                     onClick={() => handleDeleteStaff(staff)}
                                     disabled={savingStaff}
                                     className="p-2 text-red-300 hover:bg-red-500/10 rounded-xl"
@@ -2892,12 +3070,19 @@ export const SettingsManager = ({
                             </div>
 
                             {staff.role !== "owner" && (
-                              <div className="pt-2 grid grid-cols-2 gap-2">
+                              <div className="pt-2 grid grid-cols-3 gap-2">
                                 <button
                                   onClick={() => setEditingStaff({ ...staff })}
                                   className="px-3 py-2 rounded-lg bg-blue-600/20 text-blue-300 border border-blue-400/30 text-xs font-semibold"
                                 >
                                   Sửa
+                                </button>
+                                <button
+                                  onClick={() => openResetStaffDialog(staff)}
+                                  disabled={resettingStaff || savingStaff}
+                                  className="px-3 py-2 rounded-lg bg-amber-600/20 text-amber-300 border border-amber-400/30 text-xs font-semibold disabled:opacity-70"
+                                >
+                                  Đặt MK
                                 </button>
                                 <button
                                   onClick={() => handleDeleteStaff(staff)}

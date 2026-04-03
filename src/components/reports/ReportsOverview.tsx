@@ -22,6 +22,18 @@ type FilterKey =
 
 type MetricTab = "revenue" | "cashflow" | "inventory" | "payroll" | "debt" | "tax";
 
+type DailyCashflowRow = {
+  dayKey: string;
+  income: number;
+  expense: number;
+  diff: number;
+  cashIn: number;
+  cashOut: number;
+  bankIn: number;
+  bankOut: number;
+  txCount: number;
+};
+
 function toLocalDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -34,6 +46,11 @@ function toDateKeyFromRaw(raw: any): string | null {
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return null;
   return toLocalDateKey(d);
+}
+
+function isCashSource(sourceId?: string): boolean {
+  const normalized = String(sourceId || "").toLowerCase();
+  return normalized.includes("cash") || normalized.includes("tienmat");
 }
 
 function getFilterRange(filter: FilterKey): { start: Date; end: Date } {
@@ -176,6 +193,74 @@ export default function ReportsOverview() {
     return rows.reverse();
   }, [reportFilter, workOrders, parts, cashTransactions, currentBranchId]);
 
+  const dailyCashflowRows = useMemo<DailyCashflowRow[]>(() => {
+    const { start, end } = getFilterRange(reportFilter);
+    const rowsMap = new Map<string, DailyCashflowRow>();
+
+    for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      const day = new Date(cursor);
+      day.setHours(0, 0, 0, 0);
+      const dayKey = toLocalDateKey(day);
+      rowsMap.set(dayKey, {
+        dayKey,
+        income: 0,
+        expense: 0,
+        diff: 0,
+        cashIn: 0,
+        cashOut: 0,
+        bankIn: 0,
+        bankOut: 0,
+        txCount: 0,
+      });
+    }
+
+    (cashTransactions || []).forEach((tx: any) => {
+      const txDay = toDateKeyFromRaw(tx.date);
+      if (!txDay || !rowsMap.has(txDay)) return;
+
+      const txBranch = tx.branchId || tx.branchid || tx.branch_id;
+      if (currentBranchId && txBranch && txBranch !== currentBranchId) return;
+
+      const row = rowsMap.get(txDay)!;
+      const amount = Number(tx.amount || 0);
+      const isCash = isCashSource(tx.paymentSourceId || tx.paymentsource || tx.paymentSource);
+      const txType = tx.type === "income" ? "income" : "expense";
+
+      if (txType === "income") {
+        row.income += amount;
+        if (isCash) row.cashIn += amount;
+        else row.bankIn += amount;
+      } else {
+        row.expense += amount;
+        if (isCash) row.cashOut += amount;
+        else row.bankOut += amount;
+      }
+
+      row.txCount += 1;
+    });
+
+    return Array.from(rowsMap.values())
+      .map((row) => ({
+        ...row,
+        diff: row.income - row.expense,
+      }))
+      .reverse();
+  }, [cashTransactions, currentBranchId, reportFilter]);
+
+  const cashflowTotals = useMemo(() => {
+    return dailyCashflowRows.reduce(
+      (acc, row) => {
+        acc.income += row.income;
+        acc.expense += row.expense;
+        acc.diff += row.diff;
+        acc.cashIn += row.cashIn;
+        acc.bankIn += row.bankIn;
+        return acc;
+      },
+      { income: 0, expense: 0, diff: 0, cashIn: 0, bankIn: 0 }
+    );
+  }, [dailyCashflowRows]);
+
   const isLoading = loadingWorkOrders || loadingParts || loadingCashTx;
 
   return (
@@ -233,59 +318,160 @@ export default function ReportsOverview() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <Coins className="h-4 w-4" /> Tổng doanh thu
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-            {formatCurrency(filteredStats.revenue)}
-          </div>
-        </article>
+      {metricTab === "cashflow" ? (
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <Coins className="h-4 w-4" /> Thu trong kỳ
+            </div>
+            <div className="mt-2 text-2xl font-bold text-emerald-500">
+              {formatCurrency(cashflowTotals.income)}
+            </div>
+          </article>
 
-        <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <Wallet className="h-4 w-4" /> Tổng chi phí
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-            {formatCurrency(filteredStats.expense)}
-          </div>
-        </article>
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <Wallet className="h-4 w-4" /> Chi trong kỳ
+            </div>
+            <div className="mt-2 text-2xl font-bold text-rose-500">
+              {formatCurrency(cashflowTotals.expense)}
+            </div>
+          </article>
 
-        <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <TrendingUp className="h-4 w-4" /> Lợi nhuận thuần
-          </div>
-          <div
-            className={`mt-2 text-2xl font-bold ${
-              filteredStats.profit >= 0 ? "text-emerald-500" : "text-rose-500"
-            }`}
-          >
-            {formatCurrency(filteredStats.profit)}
-          </div>
-        </article>
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <TrendingUp className="h-4 w-4" /> Chênh lệch
+            </div>
+            <div
+              className={`mt-2 text-2xl font-bold ${
+                cashflowTotals.diff >= 0 ? "text-emerald-500" : "text-rose-500"
+              }`}
+            >
+              {formatCurrency(cashflowTotals.diff)}
+            </div>
+          </article>
 
-        <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-            <HandCoins className="h-4 w-4" /> Tỷ suất lợi nhuận
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
-            {filteredStats.revenue > 0
-              ? ((filteredStats.profit / filteredStats.revenue) * 100).toFixed(1)
-              : "0.0"}
-            %
-          </div>
-        </article>
-      </section>
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <HandCoins className="h-4 w-4" /> TM trong kỳ
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+              {formatCurrency(cashflowTotals.cashIn)}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <HandCoins className="h-4 w-4" /> NH trong kỳ
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+              {formatCurrency(cashflowTotals.bankIn)}
+            </div>
+          </article>
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <Coins className="h-4 w-4" /> Tổng doanh thu
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+              {formatCurrency(filteredStats.revenue)}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <Wallet className="h-4 w-4" /> Tổng chi phí
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+              {formatCurrency(filteredStats.expense)}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <TrendingUp className="h-4 w-4" /> Lợi nhuận thuần
+            </div>
+            <div
+              className={`mt-2 text-2xl font-bold ${
+                filteredStats.profit >= 0 ? "text-emerald-500" : "text-rose-500"
+              }`}
+            >
+              {formatCurrency(filteredStats.profit)}
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <HandCoins className="h-4 w-4" /> Tỷ suất lợi nhuận
+            </div>
+            <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+              {filteredStats.revenue > 0
+                ? ((filteredStats.profit / filteredStats.revenue) * 100).toFixed(1)
+                : "0.0"}
+              %
+            </div>
+          </article>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-          <CalendarDays className="h-4 w-4 text-blue-500" /> Chi tiết theo ngày
+          <CalendarDays className="h-4 w-4 text-blue-500" />
+          {metricTab === "cashflow" ? "Thu chi theo ngày" : "Chi tiết theo ngày"}
         </div>
 
         {isLoading ? (
           <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
             Đang tải dữ liệu báo cáo...
+          </div>
+        ) : metricTab === "cashflow" ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  <th className="px-3 py-2">Ngày</th>
+                  <th className="px-3 py-2">Thu</th>
+                  <th className="px-3 py-2">Chi</th>
+                  <th className="px-3 py-2">Chênh lệch</th>
+                  <th className="px-3 py-2">TM thu/chi</th>
+                  <th className="px-3 py-2">NH thu/chi</th>
+                  <th className="px-3 py-2">Số GD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyCashflowRows.map((row) => (
+                  <tr key={row.dayKey} className="border-b border-slate-100 dark:border-slate-800">
+                    <td className="px-3 py-2 font-semibold text-slate-700 dark:text-slate-200">
+                      {row.dayKey}
+                    </td>
+                    <td className="px-3 py-2 text-emerald-500 font-semibold">
+                      {formatCurrency(row.income)}
+                    </td>
+                    <td className="px-3 py-2 text-rose-500 font-semibold">
+                      {formatCurrency(row.expense)}
+                    </td>
+                    <td
+                      className={`px-3 py-2 font-bold ${
+                        row.diff >= 0 ? "text-emerald-500" : "text-rose-500"
+                      }`}
+                    >
+                      {formatCurrency(row.diff)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {formatCurrency(row.cashIn)} / {formatCurrency(row.cashOut)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {formatCurrency(row.bankIn)} / {formatCurrency(row.bankOut)}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
+                      {row.txCount}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="overflow-x-auto">
