@@ -62,6 +62,7 @@ interface StoreSettings {
   currency?: string;
   date_format?: string;
   timezone?: string;
+  facebook?: string;
 }
 
 interface StaffMember {
@@ -164,6 +165,7 @@ export const SettingsManager = ({
   const [salaryDetailRows, setSalaryDetailRows] = useState<WorkerLaborDetailRow[]>([]);
   const [loadingSalaryDetails, setLoadingSalaryDetails] = useState(false);
   const salaryRowsCacheRef = useRef<Record<string, any[]>>({});
+  const missingStoreSettingsColumnsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     loadSettings();
@@ -1005,15 +1007,28 @@ export const SettingsManager = ({
 
   const loadSettings = async () => {
     try {
-      // Use maybeSingle() instead of single() to avoid 406 error when table is empty
-      const { data, error } = await supabase
+      // Always use canonical row id='default' to avoid reading a different stale row.
+      const { data: defaultData, error: defaultError } = await supabase
         .from("store_settings")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .eq("id", "default")
         .maybeSingle();
 
-      if (error) throw error;
+      if (defaultError) throw defaultError;
+
+      // Fallback for legacy databases that may have a non-default id row.
+      let data = defaultData;
+      if (!data) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("store_settings")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fallbackError) throw fallbackError;
+        data = fallbackData;
+      }
 
       if (data) {
         // Normalize camelCase columns (from DB) to snake_case (used by UI)
@@ -1046,6 +1061,79 @@ export const SettingsManager = ({
     }
   };
 
+  const normalizeSchemaKey = (value: string) =>
+    value.toLowerCase().replace(/[_\-\s]/g, "");
+
+  const extractMissingColumnFromError = (error: any): string | null => {
+    const raw =
+      error?.message ||
+      error?.details ||
+      error?.hint ||
+      (typeof error === "string" ? error : "");
+    if (!raw) return null;
+
+    const match = String(raw).match(/Could not find the '([^']+)' column/i);
+    return match?.[1] || null;
+  };
+
+  const stripMissingColumn = (
+    payload: Record<string, any>,
+    missingColumn: string
+  ) => {
+    const missingRaw = String(missingColumn || "").trim().toLowerCase();
+    const nextPayload = { ...payload };
+
+    // 1) Prefer exact key match (case-insensitive) so snake_case errors don't remove camelCase aliases.
+    const exactKey = Object.keys(nextPayload).find(
+      (key) => key.toLowerCase() === missingRaw
+    );
+    if (exactKey) {
+      delete nextPayload[exactKey];
+      return nextPayload;
+    }
+
+    // 2) Fallback: remove only one normalized match key instead of removing all aliases.
+    const normalizedMissing = normalizeSchemaKey(missingColumn);
+    const normalizedKey = Object.keys(nextPayload).find(
+      (key) => normalizeSchemaKey(key) === normalizedMissing
+    );
+    if (normalizedKey) {
+      delete nextPayload[normalizedKey];
+    }
+
+    return nextPayload;
+  };
+
+  const buildStoreSettingsPayload = (input: StoreSettings): Record<string, any> => {
+    const base = Object.fromEntries(
+      Object.entries(input).filter(([, value]) => value !== undefined)
+    ) as Record<string, any>;
+
+    const aliases: Array<[string, string]> = [
+      ["store_name", "storeName"],
+      ["address", "storeAddress"],
+      ["phone", "storePhone"],
+      ["email", "storeEmail"],
+      ["bank_name", "bankName"],
+      ["bank_account_number", "bankAccount"],
+      ["bank_account_holder", "bankAccountName"],
+      ["bank_qr_url", "bankQrUrl"],
+    ];
+
+    aliases.forEach(([snakeKey, camelKey]) => {
+      const snakeValue = base[snakeKey];
+
+      // UI uses snake_case keys as source of truth. 
+      // Forcefully sync the edited snake_case value into the legacy camelCase key,
+      // so if snake_case is stripped due to schema mismatch, camelCase retains the latest user edit.
+      if (snakeValue !== undefined) {
+        base[camelKey] = snakeValue;
+      }
+    });
+
+    return base;
+  };
+
   const handleSave = async () => {
     if (!settings) return;
 
@@ -1055,19 +1143,56 @@ export const SettingsManager = ({
 
       console.log("Saving settings:", settings);
 
-      // Update settings
-      const { error, data } = await supabase
-        .from("store_settings")
-        .update(settings)
-        .eq("id", settings.id)
-        .select();
+      let payload = buildStoreSettingsPayload(settings);
+      payload.id = "default";
 
-      if (error) {
-        console.error("Update error:", error);
-        throw error;
+      // Pre-strip columns known to be missing in current DB schema to avoid repeated retries.
+      missingStoreSettingsColumnsRef.current.forEach((missingColumn) => {
+        payload = stripMissingColumn(payload, missingColumn);
+      });
+
+      let attempts = 0;
+      const maxAttempts = 30;
+      let saveError: any = null;
+      let saved = false;
+
+      while (!saved && attempts < maxAttempts) {
+        attempts += 1;
+
+        const { error, data } = await supabase
+          .from("store_settings")
+          .upsert(payload, { onConflict: "id" })
+          .select();
+
+        if (!error) {
+          console.log("Save result:", data);
+          saved = true;
+          saveError = null;
+          break;
+        }
+
+        const missingColumn = extractMissingColumnFromError(error);
+        if (!missingColumn) {
+          saveError = error;
+          break;
+        }
+
+        const nextPayload = stripMissingColumn(payload, missingColumn);
+        if (Object.keys(nextPayload).length === Object.keys(payload).length) {
+          saveError = error;
+          break;
+        }
+
+        missingStoreSettingsColumnsRef.current.add(missingColumn);
+        payload = nextPayload;
+        console.info(
+          `[Settings] Legacy schema missing '${missingColumn}', retrying with compatible payload.`
+        );
       }
 
-      console.log("Update result:", data);
+      if (!saved) {
+        throw saveError || new Error("Không thể lưu cài đặt cửa hàng");
+      }
 
       // Reload settings after save to confirm changes
       await loadSettings();
@@ -1093,9 +1218,76 @@ export const SettingsManager = ({
     setSettings({ ...settings, [field]: value });
   };
 
+  const resetFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.target.value = "";
+  };
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () =>
+        reject(reader.error || new Error("KhÃ´ng thá»ƒ Ä‘á»c file áº£nh"));
+      reader.readAsDataURL(file);
+    });
+
+  const uploadStoreAsset = async (
+    file: File,
+    prefix: "logo" | "bank-qr"
+  ): Promise<{ url: string; mode: "storage" | "inline" }> => {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${prefix}-${Date.now()}.${fileExt}`;
+    const filePath = `store-assets/${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("public-assets")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("public-assets")
+        .getPublicUrl(filePath);
+
+      if (!data?.publicUrl) {
+        throw new Error("KhÃ´ng láº¥y Ä‘Æ°á»£c URL cÃ´ng khai cá»§a áº£nh");
+      }
+
+      return { url: data.publicUrl, mode: "storage" };
+    } catch (error) {
+      console.warn(
+        "[SettingsManager] Upload lÃªn storage tháº¥t báº¡i, chuyá»ƒn sang lÆ°u áº£nh trá»±c tiáº¿p trong cÃ i Ä‘áº·t:",
+        error
+      );
+
+      const dataUrl = await readFileAsDataUrl(file);
+      return { url: dataUrl, mode: "inline" };
+    }
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const finishLogoUpload = async () => {
+      setUploadingLogo(true);
+      try {
+        const result = await uploadStoreAsset(file, "logo");
+        updateField("logo_url", result.url);
+        showToast.success(
+          result.mode === "storage"
+            ? "ÄÃ£ táº£i logo lÃªn thÃ nh cÃ´ng!"
+            : "ÄÃ£ gáº¯n logo vÃ o cÃ i Ä‘áº·t. Nhá»› báº¥m LÆ°u thay Ä‘á»•i."
+        );
+      } catch (error: any) {
+        console.error("Error uploading logo:", error);
+        showToast.error(error.message || "KhÃ´ng thá»ƒ táº£i logo lÃªn");
+      } finally {
+        setUploadingLogo(false);
+        resetFileInput(e);
+      }
+    };
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
@@ -1109,6 +1301,7 @@ export const SettingsManager = ({
       return;
     }
 
+    return finishLogoUpload();
     setUploadingLogo(true);
     try {
       const fileExt = file.name.split(".").pop();
@@ -1139,6 +1332,25 @@ export const SettingsManager = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const finishQRUpload = async () => {
+      setUploadingQR(true);
+      try {
+        const result = await uploadStoreAsset(file, "bank-qr");
+        updateField("bank_qr_url", result.url);
+        showToast.success(
+          result.mode === "storage"
+            ? "ÄÃ£ táº£i mÃ£ QR ngÃ¢n hÃ ng lÃªn thÃ nh cÃ´ng!"
+            : "ÄÃ£ gáº¯n mÃ£ QR vÃ o cÃ i Ä‘áº·t. Nhá»› báº¥m LÆ°u thay Ä‘á»•i."
+        );
+      } catch (error: any) {
+        console.error("Error uploading QR:", error);
+        showToast.error(error.message || "KhÃ´ng thá»ƒ táº£i mÃ£ QR lÃªn");
+      } finally {
+        setUploadingQR(false);
+        resetFileInput(e);
+      }
+    };
+
     if (!file.type.startsWith("image/")) {
       showToast.error("Vui lòng chọn file ảnh");
       return;
@@ -1149,6 +1361,7 @@ export const SettingsManager = ({
       return;
     }
 
+    return finishQRUpload();
     setUploadingQR(true);
     try {
       const fileExt = file.name.split(".").pop();
@@ -1464,8 +1677,8 @@ export const SettingsManager = ({
                 </label>
                 <input
                   type="text"
-                  value={settings.email || ""}
-                  onChange={(e) => updateField("email", e.target.value)}
+                  value={settings.facebook || ""}
+                  onChange={(e) => updateField("facebook", e.target.value)}
                   disabled={!isOwner}
                   placeholder="Link Facebook hoặc Tên Fanpage"
                   className="w-full px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"

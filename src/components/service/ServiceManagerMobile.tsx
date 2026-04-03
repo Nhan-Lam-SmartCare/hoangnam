@@ -127,8 +127,8 @@ const WorkOrderCard = React.memo(({
     "Chưa ghi mô tả lỗi";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#254a8e]/45 bg-[#161922] shadow-[0_8px_20px_rgba(0,0,0,0.25)]">
-      <div className="p-3.5 space-y-2.5">
+    <div className="overflow-hidden rounded-xl border border-[#254a8e]/45 bg-[#161922] shadow-[0_6px_16px_rgba(0,0,0,0.22)]">
+      <div className="p-2.5 space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -141,15 +141,15 @@ const WorkOrderCard = React.memo(({
             </div>
           </div>
 
-          <div className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold ${statusMeta.className}`}>
+          <div className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}>
             {statusMeta.icon}
             <span>{workOrder.status}</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-          <div className="min-w-0 space-y-1.5">
-            <div className="text-[13px] font-semibold text-slate-100 truncate">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <div className="min-w-0 space-y-1">
+            <div className="text-[12px] font-semibold text-slate-100 truncate">
               {workOrder.customerName || "Khách lẻ"}
             </div>
             <div className="text-[11px] text-slate-400 truncate">{workOrder.vehicleModel || "--"}</div>
@@ -158,7 +158,7 @@ const WorkOrderCard = React.memo(({
             </div>
           </div>
           <div className="text-right min-w-0">
-            <div className="text-[12px] font-medium text-slate-300">{workOrder.customerPhone || "--"}</div>
+            <div className="text-[11px] font-medium text-slate-300">{workOrder.customerPhone || "--"}</div>
             <div className="text-[11px] font-mono text-slate-500 mt-0.5">{workOrder.licensePlate || "--"}</div>
           </div>
         </div>
@@ -166,9 +166,9 @@ const WorkOrderCard = React.memo(({
         <div className="h-px bg-[#273348]" />
 
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[12px] text-slate-400">KTV:</span>
-            <span className="text-[12px] font-semibold text-slate-200 truncate max-w-[120px]">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[11px] text-slate-400">KTV:</span>
+            <span className="text-[11px] font-semibold text-slate-200 truncate max-w-[110px]">
               {workOrder.technicianName || "Chưa phân"}
             </span>
             {isPaid && (
@@ -181,7 +181,7 @@ const WorkOrderCard = React.memo(({
           <div className="text-right">
             {hasDebt ? (
               <>
-                <div className="text-[18px] leading-none font-bold text-red-400">
+                <div className="text-[16px] leading-none font-bold text-red-400">
                   Nợ {formatCurrency(remainingAmount)}
                 </div>
                 <div className="mt-1 text-[11px] text-slate-400">
@@ -189,7 +189,7 @@ const WorkOrderCard = React.memo(({
                 </div>
               </>
             ) : (
-              <div className="text-[18px] leading-none font-bold text-emerald-300">
+              <div className="text-[16px] leading-none font-bold text-emerald-300">
                 {formatCurrency(workOrder.total || 0)}
               </div>
             )}
@@ -200,36 +200,36 @@ const WorkOrderCard = React.memo(({
       <div className="grid grid-cols-4 border-t border-[#273348]">
         <button
           onClick={() => onCall(workOrder.customerPhone || "")}
-          className="h-12 flex items-center justify-center gap-1.5 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
           title="Gọi"
         >
-          <Phone className="w-4 h-4" />
-          <span className="text-[12px] font-medium">Gọi</span>
+          <Phone className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-medium">Gọi</span>
         </button>
         <button
           onClick={() => onPrint(workOrder)}
-          className="h-12 flex items-center justify-center gap-1.5 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
           title="In"
         >
-          <Printer className="w-4 h-4" />
-          <span className="text-[12px] font-medium">In</span>
+          <Printer className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-medium">In</span>
         </button>
         <button
           onClick={() => onEdit(workOrder)}
-          className="h-12 flex items-center justify-center gap-1.5 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
           title="Sửa"
         >
-          <Edit2 className="w-4 h-4" />
-          <span className="text-[12px] font-medium">Sửa</span>
+          <Edit2 className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-medium">Sửa</span>
         </button>
         <button
           onClick={() => onDelete(workOrder)}
           disabled={!canDelete}
-          className="h-12 flex items-center justify-center gap-1.5 text-pink-400 disabled:text-slate-600 active:bg-slate-800/50"
+          className="h-10 flex items-center justify-center gap-1 text-pink-400 disabled:text-slate-600 active:bg-slate-800/50"
           title={canDelete ? "Xóa" : "Không có quyền xóa"}
         >
-          <Trash2 className="w-4 h-4" />
-          <span className="text-[12px] font-medium">Xóa</span>
+          <Trash2 className="w-3.5 h-3.5" />
+          <span className="text-[11px] font-medium">Xóa</span>
         </button>
       </div>
     </div>
@@ -510,17 +510,17 @@ export function ServiceManagerMobile({
   const canDeleteWorkOrder = canDo(profile?.role, "work_order.delete");
 
   return (
-    <div className="md:hidden flex flex-col h-screen bg-[#0f131b]">
+    <div className="md:hidden flex flex-col h-[100dvh] bg-[#0f131b]">
       {/* SEARCH BAR & TAB NAVIGATION - Always visible */}
-      <div className="border-b border-[#22304a] bg-[#111624] px-3 py-2.5">
+      <div className="border-b border-[#22304a] bg-[#111624] px-2 py-2">
         <div className="grid grid-cols-3 gap-2">
-          <button onClick={() => setActiveTab('orders')} className={`py-2 text-xs font-semibold rounded-xl transition-all border ${activeTab === 'orders' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
+          <button onClick={() => setActiveTab('orders')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'orders' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Phiếu SC
           </button>
-          <button onClick={() => setActiveTab('history')} className={`py-2 text-xs font-semibold rounded-xl transition-all border ${activeTab === 'history' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
+          <button onClick={() => setActiveTab('history')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'history' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Lịch sử
           </button>
-          <button onClick={() => setActiveTab('templates')} className={`py-2 text-xs font-semibold rounded-xl transition-all border ${activeTab === 'templates' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
+          <button onClick={() => setActiveTab('templates')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'templates' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Mẫu SC
           </button>
         </div>
@@ -531,9 +531,9 @@ export function ServiceManagerMobile({
         {activeTab === "orders" && (
           <>
             <PullToRefresh onRefresh={onRefresh || (async () => { })}>
-              <div className="pb-24">
+              <div className="pb-20">
                 {/* KPI CARDS */}
-                <div className="border-b border-[#22304a] bg-[#111624] px-3 py-3">
+                <div className="border-b border-[#22304a] bg-[#111624] px-2 py-2">
                   <div className="grid grid-cols-4 gap-2">
                     {/* Tiếp nhận */}
                     <button
@@ -542,13 +542,13 @@ export function ServiceManagerMobile({
                           statusFilter === "Tiếp nhận" ? "all" : "Tiếp nhận"
                         )
                       }
-                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Tiếp nhận"
+                        className={`rounded-xl border px-1 py-2 text-center transition-all ${statusFilter === "Tiếp nhận"
                         ? "bg-[#16365d] border-[#2f6ea8]"
                         : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <FileText className="w-4 h-4 text-[#54b3ff] mx-auto mb-1" />
-                      <div className="text-2xl leading-none font-bold text-slate-100">{kpis.tiepNhan}</div>
+                      <FileText className="w-3.5 h-3.5 text-[#54b3ff] mx-auto mb-0.5" />
+                      <div className="text-xl leading-none font-bold text-slate-100">{kpis.tiepNhan}</div>
                       <span className="text-[11px] text-slate-400">Tiếp nhận</span>
                     </button>
 
@@ -557,13 +557,13 @@ export function ServiceManagerMobile({
                       onClick={() =>
                         setStatusFilter(statusFilter === "Đang sửa" ? "all" : "Đang sửa")
                       }
-                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Đang sửa"
+                        className={`rounded-xl border px-1 py-2 text-center transition-all ${statusFilter === "Đang sửa"
                         ? "bg-[#442131] border-[#8d3a5c]"
                         : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <Wrench className="w-4 h-4 text-[#ff6e9f] mx-auto mb-1" />
-                      <div className="text-2xl leading-none font-bold text-slate-100">{kpis.dangSua}</div>
+                      <Wrench className="w-3.5 h-3.5 text-[#ff6e9f] mx-auto mb-0.5" />
+                      <div className="text-xl leading-none font-bold text-slate-100">{kpis.dangSua}</div>
                       <span className="text-[11px] text-slate-400">Đang sửa</span>
                     </button>
 
@@ -574,13 +574,13 @@ export function ServiceManagerMobile({
                           statusFilter === "Đã sửa xong" ? "all" : "Đã sửa xong"
                         )
                       }
-                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Đã sửa xong"
+                        className={`rounded-xl border px-1 py-2 text-center transition-all ${statusFilter === "Đã sửa xong"
                         ? "bg-[#153b32] border-[#2f7f6b]"
                         : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <Check className="w-4 h-4 text-[#7ce0bf] mx-auto mb-1" />
-                      <div className="text-2xl leading-none font-bold text-slate-100">
+                      <Check className="w-3.5 h-3.5 text-[#7ce0bf] mx-auto mb-0.5" />
+                      <div className="text-xl leading-none font-bold text-slate-100">
                         {kpis.daHoanThanh}
                       </div>
                       <span className="text-[11px] text-slate-400">Đã sửa</span>
@@ -591,20 +591,20 @@ export function ServiceManagerMobile({
                       onClick={() =>
                         setStatusFilter(statusFilter === "Trả máy" ? "all" : "Trả máy")
                       }
-                        className={`rounded-2xl border px-1.5 py-3 text-center transition-all ${statusFilter === "Trả máy"
+                        className={`rounded-xl border px-1 py-2 text-center transition-all ${statusFilter === "Trả máy"
                         ? "bg-[#2f1f4a] border-[#6650a4]"
                         : "bg-[#171e2d] border-[#27364e]"
                         }`}
                     >
-                      <Key className="w-4 h-4 text-[#9d72ff] mx-auto mb-1" />
-                      <div className="text-2xl leading-none font-bold text-slate-100">{kpis.traMay}</div>
+                      <Key className="w-3.5 h-3.5 text-[#9d72ff] mx-auto mb-0.5" />
+                      <div className="text-xl leading-none font-bold text-slate-100">{kpis.traMay}</div>
                       <span className="text-[11px] text-slate-400">Trả máy</span>
                     </button>
                   </div>
 
                   {/* Doanh thu & Lợi nhuận */}
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="relative overflow-hidden rounded-2xl border border-[#27364e] bg-[#171b2a] p-3 text-white">
+                    <div className="relative overflow-hidden rounded-xl border border-[#27364e] bg-[#171b2a] p-2.5 text-white">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-semibold text-slate-300">
                           Doanh thu {getDateLabel()}
@@ -626,11 +626,11 @@ export function ServiceManagerMobile({
                           <DollarSign className="w-4 h-4" />
                         </div>
                       </div>
-                      <div className="text-base font-black text-emerald-300">
+                      <div className="text-sm font-black text-emerald-300">
                         {showFinancials ? formatCurrency(kpis.doanhThu) : "•••••••"}
                       </div>
                     </div>
-                    <div className="relative overflow-hidden rounded-2xl border border-[#27364e] bg-[#171b2a] p-3 text-white">
+                    <div className="relative overflow-hidden rounded-xl border border-[#27364e] bg-[#171b2a] p-2.5 text-white">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[11px] font-semibold text-slate-300">
                           Lợi nhuận {getDateLabel()}
@@ -652,26 +652,26 @@ export function ServiceManagerMobile({
                           <TrendingUp className="w-4 h-4" />
                         </div>
                       </div>
-                      <div className="text-base font-black text-blue-300">
+                      <div className="text-sm font-black text-blue-300">
                         {showFinancials ? formatCurrency(kpis.loiNhuan) : "•••••••"}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-3 relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <div className="mt-2 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input
                       type="text"
                       placeholder="Tìm tên, SĐT, biển số, dòng xe..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full h-12 pl-11 pr-3 rounded-2xl border border-[#334968] bg-[#141a28] text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#4a8bd1]"
+                      className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#334968] bg-[#141a28] text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#4a8bd1]"
                     />
                   </div>
                 </div>
 
                 {/* DATE FILTER - Only for Orders tab */}
-                <div className="border-b border-[#22304a] bg-[#111624] px-3 py-2.5">
+                <div className="border-b border-[#22304a] bg-[#111624] px-2 py-2">
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       { label: "Hôm nay", value: "today" },
@@ -682,7 +682,7 @@ export function ServiceManagerMobile({
                       <button
                         key={option.value}
                         onClick={() => setDateFilter(option.value)}
-                        className={`h-12 rounded-2xl text-sm font-semibold transition-colors ${dateFilter === option.value
+                        className={`h-10 rounded-xl text-xs font-semibold transition-colors ${dateFilter === option.value
                           ? "bg-[#173b65] text-[#54b3ff] border border-[#2f6ea8]"
                           : "bg-[#171e2d] text-slate-300 border border-[#27364e]"
                           }`}
@@ -694,7 +694,7 @@ export function ServiceManagerMobile({
                 </div>
 
                 {/* DANH SÁCH PHIẾU SỬA CHỮA */}
-                <div className="space-y-3 px-3 pb-4 pt-3 min-h-[50vh]">
+                <div className="space-y-2 px-2 pb-3 pt-2 min-h-[45vh]">
                   {isLoading ? (
                     // Loading Skeletons using shared Skeleton component
                     Array.from({ length: 4 }).map((_, i) => (
@@ -778,10 +778,10 @@ export function ServiceManagerMobile({
             <button
               onClick={handleCreateWorkOrder}
               disabled={isCreating}
-              className="fixed bottom-20 right-4 w-12 h-12 bg-gradient-to-br from-[#009ef7] to-[#0077b6] rounded-full shadow-xl shadow-[#009ef7]/50 flex items-center justify-center hover:from-[#0077b6] hover:to-[#005a8a] transition-all z-[60] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="fixed bottom-[4.25rem] right-3 w-11 h-11 bg-gradient-to-br from-[#009ef7] to-[#0077b6] rounded-full shadow-xl shadow-[#009ef7]/50 flex items-center justify-center hover:from-[#0077b6] hover:to-[#005a8a] transition-all z-[60] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Tạo phiếu mới"
             >
-              <Plus className="w-5 h-5 text-white" />
+              <Plus className="w-4 h-4 text-white" />
             </button>
           </>
         )}
@@ -795,7 +795,7 @@ export function ServiceManagerMobile({
 
         {/* TEMPLATES TAB */}
         {activeTab === "templates" && (
-          <div className="h-full overflow-y-auto pb-24 scrollbar-hide p-3">
+          <div className="h-full overflow-y-auto pb-20 scrollbar-hide p-2">
             <div className="space-y-3">
               {templates?.map((template) => (
                 <div

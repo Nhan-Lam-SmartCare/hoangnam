@@ -48,6 +48,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const FORCE_OWNER_EMAILS = ["hoangnam1583@gmail.com"];
+
+const normalizeEmail = (email?: string | null) =>
+  String(email || "").trim().toLowerCase();
+
+const isForcedOwnerEmail = (email?: string | null) =>
+  FORCE_OWNER_EMAILS.includes(normalizeEmail(email));
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -81,7 +89,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setLoading(false);
         }, 10000); // 10 second timeout
 
-        loadUserProfile(session.user.id).finally(() => {
+        loadUserProfile(session.user.id, session.user.email).finally(() => {
           if (timeoutId) clearTimeout(timeoutId);
         });
       } else {
@@ -97,7 +105,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
-        loadUserProfile(nextSession.user.id);
+        loadUserProfile(nextSession.user.id, nextSession.user.email);
       } else {
         setProfile(null);
         setLoading(false);
@@ -114,7 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = async (userId: string, userEmail?: string) => {
     try {
       // Ưu tiên bảng profiles trước, sau đó fallback sang user_profiles nếu không có hoặc bảng không tồn tại
       let { data, error } = await supabase
@@ -140,26 +148,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (error) throw error;
+      const resolvedEmail = normalizeEmail(userEmail || user?.email || (data as any)?.email);
+
       if (!data) {
         // Nếu không có profile, tạo một profile mặc định để tránh stuck
         console.warn('No profile found for user, creating default profile');
         const defaultProfile: UserProfile = {
           id: userId,
-          email: user?.email || 'unknown',
-          role: 'staff', // default role
+          email: userEmail || user?.email || 'unknown',
+          role: isForcedOwnerEmail(resolvedEmail) ? 'owner' : 'staff', // default role
           created_at: new Date().toISOString(),
         };
         setProfile(defaultProfile);
       } else {
-        setProfile(data as any);
+        const normalizedProfile = {
+          ...(data as any),
+          role: isForcedOwnerEmail(resolvedEmail)
+            ? ("owner" as const)
+            : (data as any).role,
+        };
+        setProfile(normalizedProfile as UserProfile);
       }
     } catch (error: any) {
       console.error("Error loading user profile:", error);
       // Suppress toast for missing table/row, just use default profile
+      const resolvedEmail = normalizeEmail(userEmail || user?.email);
       const defaultProfile: UserProfile = {
         id: userId,
-        email: user?.email || 'unknown',
-        role: (user?.user_metadata?.role as UserRole) || 'staff',
+        email: userEmail || user?.email || 'unknown',
+        role: isForcedOwnerEmail(resolvedEmail)
+          ? 'owner'
+          : ((user?.user_metadata?.role as UserRole) || 'staff'),
         name: user?.user_metadata?.name || user?.email?.split("@")[0],
         created_at: new Date().toISOString(),
         branch_id: "CN1"

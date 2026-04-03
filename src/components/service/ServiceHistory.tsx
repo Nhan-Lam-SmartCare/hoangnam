@@ -14,12 +14,15 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { printElementById } from "../../utils/print";
-import { supabase } from "../../supabaseClient";
 import type { WorkOrder, WorkOrderPart } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { WORK_ORDER_STATUS, PAYMENT_STATUS } from "../../constants";
 import { useWorkOrdersRepo } from "../../hooks/useWorkOrdersRepository";
 import PrintOrderPreviewModal from "./modals/PrintOrderPreviewModal";
+import {
+  fetchStoreSettingsForBranch,
+  sanitizeIssueDescriptionForPrint,
+} from "./utils/service.utils";
 
 interface StoreSettings {
   store_name?: string;
@@ -91,25 +94,15 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(
     null
   );
+  const printableIssueDescription = sanitizeIssueDescriptionForPrint(
+    printOrder?.issueDescription
+  );
 
   // Fetch store settings on mount
   useEffect(() => {
     const fetchStoreSettings = async () => {
       try {
-        const { data, error } = await supabase
-          .from("store_settings")
-          .select(
-            "store_name, address, phone, email, logo_url, bank_qr_url, bank_name, bank_account_number, bank_account_holder, bank_branch"
-          )
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error) {
-          console.error("Error fetching store settings:", error);
-          return;
-        }
-
+        const data = await fetchStoreSettingsForBranch(currentBranchId);
         setStoreSettings(data);
       } catch (err) {
         console.error("Failed to fetch store settings:", err);
@@ -117,7 +110,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
     };
 
     fetchStoreSettings();
-  }, []);
+  }, [currentBranchId]);
 
   const getDateRange = (filter: string) => {
     const now = new Date();
@@ -1251,178 +1244,155 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
           {/* Header with Logo, Store Info and Bank Info */}
           <div
             style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "4mm",
               borderBottom: "2px solid #3b82f6",
               paddingBottom: "3mm",
               marginBottom: "4mm",
             }}
           >
-            {/* Left: Logo (if available) */}
-            {storeSettings?.logo_url && (
-              <img
-                src={storeSettings.logo_url}
-                alt="Logo"
-                style={{
-                  height: "18mm",
-                  width: "18mm",
-                  objectFit: "contain",
-                  flexShrink: 0,
-                }}
-              />
-            )}
-
-            {/* Center: Store Info */}
-            <div style={{ fontSize: "8.5pt", lineHeight: "1.4", flex: 1, textAlign: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
+                gap: "1.8mm",
+                marginBottom: storeSettings?.bank_name ? "3.5mm" : "0",
+              }}
+            >
+              {storeSettings?.logo_url && (
+                <div
+                  style={{
+                    width: "19mm",
+                    height: "19mm",
+                    borderRadius: "999px",
+                    border: "1px solid #bfdbfe",
+                    background:
+                      "linear-gradient(180deg, #ffffff 0%, #eff6ff 100%)",
+                    boxShadow: "0 1.5mm 3mm rgba(37, 99, 235, 0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "2mm",
+                  }}
+                >
+                  <img
+                    src={storeSettings.logo_url}
+                    alt="Logo"
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
+              )}
               <div
                 style={{
                   fontWeight: "bold",
-                  fontSize: "11pt",
-                  marginBottom: "1mm",
-                  color: "#1e40af",
-                  letterSpacing: "0.2mm",
+                  fontSize: "14pt",
+                  lineHeight: "1.15",
+                  color: "#1d4ed8",
+                  letterSpacing: "0.15mm",
+                  maxWidth: "100%",
                 }}
               >
-                {storeSettings?.store_name || "SƠN NAM"}
+                {storeSettings?.store_name || "S?N NAM"}
               </div>
               <div
                 style={{
-                  color: "#000",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "1mm",
+                  fontSize: "8.5pt",
+                  lineHeight: "1.45",
+                  color: "#334155",
+                  maxWidth: "94%",
                 }}
               >
-                <svg
-                  style={{ width: "10px", height: "10px", flexShrink: 0 }}
-                  viewBox="0 0 24 24"
-                  fill="#ef4444"
-                >
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                </svg>
-                <span>
-                  {storeSettings?.address ||
-                    "Ấp Phú Lợi B, Xã Long Phú Thuận, Đông Tháp"}
-                </span>
+                {storeSettings?.address ||
+                  "?p Ph? L?i B, X? Long Ph? Thu?n, ??ng Th?p"}
               </div>
               <div
                 style={{
-                  color: "#000",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "1mm",
+                  gap: "1.6mm",
+                  fontSize: "8.5pt",
+                  fontWeight: "bold",
+                  color: "#0f172a",
+                  padding: "1.2mm 3mm",
+                  borderRadius: "999px",
+                  border: "1px solid #bfdbfe",
+                  backgroundColor: "#eff6ff",
                 }}
               >
-                <svg
-                  style={{ width: "10px", height: "10px", flexShrink: 0 }}
-                  viewBox="0 0 24 24"
-                  fill="#16a34a"
-                >
-                  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
-                </svg>
+                <span style={{ color: "#2563eb" }}>Hotline</span>
                 <span>{storeSettings?.phone || "0947.747.907"}</span>
               </div>
-              {storeSettings?.email && (
-                <div
-                  style={{
-                    color: "#000",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1mm",
-                  }}
-                >
-                  <svg
-                    style={{
-                      width: "10px",
-                      height: "10px",
-                      flexShrink: 0,
-                      fill: "#1877F2"
-                    }}
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.791-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                  </svg>
-                  {/* storeSettings.email is used for Facebook */}
-                  <span>{storeSettings.email}</span>
-                </div>
-              )}
             </div>
-
-            {/* Right: Bank Info & QR */}
-            <div
-              style={{
-                fontSize: "8pt",
-                lineHeight: "1.4",
-                textAlign: "right",
-                flexShrink: 0,
-              }}
-            >
-              {storeSettings?.bank_name && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    gap: "3mm",
-                    border: "1px solid #3b82f6",
-                    borderRadius: "2mm",
-                    padding: "2mm",
-                    backgroundColor: "#eff6ff",
-                  }}
-                >
-                  {/* Bank Info */}
-                  <div style={{ textAlign: "right", flex: 1 }}>
-                    <div
+            {storeSettings?.bank_name && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "3mm",
+                  width: "100%",
+                  border: "1px solid #93c5fd",
+                  borderRadius: "3.5mm",
+                  padding: "2.8mm 3mm",
+                  background:
+                    "linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%)",
+                  boxShadow: "inset 0 0 0 0.3mm rgba(255, 255, 255, 0.65)",
+                }}
+              >
+                {storeSettings.bank_qr_url && (
+                  <div
+                    style={{
+                      width: "20mm",
+                      height: "20mm",
+                      borderRadius: "2.5mm",
+                      overflow: "hidden",
+                      border: "1px solid #bfdbfe",
+                      backgroundColor: "#ffffff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src={storeSettings.bank_qr_url}
+                      alt="QR Banking"
                       style={{
-                        fontWeight: "bold",
-                        marginBottom: "1mm",
-                        color: "#000",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "flex-end",
-                        gap: "1mm",
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
                       }}
-                    >
-                      <svg
-                        style={{ width: "10px", height: "10px", flexShrink: 0 }}
-                        viewBox="0 0 24 24"
-                        fill="#0891b2"
-                      >
-                        <path d="M4 10h3v7H4zm6.5 0h3v7h-3zM2 19h20v3H2zm15-9h3v7h-3zm-5-9L2 6v2h20V6z" />
-                      </svg>
-                      <span>{storeSettings.bank_name}</span>
-                    </div>
-                    {storeSettings.bank_account_number && (
-                      <div style={{ color: "#000" }}>
-                        STK: {storeSettings.bank_account_number}
-                      </div>
-                    )}
-                    {storeSettings.bank_account_holder && (
-                      <div style={{ color: "#000", fontSize: "7.5pt" }}>
-                        {storeSettings.bank_account_holder}
-                      </div>
-                    )}
+                    />
                   </div>
-                  {/* QR Code - Larger */}
-                  {storeSettings.bank_qr_url && (
-                    <div style={{ flexShrink: 0 }}>
-                      <img
-                        src={storeSettings.bank_qr_url}
-                        alt="QR Banking"
-                        style={{
-                          height: "25mm",
-                          width: "25mm",
-                          objectFit: "contain",
-                        }}
-                      />
+                )}
+                <div style={{ flex: 1, minWidth: 0, color: "#0f172a" }}>
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      fontSize: "8.8pt",
+                      marginBottom: "1mm",
+                      color: "#1e3a8a",
+                    }}
+                  >
+                    {storeSettings.bank_name}
+                  </div>
+                  {storeSettings.bank_account_number && (
+                    <div style={{ fontSize: "8pt", marginBottom: "0.6mm" }}>
+                      STK: {storeSettings.bank_account_number}
+                    </div>
+                  )}
+                  {storeSettings.bank_account_holder && (
+                    <div style={{ fontSize: "8pt", fontWeight: 600 }}>
+                      {storeSettings.bank_account_holder}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Title & Meta */}
@@ -1506,7 +1476,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               Mô tả sự cố:
             </div>
             <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-              {printOrder.issueDescription || "Không có mô tả"}
+              {printableIssueDescription}
             </div>
           </div>
 
@@ -1943,3 +1913,4 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
 };
 
 export default ServiceHistory;
+

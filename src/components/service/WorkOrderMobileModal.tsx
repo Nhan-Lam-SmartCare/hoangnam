@@ -1626,15 +1626,15 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       {/* Mobile Full Screen */}
       <div className="md:hidden w-full h-full bg-slate-50 dark:bg-[#151521] flex flex-col transition-colors">
         {/* Header */}
-        <div className="flex-shrink-0 bg-white dark:bg-[#1e1e2d] px-4 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700/50">
+        <div className="flex-shrink-0 bg-white dark:bg-[#1e1e2d] px-3 py-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-700/50">
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 active:scale-95 transition-all"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 active:scale-95 transition-all"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+            <h2 className="text-[13px] font-bold text-slate-900 dark:text-white">
               {workOrder
                 ? `Sửa phiếu #${formatWorkOrderId(workOrder.id)}`
                 : "Tạo phiếu mới"}
@@ -1644,9 +1644,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto pb-32 bg-slate-50 dark:bg-[#151521]">
+        <div className="flex-1 overflow-y-auto pb-24 bg-slate-50 dark:bg-[#151521]">
           {/* Tabs Navigation */}
-          <div className="sticky top-0 z-10 bg-white dark:bg-[#1e1e2d] border-b border-slate-200 dark:border-slate-800 px-2 pt-2 flex items-center justify-between shadow-sm overflow-x-auto scrollbar-hide">
+          <div className="sticky top-0 z-10 bg-white dark:bg-[#1e1e2d] border-b border-slate-200 dark:border-slate-800 px-1.5 pt-1 flex items-center justify-between shadow-sm overflow-x-auto scrollbar-hide">
             {[
               { id: "info", label: "Thông tin", icon: User },
               { id: "issue", label: "Sự cố", icon: AlertTriangle },
@@ -1659,25 +1659,25 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setActiveSection(tab.id as any)}
-                  className={`flex flex-col items-center gap-1 px-4 py-2 border-b-2 transition-all ${isActive
+                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 border-b-2 transition-all ${isActive
                     ? "border-blue-600 text-blue-600 dark:text-blue-400"
                     : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     }`}
                 >
-                  <Icon className={`w-5 h-5 ${isActive ? "fill-current/10" : ""}`} />
+                  <Icon className={`w-4 h-4 ${isActive ? "fill-current/10" : ""}`} />
                   <span className="text-[10px] font-bold uppercase">{tab.label}</span>
                 </button>
               )
             })}
           </div>
 
-          <div className="p-4 space-y-4">
+          <div className="p-2.5 space-y-3">
 
             {/* SECTION: INFO */}
             {activeSection === "info" && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
                 {/* KHỐI 1: TRẠNG THÁI & KỸ THUẬT VIÊN */}
-                <div className="p-4 space-y-4">
+                <div className="p-2.5 space-y-3">
                   {/* Status Segmented Control */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
@@ -1696,12 +1696,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                           <button
                             key={item.id}
                             onClick={() => setStatus(item.id as WorkOrderStatus)}
-                            className={`flex flex-col items-center justify-center py-2.5 rounded-lg transition-all ${isActive
+                            className={`flex flex-col items-center justify-center py-2 rounded-lg transition-all ${isActive
                               ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20 scale-[1.02]"
                               : "text-slate-500 hover:text-slate-300"
                               }`}
                           >
-                            <Icon className={`w-4 h-4 mb-1 ${isActive ? "text-white" : "text-slate-500"}`} />
+                            <Icon className={`w-3.5 h-3.5 mb-0.5 ${isActive ? "text-white" : "text-slate-500"}`} />
                             <span className="text-[10px] font-bold">{item.label}</span>
                           </button>
                         );
@@ -1723,7 +1723,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             <button
                               key={emp.id}
                               onClick={() => setSelectedTechnicianId(emp.id)}
-                              className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${isActive
+                              className={`flex-shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${isActive
                                 ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20 scale-[1.02]"
                                 : "bg-white dark:bg-[#1e1e2d] border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600"
                                 }`}
@@ -1742,14 +1742,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                 </div>
 
                 {/* KHỐI 2: KHÁCH HÀNG & THIẾT BỊ */}
-                <div className="px-4 pb-4 space-y-3">
+                <div className="px-2.5 pb-3 space-y-2.5">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
                     Thông tin khách hàng
                   </label>
 
                   {/* Customer Selection */}
                   {showCustomerSearch ? (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       <div className="relative group">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                         <input
@@ -1757,13 +1757,13 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                           value={customerSearchTerm}
                           onChange={(e) => setCustomerSearchTerm(e.target.value)}
                           placeholder="Tìm tên hoặc số điện thoại..."
-                          className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/50 rounded-2xl text-slate-900 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
+                          className="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/50 rounded-xl text-slate-900 dark:text-white text-[13px] placeholder-slate-400 dark:placeholder-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-inner"
                           autoFocus
                         />
                       </div>
 
                       {/* Customer List */}
-                      <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+                      <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                         {filteredCustomers.map((customer) => {
                           const primaryVehicle =
                             customer.vehicles?.find((v: any) => v.isPrimary) ||
@@ -1773,7 +1773,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             <div
                               key={customer.id}
                               onClick={() => handleSelectCustomer(customer)}
-                              className="p-4 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/30 rounded-2xl cursor-pointer hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/5 transition-all active:scale-[0.98]"
+                              className="p-3 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/30 rounded-xl cursor-pointer hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-500/5 transition-all active:scale-[0.98]"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
@@ -2991,7 +2991,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         </div>
 
         {/* STICKY FOOTER - Action Buttons */}
-        <div className="flex-shrink-0 bg-white dark:bg-[#1e1e2d] border-t border-slate-200 dark:border-slate-700 p-3">
+        <div className="flex-shrink-0 bg-white dark:bg-[#1e1e2d] border-t border-slate-200 dark:border-slate-700 p-2">
           {/* Row 1: Print/Share buttons - only show when editing existing order */}
           {workOrder?.id && (
             <div className="flex gap-2 mb-2">
