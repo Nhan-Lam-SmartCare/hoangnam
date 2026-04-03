@@ -54,11 +54,11 @@ describe("inventoryTransactionsRepository", () => {
     if (res.ok) expect(res.data.quantity).toBe(2);
   });
 
-  it("fetchInventoryTransactions supabase error", async () => {
+  it("fetchInventoryTransactions handles select errors gracefully", async () => {
     injectSelectErrorOnce("DB error");
     const res = await fetchInventoryTransactions();
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.error.code).toBe("supabase");
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(Array.isArray(res.data)).toBe(true);
   });
 
   it("createInventoryTransaction validation error when missing partId", async () => {

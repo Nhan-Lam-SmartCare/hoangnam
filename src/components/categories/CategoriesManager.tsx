@@ -320,7 +320,7 @@ const CategoriesManager: React.FC = () => {
                           }}
                         >
                           {React.cloneElement(
-                            IconComponent as React.ReactElement,
+                            IconComponent as React.ReactElement<{ className?: string }>,
                             { className: "w-5 h-5" }
                           )}
                         </div>

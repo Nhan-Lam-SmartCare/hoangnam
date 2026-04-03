@@ -1484,7 +1484,7 @@ export default function ServiceManager() {
       estimatedCompletion: new Date(
         Date.now() + (template.duration || 30) * 60000
       ).toISOString(),
-      assignedTechnician: "",
+      technicianName: "",
       laborCost: template.labor_cost || 0,
       partsUsed: (template.parts || []).map((p: any) => ({
         partId: p.partId || "",
@@ -1597,16 +1597,18 @@ export default function ServiceManager() {
               estimatedCompletion: new Date(
                 Date.now() + template.duration * 60000
               ).toISOString(),
-              assignedTechnician: "",
+              technicianName: "",
               laborCost: template.laborCost,
               partsUsed: template.parts.map((p) => ({
                 partId: "",
                 partName: p.name,
                 quantity: p.quantity,
                 price: p.price,
+                sku: p.sku || "",
               })),
               notes: "",
               total: 0,
+              branchId: currentBranchId,
             };
             setEditingOrder(newOrder);
             setShowTemplateModal(false);
@@ -1691,7 +1693,7 @@ export default function ServiceManager() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[9px] font-semibold uppercase tracking-wide text-white/80">
-                  Doanh thu {getDateFilterLabel()}
+                  Doanh thu {getDateFilterLabel(dateFilter)}
                 </p>
                 <p className="mt-1 text-xl font-semibold">
                   {formatCurrency(stats.filteredRevenue)}
@@ -1700,7 +1702,7 @@ export default function ServiceManager() {
               <HandCoins className="w-6 h-6 text-white/80" />
             </div>
             <p className="mt-1.5 text-[10px] text-white/80">
-              Bao gồm các phiếu đã thanh toán {getDateFilterLabel()}
+              Bao gồm các phiếu đã thanh toán {getDateFilterLabel(dateFilter)}
             </p>
           </div>
 
@@ -1708,7 +1710,7 @@ export default function ServiceManager() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                  Lợi nhuận {getDateFilterLabel()}
+                  Lợi nhuận {getDateFilterLabel(dateFilter)}
                 </p>
                 <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
                   {formatCurrency(stats.filteredProfit)}
@@ -2547,7 +2549,7 @@ export default function ServiceManager() {
             estimatedCompletion: new Date(
               Date.now() + template.duration * 60000
             ).toISOString(),
-            assignedTechnician: "",
+            technicianName: "",
             laborCost: template.laborCost,
             partsUsed: template.parts.map((p) => ({
               partId: p.partId || "",
@@ -2558,6 +2560,7 @@ export default function ServiceManager() {
             })),
             notes: "",
             total: 0,
+            branchId: currentBranchId,
           };
           setEditingOrder(newOrder);
           setShowTemplateModal(false);

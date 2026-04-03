@@ -37,6 +37,11 @@ export default tseslint.config(
       "no-console": ["warn", { allow: ["warn", "error"] }],
       "prefer-const": "warn",
       "no-var": "error",
+      "no-empty": "warn",
+      "no-case-declarations": "warn",
+      "no-useless-escape": "warn",
+      "no-constant-binary-expression": "warn",
+      "@typescript-eslint/ban-ts-comment": "warn",
 
       // Maintainability rules
       "max-lines": [

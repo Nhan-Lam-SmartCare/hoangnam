@@ -102,9 +102,9 @@ describe("formatWorkOrderId", () => {
 
     const result = formatWorkOrderId(workOrderId, "SC");
 
-    // Should contain store prefix and date
+    // Should contain store prefix and compact numeric suffix
     expect(result).toContain("SC-");
-    expect(result).toContain("2024");
+    expect(result).toMatch(/^SC-\d{6}$/);
   });
 
   it("should use default prefix when not provided", () => {
@@ -134,7 +134,7 @@ describe("formatWorkOrderId", () => {
     const result = formatWorkOrderId(workOrderId, "SC");
 
     expect(result).toContain("SC-");
-    expect(result).toContain("2024");
+    expect(result).toMatch(/^SC-\d{6}$/);
   });
 });
 

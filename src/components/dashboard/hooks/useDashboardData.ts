@@ -411,7 +411,7 @@ export const useDashboardData = (
         });
 
         filteredSales.forEach((sale) => {
-            sale.items.forEach((item) => {
+            sale.items.forEach((item: any) => {
                 // Ensure partId exists
                 const pId = item.partId || (item as any).id;
                 const pName = item.partName || "Sản phẩm không xác định";
@@ -623,7 +623,7 @@ export const useDashboardData = (
         sales.forEach(s => {
             const d = toLocalDateStr(s.date);
             if (d && d >= startDateStr && d <= endDateStr) {
-                s.items.forEach(item => {
+            s.items.forEach((item: any) => {
                     const name = item.partName || "";
                     if (name.toLowerCase().includes("elf")) {
                         transactions.push({

@@ -3041,7 +3041,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
             </button>
             {/* Nút Lưu Phiếu - luôn hiển thị */}
             <button
-              onClick={handleSave}
+              onClick={() => {
+                void handleSave();
+              }}
               disabled={isSubmitting}
               className="flex-1 py-2.5 bg-slate-600 hover:bg-slate-500 rounded-lg font-medium text-white transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -3050,7 +3052,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
             {/* Nút Đặt cọc - chỉ hiển thị khi có đặt cọc và không phải trạng thái Trả máy */}
             {status !== "Trả máy" && isDeposit && depositAmount > 0 && (
               <button
-                onClick={handleSave}
+                onClick={() => {
+                  void handleSave();
+                }}
                 disabled={isSubmitting}
                 className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium text-white transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >

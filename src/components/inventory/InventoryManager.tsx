@@ -84,7 +84,7 @@ import GoodsReceiptMobileWrapper from "./modals/GoodsReceiptMobileWrapper";
 import GoodsReceiptModal from "./modals/GoodsReceiptModal";
 import InventoryHistoryModal from "./modals/InventoryHistoryModal";
 import InventoryHistorySection from "./InventoryHistorySection";
-import ImportInventoryModal from "./modals/ImportInventoryModal";
+import ImportInventoryModal from "./components/ImportInventoryModal";
 import EditPartModal from "./modals/EditPartModal";
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -704,9 +704,12 @@ const InventoryManagerNew: React.FC = () => {
                 });
 
                 if (!result.ok || !result.data) {
-                  console.error("❌ Link lỗi khi tạo sản phẩm:", result.error);
+                  const errorMessage = !result.ok
+                    ? result.error?.message || "Lỗi không xác định"
+                    : "Không nhận được dữ liệu sản phẩm";
+                  console.error("❌ Link lỗi khi tạo sản phẩm:", errorMessage);
                   throw new Error(
-                    `Không thể tạo sản phẩm ${item._productData.name}: ${result.error?.message}`
+                    `Không thể tạo sản phẩm ${item._productData.name}: ${errorMessage}`
                   );
                 }
 
@@ -1093,7 +1096,6 @@ const InventoryManagerNew: React.FC = () => {
 
   // Handle save edited receipt
   const handleSaveEditedReceipt = async (
-    receiptId: string,
     updatedData: {
       date: string;
       supplierId: string;
@@ -1104,7 +1106,7 @@ const InventoryManagerNew: React.FC = () => {
     }
   ) => {
     try {
-      console.log("💾 Saving edited receipt:", receiptId, updatedData);
+      console.log("💾 Saving edited receipt:", updatedData);
 
       // 1. Update transaction notes/date if needed (limited edit capability for now)
       // Ideally we should update all transactions linked to this receipt
@@ -2558,11 +2560,9 @@ const InventoryManagerNew: React.FC = () => {
       {/* Edit Receipt Modal */}
       {editingReceipt && (
         <EditReceiptModal
-          isOpen={!!editingReceipt}
           onClose={() => setEditingReceipt(null)}
           receipt={editingReceipt}
           onSave={handleSaveEditedReceipt}
-          parts={allPartsData || []}
           currentBranchId={currentBranchId}
         />
       )}
@@ -2572,7 +2572,7 @@ const InventoryManagerNew: React.FC = () => {
         <ImportInventoryModal
           onClose={() => setShowImportModal(false)}
           onDownloadTemplate={handleDownloadTemplate}
-          onImport={async (file) => {
+          onImport={async (file: File) => {
             try {
               const { items: importedData, errors: rowErrors } =
                 await importPartsFromExcelDetailed(file, currentBranchId);

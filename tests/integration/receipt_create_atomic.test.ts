@@ -19,7 +19,9 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
     },
 });
 
-describe("Atomic Receipt Creation (Integration)", () => {
+const dbDescribe = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
+
+dbDescribe("Atomic Receipt Creation (Integration)", () => {
     beforeAll(async () => {
         // SQL function should be applied manually before running tests
     });

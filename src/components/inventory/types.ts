@@ -1,5 +1,5 @@
 // Types for Inventory Manager
-import type { Part, InventoryTransaction } from '../../../types';
+import type { Part, InventoryTransaction } from '../../types';
 
 export interface ReceiptItem {
     partId: string;

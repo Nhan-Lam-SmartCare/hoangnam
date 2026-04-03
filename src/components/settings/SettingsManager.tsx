@@ -1351,11 +1351,12 @@ export const SettingsManager = ({
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const selectedFile = file;
 
     const finishLogoUpload = async () => {
       setUploadingLogo(true);
       try {
-        const result = await uploadStoreAsset(file, "logo");
+        const result = await uploadStoreAsset(selectedFile, "logo");
         updateField("logo_url", result.url);
         showToast.success(
           result.mode === "storage"
@@ -1384,40 +1385,17 @@ export const SettingsManager = ({
     }
 
     return finishLogoUpload();
-    setUploadingLogo(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
-      const filePath = `store-assets/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("public-assets")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("public-assets")
-        .getPublicUrl(filePath);
-
-      updateField("logo_url", data.publicUrl);
-      showToast.success("Đã tải logo lên thành công!");
-    } catch (error: any) {
-      console.error("Error uploading logo:", error);
-      showToast.error(error.message || "Không thể tải logo lên");
-    } finally {
-      setUploadingLogo(false);
-    }
   };
 
   const handleQRUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const selectedFile = file;
 
     const finishQRUpload = async () => {
       setUploadingQR(true);
       try {
-        const result = await uploadStoreAsset(file, "bank-qr");
+        const result = await uploadStoreAsset(selectedFile, "bank-qr");
         updateField("bank_qr_url", result.url);
         showToast.success(
           result.mode === "storage"
@@ -1444,30 +1422,6 @@ export const SettingsManager = ({
     }
 
     return finishQRUpload();
-    setUploadingQR(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `bank-qr-${Date.now()}.${fileExt}`;
-      const filePath = `store-assets/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("public-assets")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("public-assets")
-        .getPublicUrl(filePath);
-
-      updateField("bank_qr_url", data.publicUrl);
-      showToast.success("Đã tải mã QR ngân hàng lên thành công!");
-    } catch (error: any) {
-      console.error("Error uploading QR:", error);
-      showToast.error(error.message || "Không thể tải mã QR lên");
-    } finally {
-      setUploadingQR(false);
-    }
   };
 
   // Check permissions

@@ -228,6 +228,7 @@ export interface WorkOrder {
   vehicleId?: string; // NEW: Link to specific vehicle from customer.vehicles[]
   currentKm?: number; // Số km hiện tại tại thời điểm tạo phiếu
   issueDescription?: string;
+  estimatedCompletion?: string;
   technicianName?: string;
   status: "Tiếp nhận" | "Đang sửa" | "Đã sửa xong" | "Trả máy" | "\u0110\u00E3 h\u1EE7y";
   laborCost: number;
@@ -279,6 +280,8 @@ export interface InventoryTransaction {
   totalPrice: number;
   branchId: string;
   notes?: string;
+  supplierId?: string;
+  supplier_id?: string;
   saleId?: string;
   workOrderId?: string;
 }

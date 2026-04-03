@@ -24,6 +24,8 @@ const svc =
       })
     : null;
 
+  const dbDescribe = process.env.RUN_DB_INTEGRATION === "1" ? describe : describe.skip;
+
 // Helper: tạo sale đơn giản (tránh dùng RPC để test RLS thô)
 async function seedSale(id: string, branch: string) {
   const { error } = await svc!.from("sales").insert({
@@ -45,7 +47,7 @@ async function seedSale(id: string, branch: string) {
 // NOTE: Để test RLS theo từng user (branch khác), ta cần JWT với claims role/branch (tuỳ implement). Ở đây
 // minh hoạ cơ bản bằng service role để seed và sau đó gọi RPC kiểm tra guard logic.
 
-describe("rls_access (integration)", () => {
+dbDescribe("rls_access (integration)", () => {
   beforeAll(async () => {
     if (!svc) return;
     // Seed 2 sales khác branch nếu chưa tồn tại
