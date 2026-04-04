@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppContext } from "../../contexts/AppContext";
+import { canDo } from "../../utils/permissions";
 import type {
   WorkOrder,
   Part,
@@ -140,6 +141,23 @@ export default function ServiceManager() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth(); // Get user profile early for createCustomerDebtIfNeeded
   const isOwner = profile?.role === USER_ROLES.OWNER; // Check if user is owner
+  const canCreateWorkOrder = canDo(profile, "work_order.create");
+  const canUpdateWorkOrder = canDo(profile, "work_order.update");
+  const canDeleteWorkOrder = canDo(profile, "work_order.delete");
+  const canPrintWorkOrder = canDo(profile, "work_order.print");
+  const canRefundWorkOrder = canDo(profile, "work_order.refund");
+  const canViewServiceHistory = canDo(profile, "work_order.history.view");
+  const canUpdateWorkOrderStatus = canDo(profile, "work_order.status.update");
+  const canUpdateWorkOrderPayment = canDo(profile, "work_order.payment.update");
+  const canUpdateWorkOrderParts = canDo(profile, "work_order.parts.update");
+  const canUpdateWorkOrderLabor = canDo(profile, "work_order.labor.update");
+  const canUpdateWorkOrderDiscount = canDo(profile, "work_order.discount.update");
+  const canUpdateWorkOrderCustomer = canDo(profile, "work_order.customer.update");
+  const canUpdateWorkOrderVehicle = canDo(profile, "work_order.vehicle.update");
+  const canUpdateWorkOrderOutsourceService = canDo(
+    profile,
+    "work_order.outsource_service.update"
+  );
 
   const {
     parts: contextParts,
@@ -180,6 +198,8 @@ export default function ServiceManager() {
     limit: fetchLimit,
     daysBack: dateRangeDays,
     branchId: currentBranchId,
+    ownerUserId: profile?.id,
+    ownerDisplayName: profile?.name || profile?.full_name,
   });
 
   // Use context data directly for better performance
@@ -193,16 +213,6 @@ export default function ServiceManager() {
 
   // Sync fetched work orders to context
   useEffect(() => {
-    console.log(
-      "[ServiceManager] fetchedWorkOrders:",
-      fetchedWorkOrders?.length,
-      fetchedWorkOrders
-    );
-    console.log(
-      "[ServiceManager] workOrders from context:",
-      workOrders?.length,
-      workOrders
-    );
     if (fetchedWorkOrders) {
       setWorkOrders(fetchedWorkOrders);
     }
@@ -210,7 +220,6 @@ export default function ServiceManager() {
 
   // 🔹 REALTIME SUBSCRIPTION - Auto refresh when work orders change
   useEffect(() => {
-    console.log("[ServiceManager] Setting up realtime subscription...");
 
     const channel = supabase
       .channel("work_orders_realtime")
@@ -222,18 +231,15 @@ export default function ServiceManager() {
           table: "work_orders",
         },
         (payload) => {
-          console.log("[Realtime] Work order changed:", payload);
           // Refetch work orders to get latest data
           refetchWorkOrders();
         }
       )
       .subscribe((status) => {
-        console.log("[Realtime] Subscription status:", status);
       });
 
     // Cleanup on unmount
     return () => {
-      console.log("[ServiceManager] Cleaning up realtime subscription");
       supabase.removeChannel(channel);
     };
   }, [refetchWorkOrders]);
@@ -573,6 +579,16 @@ export default function ServiceManager() {
   const statusSnapshotCards = getStatusSnapshotCards(stats);
 
   const handleOpenModal = (order?: WorkOrder) => {
+    if (order && !canUpdateWorkOrder) {
+      showToast.error("Bạn không có quyền sửa phiếu sửa chữa");
+      return;
+    }
+
+    if (!order && !canCreateWorkOrder) {
+      showToast.error("Bạn không có quyền tạo phiếu sửa chữa");
+      return;
+    }
+
     if (order) {
       setEditingOrder(order);
     } else {
@@ -629,6 +645,11 @@ export default function ServiceManager() {
 
   // Handle print work order - show preview modal
   const handlePrintOrder = async (order: WorkOrder) => {
+    if (!canPrintWorkOrder) {
+      showToast.error("Bạn không có quyền in phiếu sửa chữa");
+      return;
+    }
+
     setPrintOrder(order);
 
     try {
@@ -696,7 +717,6 @@ export default function ServiceManager() {
       if (error) {
         console.error("❌ Error creating notification:", error);
       } else {
-        console.log("✅ Notification created for work order:", orderId);
       }
     } catch (err) {
       console.error("❌ Error in createWorkOrderNotification:", err);
@@ -748,12 +768,6 @@ export default function ServiceManager() {
         vehicles: updatedVehicles,
       });
 
-      console.log("[updateVehicleKmAndMaintenance] Updated vehicle:", {
-        vehicleId,
-        currentKm,
-        maintenanceTypes,
-        updatedVehicle,
-      });
     } catch (err) {
       console.error("[updateVehicleKmAndMaintenance] Error:", err);
       // Don't throw - this is a non-critical update
@@ -769,14 +783,7 @@ export default function ServiceManager() {
   ) => {
     if (remainingAmount <= 0) return;
 
-    console.log("[createCustomerDebtIfNeeded] CALLED with:", {
-      workOrderId: workOrder.id,
-      totalAmount,
-      paidAmount,
-      remainingAmount,
-      customerName: workOrder.customerName,
-      timestamp: new Date().toISOString(),
-    });
+
 
     try {
       const safeCustomerId =
@@ -856,9 +863,7 @@ export default function ServiceManager() {
         workOrderId: workOrder.id, // 🔹 Link debt với work order
       };
 
-      console.log("[ServiceManager] createCustomerDebt payload:", payload);
       const result = await createCustomerDebt.mutateAsync(payload as any);
-      console.log("[ServiceManager] createCustomerDebt result:", result);
       showToast.success(
         `Đã tạo/cập nhật công nợ ${remainingAmount.toLocaleString()}đ (Mã: ${result?.id || "N/A"
         })`
@@ -878,7 +883,6 @@ export default function ServiceManager() {
   // 🔹 Handle Mobile Save - Similar to desktop handleSave
   const handleMobileSave = async (workOrderData: any) => {
     try {
-      console.log("[handleMobileSave] Mobile Work Order Data:", workOrderData);
 
       // Validate required fields
       if (!workOrderData.customer?.name) {
@@ -943,10 +947,6 @@ export default function ServiceManager() {
               vehicleModel: vehicle.model || existingCustomer.vehicleModel,
             };
 
-            console.log(
-              "[handleMobileSave] Adding new vehicle to customer:",
-              updatedCustomer
-            );
             upsertCustomer(updatedCustomer);
           } else if (currentKm > 0) {
             // Vehicle exists, just update currentKm if provided
@@ -959,10 +959,6 @@ export default function ServiceManager() {
               ...existingCustomer,
               vehicles: updatedVehicles,
             };
-            console.log(
-              "[handleMobileSave] Updating vehicle km:",
-              updatedCustomer
-            );
             upsertCustomer(updatedCustomer);
           }
         } else {
@@ -980,10 +976,6 @@ export default function ServiceManager() {
             licensePlate: vehicle.licensePlate,
             vehicleModel: vehicle.model,
           };
-          console.log(
-            "[handleMobileSave] Creating new customer with vehicle:",
-            newCustomer
-          );
           upsertCustomer(newCustomer);
         }
       }
@@ -1042,6 +1034,7 @@ export default function ServiceManager() {
           totalPaid: totalPaid > 0 ? totalPaid : undefined,
           remainingAmount: remainingAmount,
           creationDate: new Date().toISOString(),
+          created_by: profile?.id || undefined,
         } as any);
 
         // 🔹 FIX Mobile: Fallback inventory deduction if atomic didn't do it
@@ -1051,9 +1044,6 @@ export default function ServiceManager() {
           !responseData?.inventoryDeducted
         ) {
           try {
-            console.log(
-              "[handleMobileSave] New order is fully paid AND atomic create didn't deduct inventory. Calling completeWorkOrderPayment..."
-            );
             await completeWorkOrderPayment(
               orderId,
               paymentMethod || "cash",
@@ -1133,9 +1123,6 @@ export default function ServiceManager() {
           parts.length > 0
         ) {
           try {
-            console.log(
-              "[handleMobileSave] Order became fully paid, calling completeWorkOrderPayment to deduct inventory"
-            );
             await completeWorkOrderPayment(
               editingOrder.id,
               paymentMethod || "cash",
@@ -1304,7 +1291,6 @@ export default function ServiceManager() {
                       })
                       .eq("id", currentCustomer.id);
 
-                    console.log(`[WorkOrder] Updated stats for ${customer.name}`);
                   }
                 }
               } catch (err) {
@@ -1333,6 +1319,11 @@ export default function ServiceManager() {
   };
 
   const handleRefundOrder = (order: WorkOrder) => {
+    if (!canRefundWorkOrder) {
+      showToast.error("Bạn không có quyền hủy/hoàn tiền phiếu sửa chữa");
+      return;
+    }
+
     setRefundingOrder(order);
     setRefundReason("");
     setShowRefundModal(true);
@@ -1347,18 +1338,12 @@ export default function ServiceManager() {
     }
 
     try {
-      console.log(
-        "[handleConfirmRefund] Starting refund for order:",
-        refundingOrder.id
-      );
-      console.log("[handleConfirmRefund] Refund reason:", refundReason);
 
       const result = await refundWorkOrderAsync({
         orderId: refundingOrder.id,
         refundReason: refundReason,
       });
 
-      console.log("[handleConfirmRefund] Refund result:", result);
 
       // Check if mutation succeeded
       if (!result || (result as any).error) {
@@ -1459,6 +1444,11 @@ export default function ServiceManager() {
 
   // Handle delete work order - using hook for proper query invalidation
   const handleDelete = async (workOrder: WorkOrder) => {
+    if (!canDeleteWorkOrder) {
+      showToast.error("Bạn không có quyền xóa phiếu sửa chữa");
+      return;
+    }
+
     if (!confirm(`Xác nhận xóa phiếu ${formatWorkOrderId(workOrder.id)}?`)) {
       return;
     }
@@ -1513,14 +1503,45 @@ export default function ServiceManager() {
       <>
         <ServiceManagerMobile
           workOrders={displayWorkOrders || []}
+          canCreateWorkOrder={canCreateWorkOrder}
+          canUpdateWorkOrder={canUpdateWorkOrder}
+          canDeleteWorkOrder={canDeleteWorkOrder}
+          canPrintWorkOrder={canPrintWorkOrder}
+          canViewServiceHistory={canViewServiceHistory}
           isLoading={workOrdersLoading || workOrdersFetching}
           onRefresh={async () => { await refetchWorkOrders(); }}
           onCreateWorkOrder={() => {
-            setEditingOrder(undefined);
+            if (!canCreateWorkOrder) {
+              showToast.error("Bạn không có quyền tạo phiếu sửa chữa");
+              return;
+            }
+
+            setEditingOrder({
+              id: "",
+              customerName: "",
+              customerPhone: "",
+              vehicleModel: "",
+              licensePlate: "",
+              issueDescription: "",
+              technicianName: "",
+              status: "Tiếp nhận",
+              laborCost: 0,
+              discount: 0,
+              partsUsed: [],
+              total: 0,
+              branchId: currentBranchId,
+              paymentStatus: "unpaid",
+              creationDate: new Date().toISOString(),
+            } as WorkOrder);
             setMobileModalViewMode(false); // Tạo mới = edit mode
             setShowMobileModal(true);
           }}
           onEditWorkOrder={(workOrder) => {
+            if (!canUpdateWorkOrder) {
+              showToast.error("Bạn không có quyền sửa phiếu sửa chữa");
+              return;
+            }
+
             setEditingOrder(workOrder);
             setMobileModalViewMode(true); // Click vào phiếu = view mode trước
             setShowMobileModal(true);
@@ -1536,35 +1557,32 @@ export default function ServiceManager() {
           setDateRangeDays={setDateRangeDays}
         />
 
-        {/* Mobile Modal - unified with desktop layout */}
-        {showMobileModal && editingOrder && (
-          <WorkOrderModal
-            order={editingOrder}
-            onClose={() => {
-              setShowMobileModal(false);
-              setEditingOrder(undefined);
-              setMobileModalViewMode(false);
-            }}
-            onSave={() => {
-              setShowMobileModal(false);
-              setEditingOrder(undefined);
-              setMobileModalViewMode(false);
-            }}
-            parts={parts}
-            partsLoading={partsLoading}
-            customers={displayCustomers}
-            employees={displayEmployees}
-            upsertCustomer={upsertCustomer}
-            setCashTransactions={setCashTransactions}
-            setPaymentSources={setPaymentSources}
-            paymentSources={paymentSources}
-            currentBranchId={currentBranchId}
-            storeSettings={storeSettings}
-            invalidateWorkOrders={() =>
-              queryClient.invalidateQueries({ queryKey: ["workOrdersRepo"] })
-            }
-          />
-        )}
+        {/* Mobile Modal */}
+        <WorkOrderMobileModal
+          isOpen={showMobileModal}
+          onClose={() => {
+            setShowMobileModal(false);
+            setEditingOrder(undefined);
+            setMobileModalViewMode(false);
+          }}
+          onSave={handleMobileSave}
+          workOrder={editingOrder}
+          customers={displayCustomers}
+          parts={parts}
+          employees={displayEmployees || []}
+          currentBranchId={currentBranchId}
+          upsertCustomer={upsertCustomer}
+          viewMode={mobileModalViewMode}
+          onSwitchToEdit={canUpdateWorkOrder ? () => setMobileModalViewMode(false) : undefined}
+          canUpdateWorkOrderStatus={canUpdateWorkOrderStatus}
+          canUpdateWorkOrderPayment={canUpdateWorkOrderPayment}
+          canUpdateWorkOrderParts={canUpdateWorkOrderParts}
+          canUpdateWorkOrderLabor={canUpdateWorkOrderLabor}
+          canUpdateWorkOrderDiscount={canUpdateWorkOrderDiscount}
+          canUpdateWorkOrderCustomer={canUpdateWorkOrderCustomer}
+          canUpdateWorkOrderVehicle={canUpdateWorkOrderVehicle}
+          canUpdateWorkOrderOutsourceService={canUpdateWorkOrderOutsourceService}
+        />
 
         {/* Mobile Print Preview Modal */}
         <PrintOrderPreviewModal
@@ -1860,22 +1878,26 @@ export default function ServiceManager() {
           >
             <FileText className="w-3.5 h-3.5" /> Mẫu SC
           </button>
-          <Link
-            to="/service-history"
-            className="px-2.5 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
-          >
-            <History className="w-3.5 h-3.5" /> Lịch sử SC
-          </Link>
-          <button
-            onClick={() => {
-              // Always use Desktop modal
-              handleOpenModal();
-            }}
-            className="px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium flex items-center gap-1"
-            aria-label="Tạo phiếu sửa chữa mới"
-          >
-            <Plus className="w-3.5 h-3.5" /> Thêm Phiếu
-          </button>
+          {canViewServiceHistory && (
+            <Link
+              to="/service-history"
+              className="px-2.5 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-colors"
+            >
+              <History className="w-3.5 h-3.5" /> Lịch sử SC
+            </Link>
+          )}
+          {canCreateWorkOrder && (
+            <button
+              onClick={() => {
+                // Always use Desktop modal
+                handleOpenModal();
+              }}
+              className="px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium flex items-center gap-1"
+              aria-label="Tạo phiếu sửa chữa mới"
+            >
+              <Plus className="w-3.5 h-3.5" /> Thêm Phiếu
+            </button>
+          )}
         </div>
       </div>
 
@@ -1987,12 +2009,14 @@ export default function ServiceManager() {
                         Thử đổi bộ lọc hoặc tạo phiếu mới.
                       </div>
                       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleOpenModal()}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium"
-                        >
-                          <Plus className="w-4 h-4" /> Tạo phiếu
-                        </button>
+                        {canCreateWorkOrder && (
+                          <button
+                            onClick={() => handleOpenModal()}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium"
+                          >
+                            <Plus className="w-4 h-4" /> Tạo phiếu
+                          </button>
+                        )}
                         <button
                           onClick={clearFilters}
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700"
@@ -2120,8 +2144,12 @@ export default function ServiceManager() {
                   return (
                     <tr
                       key={order.id}
-                      onClick={() => handleOpenModal(order)}
-                      className="group bg-white dark:bg-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-700/50 cursor-pointer transition-all duration-150 hover:shadow-sm border-l-4 border-transparent hover:border-blue-500"
+                      onClick={() => {
+                        if (canUpdateWorkOrder) {
+                          handleOpenModal(order);
+                        }
+                      }}
+                      className={`group bg-white dark:bg-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-700/50 transition-all duration-150 hover:shadow-sm border-l-4 border-transparent hover:border-blue-500 ${canUpdateWorkOrder ? "cursor-pointer" : "cursor-default"}`}
                     >
                       {/* Column 1: Mã phiếu */}
                       <td className="px-4 py-4 align-top">
@@ -2433,30 +2461,34 @@ export default function ServiceManager() {
                                 }}
                               >
                                 <div className="py-1">
-                                  <button
-                                    onClick={() => {
-                                      handleOpenModal(order);
-                                      setRowActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                  >
-                                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                      <Edit2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                    </div>
-                                    <span>Xem chi tiết</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handlePrintOrder(order);
-                                      setRowActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-                                  >
-                                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                                      <Printer className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                                    </div>
-                                    <span>In phiếu</span>
-                                  </button>
+                                  {canUpdateWorkOrder && (
+                                    <button
+                                      onClick={() => {
+                                        handleOpenModal(order);
+                                        setRowActionMenuId(null);
+                                      }}
+                                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                    >
+                                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                        <Edit2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                      </div>
+                                      <span>Xem chi tiết</span>
+                                    </button>
+                                  )}
+                                  {canPrintWorkOrder && (
+                                    <button
+                                      onClick={() => {
+                                        handlePrintOrder(order);
+                                        setRowActionMenuId(null);
+                                      }}
+                                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                                    >
+                                      <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                                        <Printer className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                      </div>
+                                      <span>In phiếu</span>
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => {
                                       callCustomer(
@@ -2471,7 +2503,7 @@ export default function ServiceManager() {
                                     </div>
                                     <span>Gọi khách hàng</span>
                                   </button>
-                                  {!order.refunded && (
+                                  {!order.refunded && canRefundWorkOrder && (
                                     <>
                                       <div className="my-1 border-t border-slate-200 dark:border-slate-700"></div>
                                       <button
@@ -2595,6 +2627,14 @@ export default function ServiceManager() {
             paymentSources={paymentSources}
             currentBranchId={currentBranchId}
             storeSettings={storeSettings}
+            canUpdateWorkOrderStatus={canUpdateWorkOrderStatus}
+            canUpdateWorkOrderPayment={canUpdateWorkOrderPayment}
+            canUpdateWorkOrderParts={canUpdateWorkOrderParts}
+            canUpdateWorkOrderLabor={canUpdateWorkOrderLabor}
+            canUpdateWorkOrderDiscount={canUpdateWorkOrderDiscount}
+            canUpdateWorkOrderCustomer={canUpdateWorkOrderCustomer}
+            canUpdateWorkOrderVehicle={canUpdateWorkOrderVehicle}
+            canUpdateWorkOrderOutsourceService={canUpdateWorkOrderOutsourceService}
             invalidateWorkOrders={() =>
               queryClient.invalidateQueries({ queryKey: ["workOrdersRepo"] })
             }

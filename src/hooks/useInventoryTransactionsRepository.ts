@@ -30,16 +30,13 @@ export const useCreateInventoryTxRepo = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateInventoryTxInput) => {
-      console.log("🔥 Đang gọi createInventoryTransaction với input:", input);
       const result = await createInventoryTransaction(input);
-      console.log("🔥 Kết quả createInventoryTransaction:", result);
       if (!result.ok) {
         throw result.error || new Error("Lỗi không xác định");
       }
       return result.data;
     },
     onSuccess: () => {
-      console.log("✅ Lưu lịch sử thành công!");
       qc.invalidateQueries({ queryKey: ["inventoryTxRepo"] });
       showToast.success("Đã ghi lịch sử kho");
     },

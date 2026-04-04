@@ -8,13 +8,23 @@ import type { InventoryTransaction } from "../../types";
 
 interface InventoryHistorySectionMobileProps {
   transactions: InventoryTransaction[];
+  canViewImportPrice?: boolean;
+  canEditReceipt?: boolean;
+  canDeleteReceipt?: boolean;
   onEdit?: (receipt: any) => void;
   onDelete?: (receipt: any) => void;
 }
 
 const InventoryHistorySectionMobile: React.FC<
   InventoryHistorySectionMobileProps
-> = ({ transactions, onEdit, onDelete }) => {
+> = ({
+  transactions,
+  canViewImportPrice = true,
+  canEditReceipt = false,
+  canDeleteReceipt = false,
+  onEdit,
+  onDelete,
+}) => {
   const { currentBranchId } = useAppContext();
   const { data: supplierDebts = [] } = useSupplierDebtsRepo();
   const { data: parts = [] } = usePartsRepo();
@@ -485,20 +495,24 @@ const InventoryHistorySectionMobile: React.FC<
                           <div className="text-sm font-medium text-slate-900 dark:text-white">
                             {item.quantity} x {item.partName}
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            Giá nhập: {formatCurrency(item.unitPrice || 0)} / SP
-                          </div>
+                          {canViewImportPrice && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              Giá nhập: {formatCurrency(item.unitPrice || 0)} / SP
+                            </div>
+                          )}
                           {sellingPrice > 0 && (
                             <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
                               Giá bán: {formatCurrency(sellingPrice)} / SP
                             </div>
                           )}
                         </div>
-                        <div className="text-sm font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(
-                            item.quantity * (item.unitPrice || 0)
-                          )}
-                        </div>
+                        {canViewImportPrice && (
+                          <div className="text-sm font-bold text-slate-900 dark:text-white">
+                            {formatCurrency(
+                              item.quantity * (item.unitPrice || 0)
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -506,56 +520,62 @@ const InventoryHistorySectionMobile: React.FC<
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    if (onEdit) {
-                      onEdit(selectedReceipt);
-                      setSelectedReceipt(null);
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-medium active:scale-95 transition-transform"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
-                  Chỉnh sửa
-                </button>
-                <button
-                  onClick={() => {
-                    if (onDelete) {
-                      onDelete(selectedReceipt);
-                      setSelectedReceipt(null);
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-medium active:scale-95 transition-transform"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  Xóa phiếu
-                </button>
-              </div>
+              {(canEditReceipt || canDeleteReceipt) && (
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  {canEditReceipt && (
+                    <button
+                      onClick={() => {
+                        if (onEdit) {
+                          onEdit(selectedReceipt);
+                          setSelectedReceipt(null);
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-medium active:scale-95 transition-transform"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                      Chỉnh sửa
+                    </button>
+                  )}
+                  {canDeleteReceipt && (
+                    <button
+                      onClick={() => {
+                        if (onDelete) {
+                          onDelete(selectedReceipt);
+                          setSelectedReceipt(null);
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl font-medium active:scale-95 transition-transform"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                      Xóa phiếu
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -151,20 +151,13 @@ const GoodsReceiptModal: React.FC<{
   };
 
   const filteredParts = useMemo(() => {
-    console.log(
-      "�x� Desktop Modal - parts:",
-      parts?.length || 0,
-      parts?.slice(0, 2)
-    );
-    console.log("�x� Desktop Modal - searchTerm:", searchTerm);
+
 
     if (!parts || parts.length === 0) {
-      console.log("�a� parts is empty or undefined");
       return [];
     }
 
     if (!searchTerm || searchTerm.trim() === "") {
-      console.log("�S& Showing all parts:", parts.length);
       return parts;
     }
 
@@ -173,7 +166,6 @@ const GoodsReceiptModal: React.FC<{
       (p) =>
         p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q)
     );
-    console.log("�S& Filtered results:", filtered.length);
     return filtered;
   }, [parts, searchTerm]);
 
@@ -265,7 +257,7 @@ const GoodsReceiptModal: React.FC<{
 
   const { profile } = useAuth();
   const handleSave = () => {
-    if (!canDo(profile?.role, "part.update_price")) {
+    if (!canDo(profile, "part.update_price")) {
       showToast.error("B�n kh�ng c� quy�n c�p nh�t gi�");
       return;
     }

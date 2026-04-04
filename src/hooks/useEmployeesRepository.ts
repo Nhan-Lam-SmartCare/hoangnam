@@ -29,9 +29,7 @@ export function useCreateEmployeeRepo() {
     mutationFn: async (
       employee: Omit<Employee, "id" | "created_at" | "updated_at">
     ) => {
-      console.log("Mutation called with employee:", employee);
       const result = await createEmployee(employee);
-      console.log("Repository result:", result);
 
       if (!result.ok) {
         console.error("Repository failed:", result.error);

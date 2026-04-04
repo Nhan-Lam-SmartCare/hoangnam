@@ -47,6 +47,7 @@ const GoodsReceiptModal: React.FC<{
   onClose: () => void;
   parts: Part[];
   currentBranchId: string;
+  canViewImportPrice?: boolean;
   onSave: (
     items: Array<{
       partId: string;
@@ -66,7 +67,7 @@ const GoodsReceiptModal: React.FC<{
       discount: number;
     }
   ) => void;
-}> = ({ isOpen, onClose, parts, currentBranchId, onSave }) => {
+}> = ({ isOpen, onClose, parts, currentBranchId, canViewImportPrice = true, onSave }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -176,20 +177,13 @@ const GoodsReceiptModal: React.FC<{
   };
 
   const filteredParts = useMemo(() => {
-    console.log(
-      "🔍 Desktop Modal - parts:",
-      parts?.length || 0,
-      parts?.slice(0, 2)
-    );
-    console.log("🔍 Desktop Modal - searchTerm:", searchTerm);
+
 
     if (!parts || parts.length === 0) {
-      console.log("⚠️ parts is empty or undefined");
       return [];
     }
 
     if (!searchTerm || searchTerm.trim() === "") {
-      console.log("✅ Showing all parts:", parts.length);
       return parts;
     }
 
@@ -198,7 +192,6 @@ const GoodsReceiptModal: React.FC<{
       (p) =>
         p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q)
     );
-    console.log("✅ Filtered results:", filtered.length);
     return filtered;
   }, [parts, searchTerm]);
 
@@ -221,7 +214,9 @@ const GoodsReceiptModal: React.FC<{
           partName: part.name,
           sku: part.sku,
           quantity: 1,
-          importPrice: part.costPrice?.[currentBranchId] || 0,
+            importPrice: canViewImportPrice
+              ? part.costPrice?.[currentBranchId] || 0
+              : 0,
           laborCost:
             (part as any).laborCost?.[currentBranchId] ||
             part.wholesalePrice?.[currentBranchId] ||
@@ -272,7 +267,6 @@ const GoodsReceiptModal: React.FC<{
 
   // Handle camera barcode scan - Modal tự đóng sau khi quét
   const handleCameraScan = (barcode: string) => {
-    console.log("📷 Camera scanned:", barcode);
 
     const normalizeCode = (code: string): string =>
       code.toLowerCase().replace(/[-\s./\\]/g, "");
@@ -311,7 +305,9 @@ const GoodsReceiptModal: React.FC<{
             partName: foundPart.name,
             sku: foundPart.sku,
             quantity: 1,
-            importPrice: foundPart.costPrice?.[currentBranchId] || 0,
+            importPrice: canViewImportPrice
+              ? foundPart.costPrice?.[currentBranchId] || 0
+              : 0,
             laborCost:
               (foundPart as any).laborCost?.[currentBranchId] ||
               foundPart.wholesalePrice?.[currentBranchId] ||
@@ -363,8 +359,9 @@ const GoodsReceiptModal: React.FC<{
   }, [subtotal, discount]);
 
   const { profile } = useAuth();
+  const canCreatePart = canDo(profile, "part.create");
   const handleSave = () => {
-    if (!canDo(profile?.role, "part.update_price")) {
+    if (!canDo(profile, "part.update_price")) {
       showToast.error("Bạn không có quyền cập nhật giá");
       return;
     }
@@ -401,6 +398,11 @@ const GoodsReceiptModal: React.FC<{
   };
 
   const handleAddNewProduct = (productData: any) => {
+    if (!canCreatePart) {
+      showToast.error("Bạn không có quyền tạo sản phẩm mới");
+      return;
+    }
+
     // Tạo sản phẩm mới với stock = 0, stock sẽ được cập nhật khi hoàn tất phiếu nhập
     (async () => {
       try {
@@ -490,25 +492,27 @@ const GoodsReceiptModal: React.FC<{
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowAddProductModal(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {canCreatePart && (
+                <button
+                  onClick={() => setShowAddProductModal(true)}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                <span>Thêm mới</span>
-              </button>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  <span>Thêm mới</span>
+                </button>
+              )}
             </div>
 
             {/* Search Bar with Icon */}
@@ -746,13 +750,17 @@ const GoodsReceiptModal: React.FC<{
 
                               return (
                                 <>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Nhập:</span>
-                                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
-                                      {formatCurrency(displayImportPrice)}
-                                    </span>
-                                  </div>
-                                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                                  {canViewImportPrice && (
+                                    <>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Nhập:</span>
+                                        <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
+                                          {formatCurrency(displayImportPrice)}
+                                        </span>
+                                      </div>
+                                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                                    </>
+                                  )}
                                   <div className="flex items-center gap-1">
                                     <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Bán:</span>
                                     <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">

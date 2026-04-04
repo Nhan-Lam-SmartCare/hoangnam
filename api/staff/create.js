@@ -11,6 +11,77 @@ function getSupabaseEnv() {
   };
 }
 
+const ALLOWED_ACTIONS = [
+  "sale.create",
+  "sale.delete",
+  "work_order.create",
+  "work_order.update",
+  "work_order.status.update",
+  "work_order.payment.update",
+  "work_order.parts.update",
+  "work_order.labor.update",
+  "work_order.discount.update",
+  "work_order.customer.update",
+  "work_order.vehicle.update",
+  "work_order.outsource_service.update",
+  "work_order.delete",
+  "work_order.print",
+  "work_order.refund",
+  "work_order.history.view",
+  "inventory.import",
+  "inventory.transfer",
+  "inventory.export_excel",
+  "inventory.import.file",
+  "inventory.history.view",
+  "inventory.barcode.print",
+  "inventory.view_import_price",
+  "inventory.receipt.edit",
+  "inventory.receipt.delete",
+  "part.create",
+  "part.update",
+  "part.update_price",
+  "part.delete",
+  "settings.update",
+  "cashbook.view",
+  "finance.view",
+  "payroll.view",
+  "analytics.view",
+  "reports.view",
+  "employees.view",
+  "debt.view",
+];
+
+function normalizePermissions(input) {
+  if (!input || typeof input !== "object") return {};
+
+  return ALLOWED_ACTIONS.reduce((acc, action) => {
+    if (typeof input[action] === "boolean") {
+      acc[action] = input[action];
+    }
+    return acc;
+  }, {});
+}
+
+async function upsertProfileWithPermissionFallback(adminClient, basePayload, permissions) {
+  const candidates = [
+    { ...basePayload, custom_permissions: permissions },
+    { ...basePayload, permission_overrides: permissions },
+    { ...basePayload },
+  ];
+
+  let lastError = null;
+  for (const payload of candidates) {
+    const { error } = await adminClient
+      .from("profiles")
+      .upsert(payload, { onConflict: "id" });
+
+    if (!error) return null;
+    lastError = error;
+  }
+
+  return lastError;
+}
+
 async function upsertEmployeeWithFallback(adminClient, data) {
   const candidatePayloads = [
     {
@@ -195,6 +266,7 @@ export default async function handler(req, res) {
     const department = String(body?.department || "Kỹ thuật").trim() || "Kỹ thuật";
     const position = String(body?.position || "").trim();
     const baseSalary = Number(body?.base_salary || 0);
+    const permissions = normalizePermissions(body?.permissions || {});
 
     if (!email) {
       return sendJson(res, 400, { error: "Email is required" });
@@ -232,6 +304,8 @@ export default async function handler(req, res) {
           department,
           position,
           base_salary: baseSalary,
+          custom_permissions: permissions,
+          permission_overrides: permissions,
           created_by_owner_id: requester.id,
         },
       });
@@ -243,20 +317,19 @@ export default async function handler(req, res) {
     }
 
     const userId = createdUserData.user.id;
-    const { error: upsertProfileError } = await adminClient
-      .from("profiles")
-      .upsert(
-        {
-          id: userId,
-          email,
-          role,
-          name,
-          full_name: name,
-          branch_id: branchId,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      );
+    const upsertProfileError = await upsertProfileWithPermissionFallback(
+      adminClient,
+      {
+        id: userId,
+        email,
+        role,
+        name,
+        full_name: name,
+        branch_id: branchId,
+        updated_at: new Date().toISOString(),
+      },
+      permissions
+    );
 
     if (upsertProfileError) {
       await adminClient.auth.admin.deleteUser(userId);
@@ -289,6 +362,7 @@ export default async function handler(req, res) {
         department,
         position,
         base_salary: baseSalary,
+        permissions,
       },
     });
   } catch (error) {

@@ -953,12 +953,10 @@ export const loadDemoData = () => {
     localStorage.setItem("motocare-data", JSON.stringify(newData));
   }
 
-  console.log("Demo data loaded successfully.");
   return true;
 };
 
 // Hàm xóa tất cả demo data
 export const clearDemoData = () => {
   localStorage.removeItem("motocare-data");
-  console.log("Demo data cleared.");
 };

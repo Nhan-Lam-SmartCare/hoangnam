@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { canDo } from '../../../utils/permissions';
 import { GoodsReceiptMobileModal } from '../../inventory/GoodsReceiptMobileModal';
 import { showToast } from '../../../utils/toast';
 import { generateSKU } from '../../../utils/sku';
@@ -13,6 +14,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
   onClose: () => void;
   parts: Part[];
   currentBranchId: string;
+  canViewImportPrice?: boolean;
   onSave: (
     items: Array<{
       partId: string;
@@ -32,7 +34,9 @@ const GoodsReceiptMobileWrapper: React.FC<{
       discount: number;
     }
   ) => Promise<void> | void;
-}> = ({ isOpen, onClose, parts, currentBranchId, onSave }) => {
+}> = ({ isOpen, onClose, parts, currentBranchId, canViewImportPrice = true, onSave }) => {
+  const { profile } = useAuth();
+  const canCreatePart = canDo(profile, "part.create");
   const [receiptItems, setReceiptItems] = useState<
     Array<{
       partId: string;
@@ -60,12 +64,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
   const createPartMutation = useCreatePartRepo();
 
   // Debug logging
-  console.log(
-    "📦 GoodsReceiptMobileWrapper - parts received:",
-    parts?.length || 0,
-    parts?.slice(0, 2)
-  );
-  console.log("📦 currentBranchId:", currentBranchId);
+
 
   // Reset state when modal closes
   useEffect(() => {
@@ -82,6 +81,11 @@ const GoodsReceiptMobileWrapper: React.FC<{
   }, [isOpen]);
 
   const handleAddNewProduct = (productData: any) => {
+    if (!canCreatePart) {
+      showToast.error("Bạn không có quyền tạo sản phẩm mới");
+      return;
+    }
+
     // Chỉ thêm vào danh sách tạm thời, KHÔNG lưu vào DB ngay
     // Sản phẩm sẽ được tạo khi hoàn tất phiếu nhập (bấm "Nhập kho")
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -215,14 +219,18 @@ const GoodsReceiptMobileWrapper: React.FC<{
         setShowAddProductModal={setShowAddProductModal}
         onAddNewProduct={handleAddNewProduct}
         currentBranchId={currentBranchId}
+        canViewImportPrice={canViewImportPrice}
+        canCreatePart={canCreatePart}
         isSubmitting={isSubmitting}
       />
       {/* Add Product Modal */}
-      <AddProductModal
-        isOpen={showAddProductModal}
-        onClose={() => setShowAddProductModal(false)}
-        onSave={handleAddNewProduct}
-      />
+      {canCreatePart && (
+        <AddProductModal
+          isOpen={showAddProductModal}
+          onClose={() => setShowAddProductModal(false)}
+          onSave={handleAddNewProduct}
+        />
+      )}
     </>
   );
 };

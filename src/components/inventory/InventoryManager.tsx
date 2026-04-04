@@ -606,6 +606,24 @@ const InventoryManagerNew: React.FC = () => {
   const { data: allCategories = [] } = useCategories();
 
   const { profile } = useAuth();
+  const canImportInventory = canDo(profile, "inventory.import");
+  const canTransferInventory = canDo(profile, "inventory.transfer");
+  const canExportInventoryExcel = canDo(profile, "inventory.export_excel");
+  const canImportFile = canDo(profile, "inventory.import.file");
+  const canViewInventoryHistory = canDo(profile, "inventory.history.view");
+  const canPrintBarcode = canDo(profile, "inventory.barcode.print");
+  const canUpdatePart =
+    canDo(profile, "part.update") || canDo(profile, "part.update_price");
+  const canDeletePart = canDo(profile, "part.delete");
+  const canViewImportPrice = canDo(profile, "inventory.view_import_price");
+  const canEditReceipt = canDo(profile, "inventory.receipt.edit");
+  const canDeleteReceipt = canDo(profile, "inventory.receipt.delete");
+
+  useEffect(() => {
+    if (activeTab === "history" && !canViewInventoryHistory) {
+      setActiveTab("stock");
+    }
+  }, [activeTab, canViewInventoryHistory]);
   const handleSaveGoodsReceipt = useCallback(
     async (
       items: Array<{
@@ -646,13 +664,6 @@ const InventoryManagerNew: React.FC = () => {
         .toString()
         .padStart(3, "0")}`;
 
-      console.log("📦 Saving goods receipt:", {
-        receiptCode,
-        supplierId,
-        totalAmount,
-        paymentInfo,
-        itemCount: items.length,
-      });
 
       // Get supplier name
       const { data: suppliers } = await supabase
@@ -666,14 +677,6 @@ const InventoryManagerNew: React.FC = () => {
       const paidAmount = paymentInfo?.paidAmount || 0;
       const debtAmount = totalAmount - paidAmount;
 
-      console.log("💰 Payment calculation:", {
-        totalAmount,
-        paidAmount,
-        debtAmount,
-        paymentType: paymentInfo?.paymentType,
-        paymentMethod: paymentInfo?.paymentMethod,
-        willCreateDebt: debtAmount > 0,
-      });
 
       // ⚠️ IMPORTANT: Stock is now auto-updated by trigger (trg_inventory_tx_after_insert)
       // We only need to:
@@ -687,7 +690,6 @@ const InventoryManagerNew: React.FC = () => {
         const processedItems = await Promise.all(
           items.map(async (item) => {
             if (item._isNewProduct && item._productData) {
-              console.log("🆕 Đang tạo sản phẩm mới:", item._productData.name);
 
               // Create the new product in DB
               try {
@@ -739,9 +741,6 @@ const InventoryManagerNew: React.FC = () => {
                   );
                 }
 
-                console.log(
-                  `✅ Đã tạo sản phẩm: ${item._productData.name} với ID: ${realPartId}`
-                );
 
                 return {
                   partId: realPartId,
@@ -773,12 +772,6 @@ const InventoryManagerNew: React.FC = () => {
         );
 
         // Use atomic RPC for receipt creation and stock update
-        console.log("📦 Profile data:", {
-          id: profile?.id,
-          name: profile?.name,
-          full_name: profile?.full_name,
-          email: profile?.email,
-        });
         await createReceiptAtomicMutation.mutateAsync({
           items: processedItems,
           supplierId,
@@ -943,9 +936,7 @@ const InventoryManagerNew: React.FC = () => {
               }
 
               if (cashTxResult.ok) {
-                console.log(
-                  `✅ Đã ghi chi tiền ${paidAmount.toLocaleString()} đ vào sổ quỹ (${usedPaymentSourceId})`
-                );
+
               } else {
                 console.error("❌ Lỗi ghi sổ quỹ:", cashTxResult.error);
                 paymentFailed = true;
@@ -984,7 +975,6 @@ const InventoryManagerNew: React.FC = () => {
                 console.error("❌ Lỗi tạo công nợ:", debtError);
                 debtFailed = true;
               } else {
-                console.log("✅ Đã ghi nhận nợ NCC:", debtAmount);
                 // Invalidate supplier debts query to refresh UI
                 queryClient.invalidateQueries({ queryKey: ["supplierDebts"] });
               }
@@ -1070,6 +1060,10 @@ const InventoryManagerNew: React.FC = () => {
 
   // Handle delete single item
   const handleDeleteItem = async (id: string) => {
+    if (!canDeletePart) {
+      showToast.error("Bạn không có quyền xóa sản phẩm");
+      return;
+    }
     const part = repoParts.find((p) => p.id === id);
     if (!part) return;
 
@@ -1091,7 +1085,6 @@ const InventoryManagerNew: React.FC = () => {
           setSelectedItems((prev) => prev.filter((i) => i !== id));
           // Force refetch to update duplicate detection immediately
           await refetchAllParts();
-          console.log("🔄 Refetched allPartsForTotals after delete");
           showToast.success(`Đã xóa phụ tùng "${part.name}"`);
         },
         onError: (error) => {
@@ -1104,6 +1097,10 @@ const InventoryManagerNew: React.FC = () => {
 
   // Handle bulk delete
   const handleBulkDelete = async () => {
+    if (!canDeletePart) {
+      showToast.error("Bạn không có quyền xóa sản phẩm");
+      return;
+    }
     if (selectedItems.length === 0) {
       showToast.warning("Vui lòng chọn ít nhất một sản phẩm");
       return;
@@ -1135,7 +1132,6 @@ const InventoryManagerNew: React.FC = () => {
             if (successCount + errorCount === totalCount) {
               // Force refetch to update duplicate detection immediately
               await refetchAllParts();
-              console.log("🔄 Refetched allPartsForTotals after bulk delete");
               if (errorCount === 0) {
                 showToast.success(`Đã xóa ${successCount} phụ tùng`);
               } else {
@@ -1178,7 +1174,6 @@ const InventoryManagerNew: React.FC = () => {
     }
   ) => {
     try {
-      console.log("💾 Saving edited receipt:", updatedData);
 
       // 1. Update transaction notes/date if needed (limited edit capability for now)
       // Ideally we should update all transactions linked to this receipt
@@ -1231,6 +1226,11 @@ const InventoryManagerNew: React.FC = () => {
 
   // Handle delete receipt
   const handleDeleteReceipt = async (receiptCode: string) => {
+    if (!canDeleteReceipt) {
+      showToast.error("Bạn không có quyền xóa phiếu nhập kho");
+      return;
+    }
+
     const confirmed = await confirm({
       title: "Xác nhận xóa phiếu nhập",
       message: `Bạn có chắc chắn muốn xóa phiếu nhập "${receiptCode}"? Hành động này sẽ hoàn tác tồn kho và công nợ liên quan.`,
@@ -1287,7 +1287,7 @@ const InventoryManagerNew: React.FC = () => {
           if (updateError) {
             console.warn(`Could not update stock for ${tx.part_id}:`, updateError);
           } else {
-            console.log(`✅ Trừ tồn kho: ${tx.part_name || tx.part_id} - Số lượng: ${tx.quantity_change} (${branchStock} → ${newBranchStock})`);
+
           }
         }
       }
@@ -1384,6 +1384,11 @@ const InventoryManagerNew: React.FC = () => {
 
   // Handle export to Excel
   const handleExportExcel = () => {
+    if (!canExportInventoryExcel) {
+      showToast.error("Bạn không có quyền xuất Excel kho");
+      return;
+    }
+
     try {
       const now = new Date();
       const filename = `ton-kho-${now.getDate()}-${now.getMonth() + 1
@@ -1394,6 +1399,15 @@ const InventoryManagerNew: React.FC = () => {
       console.error("Export error:", error);
       showToast.error("Có lỗi khi xuất file Excel");
     }
+  };
+
+  const handleTransferInventory = () => {
+    if (!canTransferInventory) {
+      showToast.error("Bạn không có quyền chuyển kho");
+      return;
+    }
+
+    showToast.info("Tính năng chuyển kho đang phát triển");
   };
 
   // Handle download template
@@ -1444,7 +1458,11 @@ const InventoryManagerNew: React.FC = () => {
                 label: "Lịch sử",
                 icon: <FileText className="w-3.5 h-3.5" />,
               },
-            ].map((tab) => (
+            ]
+              .filter((tab) =>
+                tab.key === "history" ? canViewInventoryHistory : true
+              )
+              .map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -1463,28 +1481,30 @@ const InventoryManagerNew: React.FC = () => {
 
           {/* Action Buttons - Compact */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowBatchPrintModal(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition"
-              title="In mã vạch hàng loạt"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {canPrintBarcode && (
+              <button
+                onClick={() => setShowBatchPrintModal(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition"
+                title="In mã vạch hàng loạt"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                />
-              </svg>
-              In mã vạch
-            </button>
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                  />
+                </svg>
+                In mã vạch
+              </button>
+            )}
 
-            {canDo(profile?.role, "inventory.import") && (
+            {canImportInventory && (
               <button
                 onClick={() => setShowGoodsReceipt(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition"
@@ -1494,25 +1514,25 @@ const InventoryManagerNew: React.FC = () => {
               </button>
             )}
             <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700 px-1 py-0.5">
-              {canDo(profile?.role, "inventory.import") && (
+              {canTransferInventory && (
                 <button
-                  onClick={() => {
-                    showToast.info("Tính năng chuyển kho đang phát triển");
-                  }}
+                  onClick={handleTransferInventory}
                   className="p-1.5 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-white dark:bg-slate-800 transition"
                   title="Chuyển kho"
                 >
                   <Repeat className="w-3.5 h-3.5" />
                 </button>
               )}
-              <button
-                onClick={handleExportExcel}
-                className="p-1.5 rounded-md text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-white dark:bg-slate-800 transition"
-                title="Xuất Excel"
-              >
-                <UploadCloud className="w-3.5 h-3.5" />
-              </button>
-              {canDo(profile?.role, "inventory.import") && (
+              {canExportInventoryExcel && (
+                <button
+                  onClick={handleExportExcel}
+                  className="p-1.5 rounded-md text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-white dark:bg-slate-800 transition"
+                  title="Xuất Excel"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {canImportFile && (
                 <>
                   <button
                     onClick={() => setShowImportModal(true)}
@@ -1576,7 +1596,7 @@ const InventoryManagerNew: React.FC = () => {
           </button>
 
           {/* Create Button */}
-          {canDo(profile?.role, "inventory.import") && (
+          {canImportInventory && (
             <button
               onClick={() => setShowGoodsReceipt(true)}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition whitespace-nowrap"
@@ -1847,10 +1867,6 @@ const InventoryManagerNew: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
-                        console.log(
-                          "Stock tab: Đặt hàng button clicked, selectedItems:",
-                          selectedItems
-                        );
                         setShowCreatePO(true);
                       }}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1884,9 +1900,14 @@ const InventoryManagerNew: React.FC = () => {
               {/* Mobile: stacked cards (visible on small screens) */}
               <div className="block sm:hidden">
                 <div className="space-y-3 p-3">
-                  {filteredParts.map((part, index) => {
+                    {filteredParts.map((part, index) => {
+                    const hasPartActions = canUpdatePart || canDeletePart;
                     const stock = part.stock[currentBranchId] || 0;
                     const retailPrice = part.retailPrice[currentBranchId] || 0;
+                    const hasLaborCost = Object.prototype.hasOwnProperty.call(part, "laborCost");
+                    const laborCost = hasLaborCost
+                      ? (part as any).laborCost?.[currentBranchId] || 0
+                      : part.wholesalePrice?.[currentBranchId] || 0;
                     const isDuplicate = hasDuplicateSku(part.sku || "");
                     return (
                       <div
@@ -1905,6 +1926,14 @@ const InventoryManagerNew: React.FC = () => {
                               <div className="text-[11px] text-blue-400 mt-1 truncate font-mono">
                                 SKU: {part.sku}
                               </div>
+                              {part.description && (
+                                <div
+                                  className="text-[11px] text-slate-300/90 mt-1 line-clamp-2"
+                                  title={part.description}
+                                >
+                                  {part.description}
+                                </div>
+                              )}
                               {/* Danh mục với màu sắc */}
                               {part.category && (
                                 <span
@@ -1919,6 +1948,9 @@ const InventoryManagerNew: React.FC = () => {
                               {/* Hiển thị giá bán */}
                               <div className="text-[13px] text-emerald-400 font-semibold">
                                 {formatCurrency(retailPrice)}
+                              </div>
+                              <div className="text-[11px] text-cyan-400 mt-1 font-medium">
+                                Công: {formatCurrency(laborCost)}
                               </div>
                             </div>
                           </div>
@@ -1935,6 +1967,7 @@ const InventoryManagerNew: React.FC = () => {
                               <span className="text-xs opacity-80">SL:</span>
                               {stock}
                             </span>
+                            {hasPartActions && (
                             <div className="relative">
                               {/* Tăng vùng tap cho menu 3 chấm */}
                               <button
@@ -1953,31 +1986,36 @@ const InventoryManagerNew: React.FC = () => {
 
                               {mobileMenuOpenIndex === index && (
                                 <div className="absolute right-0 bottom-full mb-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-[9999]">
-                                  <button
-                                    onClick={() => {
-                                      setEditingPart(part);
-                                      setMobileMenuOpenIndex(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-700 flex items-center gap-2 text-white rounded-t-lg"
-                                    aria-label={`Chỉnh sửa ${part.name}`}
-                                  >
-                                    <Edit className="w-4 h-4 text-blue-400" />
-                                    <span>Chỉnh sửa</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleDeleteItem(part.id);
-                                      setMobileMenuOpenIndex(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-700 flex items-center gap-2 text-red-400 rounded-b-lg"
-                                    aria-label={`Xóa ${part.name}`}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    <span>Xóa</span>
-                                  </button>
+                                  {canUpdatePart && (
+                                    <button
+                                      onClick={() => {
+                                        setEditingPart(part);
+                                        setMobileMenuOpenIndex(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-700 flex items-center gap-2 text-white rounded-t-lg"
+                                      aria-label={`Chỉnh sửa ${part.name}`}
+                                    >
+                                      <Edit className="w-4 h-4 text-blue-400" />
+                                      <span>Chỉnh sửa</span>
+                                    </button>
+                                  )}
+                                  {canDeletePart && (
+                                    <button
+                                      onClick={() => {
+                                        handleDeleteItem(part.id);
+                                        setMobileMenuOpenIndex(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-slate-700 flex items-center gap-2 text-red-400 rounded-b-lg"
+                                      aria-label={`Xóa ${part.name}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      <span>Xóa</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2028,19 +2066,21 @@ const InventoryManagerNew: React.FC = () => {
                           )}
                         </div>
                       </th>
-                      <th
-                        className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[110px]"
-                        onClick={() => handleSort("costPrice")}
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>Giá nhập</span>
-                          {sortField === "costPrice" && (
-                            <span className="text-blue-500">
-                              {sortDirection === "asc" ? "↑" : "↓"}
-                            </span>
-                          )}
-                        </div>
-                      </th>
+                      {canViewImportPrice && (
+                        <th
+                          className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[110px]"
+                          onClick={() => handleSort("costPrice")}
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span>Giá nhập</span>
+                            {sortField === "costPrice" && (
+                              <span className="text-blue-500">
+                                {sortDirection === "asc" ? "↑" : "↓"}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      )}
                       <th
                         className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[110px]"
                         onClick={() => handleSort("retailPrice")}
@@ -2089,7 +2129,7 @@ const InventoryManagerNew: React.FC = () => {
                     {filteredParts.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={8}
+                          colSpan={canViewImportPrice ? 8 : 7}
                           className="px-4 py-6 text-center text-slate-400 dark:text-slate-500"
                         >
                           <div className="text-4xl mb-2">🗂️</div>
@@ -2204,6 +2244,14 @@ const InventoryManagerNew: React.FC = () => {
                                       </span>
                                     )}
                                   </div>
+                                  {part.description && (
+                                    <div
+                                      className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[260px]"
+                                      title={part.description}
+                                    >
+                                      {part.description}
+                                    </div>
+                                  )}
                                   {part.category && (
                                     <span
                                       className={`inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium ${getCategoryColor(part.category).bg
@@ -2250,9 +2298,11 @@ const InventoryManagerNew: React.FC = () => {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-right text-xs text-slate-600 dark:text-slate-300">
-                              {formatCurrency(costPrice)}
-                            </td>
+                            {canViewImportPrice && (
+                              <td className="px-3 py-2 whitespace-nowrap text-right text-xs text-slate-600 dark:text-slate-300">
+                                {formatCurrency(costPrice)}
+                              </td>
+                            )}
                             <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-medium text-slate-900 dark:text-slate-100">
                               {formatCurrency(retailPrice)}
                             </td>
@@ -2264,26 +2314,28 @@ const InventoryManagerNew: React.FC = () => {
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-center">
                               <div className="relative flex justify-end">
-                                <button
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    const rect =
-                                      event.currentTarget.getBoundingClientRect();
-                                    setInventoryDropdownPos({
-                                      top: rect.bottom + 4,
-                                      right: window.innerWidth - rect.right,
-                                    });
-                                    setOpenActionRow((prev) =>
-                                      prev === part.id ? null : part.id
-                                    );
-                                  }}
-                                  className="rounded-full border border-transparent p-2 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:border-slate-600 hover:text-slate-900 dark:text-slate-100 transition"
-                                  aria-haspopup="menu"
-                                  aria-expanded={openActionRow === part.id}
-                                  title="Thao tác nhanh"
-                                >
-                                  <MoreHorizontal className="w-5 h-5" />
-                                </button>
+                                {(canUpdatePart || canDeletePart) && (
+                                  <button
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      const rect =
+                                        event.currentTarget.getBoundingClientRect();
+                                      setInventoryDropdownPos({
+                                        top: rect.bottom + 4,
+                                        right: window.innerWidth - rect.right,
+                                      });
+                                      setOpenActionRow((prev) =>
+                                        prev === part.id ? null : part.id
+                                      );
+                                    }}
+                                    className="rounded-full border border-transparent p-2 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:border-slate-600 hover:text-slate-900 dark:text-slate-100 transition"
+                                    aria-haspopup="menu"
+                                    aria-expanded={openActionRow === part.id}
+                                    title="Thao tác nhanh"
+                                  >
+                                    <MoreHorizontal className="w-5 h-5" />
+                                  </button>
+                                )}
                                 {openActionRow === part.id && (
                                   <div
                                     className="fixed w-44 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl dark:bg-slate-800 z-[9999]"
@@ -2293,28 +2345,32 @@ const InventoryManagerNew: React.FC = () => {
                                     }}
                                     onClick={(event) => event.stopPropagation()}
                                   >
-                                    <button
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        setEditingPart(part);
-                                        setOpenActionRow(null);
-                                      }}
-                                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-slate-700 rounded-t-xl"
-                                    >
-                                      <Edit className="h-4 w-4 text-blue-500" />
-                                      Chỉnh sửa
-                                    </button>
-                                    <button
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        setOpenActionRow(null);
-                                        handleDeleteItem(part.id);
-                                      }}
-                                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-slate-700/70 rounded-b-xl"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      Xóa
-                                    </button>
+                                    {canUpdatePart && (
+                                      <button
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setEditingPart(part);
+                                          setOpenActionRow(null);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-blue-50 dark:hover:bg-slate-700 rounded-t-xl"
+                                      >
+                                        <Edit className="h-4 w-4 text-blue-500" />
+                                        Chỉnh sửa
+                                      </button>
+                                    )}
+                                    {canDeletePart && (
+                                      <button
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setOpenActionRow(null);
+                                          handleDeleteItem(part.id);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-slate-700/70 rounded-b-xl"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Xóa
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -2374,26 +2430,35 @@ const InventoryManagerNew: React.FC = () => {
           </div>
         )}
 
-        {activeTab === "history" && (
+        {activeTab === "history" && canViewInventoryHistory && (
           <>
             {/* Desktop Version */}
             <div className="hidden sm:block">
-              <InventoryHistorySection transactions={historyTransactions} />
+              <InventoryHistorySection
+                transactions={historyTransactions}
+                canViewImportPrice={canViewImportPrice}
+                canEditReceipt={canEditReceipt}
+                canDeleteReceipt={canDeleteReceipt}
+                canPrintBarcode={canPrintBarcode}
+              />
             </div>
             {/* Mobile Version */}
             <div className="sm:hidden">
               <InventoryHistorySectionMobile
                 transactions={historyTransactions}
-                onEdit={(receipt) => {
+                canViewImportPrice={canViewImportPrice}
+                canEditReceipt={canEditReceipt}
+                canDeleteReceipt={canDeleteReceipt}
+                onEdit={canEditReceipt ? (receipt) => {
                   // Reconstruct the receipt object for editing
                   // We need to find the original transaction or construct a compatible object
                   // For now, we'll use the receipt object passed from the mobile component
                   // which has { receiptCode, date, supplier, items, total }
                   setEditingReceipt(receipt);
-                }}
-                onDelete={(receipt) => {
+                } : undefined}
+                onDelete={canDeleteReceipt ? (receipt) => {
                   handleDeleteReceipt(receipt.receiptCode);
-                }}
+                } : undefined}
               />
             </div>
           </>
@@ -2419,7 +2484,7 @@ const InventoryManagerNew: React.FC = () => {
             ) : (
               <PurchaseOrdersList
                 onCreateNew={() => {
-                  console.log("InventoryManager: setShowCreatePO(true) called");
+
                   setShowCreatePO(true);
                 }}
                 onViewDetail={(po) => setSelectedPO(po)}
@@ -2439,6 +2504,7 @@ const InventoryManagerNew: React.FC = () => {
           onClose={() => setShowGoodsReceipt(false)}
           parts={allPartsData || []}
           currentBranchId={currentBranchId}
+          canViewImportPrice={canViewImportPrice}
           onSave={handleSaveGoodsReceipt}
         />
       </div>
@@ -2450,12 +2516,13 @@ const InventoryManagerNew: React.FC = () => {
           onClose={() => setShowGoodsReceipt(false)}
           parts={allPartsData || []}
           currentBranchId={currentBranchId}
+          canViewImportPrice={canViewImportPrice}
           onSave={handleSaveGoodsReceipt}
         />
       </div>
 
       {/* Batch Print Barcode Modal */}
-      {showBatchPrintModal && (
+      {showBatchPrintModal && canPrintBarcode && (
         <BatchPrintBarcodeModal
           parts={allPartsData || []}
           currentBranchId={currentBranchId}
@@ -2483,8 +2550,6 @@ const InventoryManagerNew: React.FC = () => {
                 const part = allPartsData?.find(p => p.id === reservedInfoPartId);
 
                 // Debug logging
-                console.log("Checking reserved for part:", part?.name, reservedInfoPartId);
-                console.log("Total work orders:", workOrders.length);
 
                 const reservingOrders = workOrders.filter((wo: WorkOrder) => {
                   if (!wo.partsUsed) return false;
@@ -2501,7 +2566,6 @@ const InventoryManagerNew: React.FC = () => {
                   return hasPart && isNotCancelled && isNotPaid;
                 });
 
-                console.log("Filtered reserving orders:", reservingOrders.length);
 
                 if (!part) return <div className="p-6 text-center text-slate-500">Không tìm thấy thông tin sản phẩm</div>;
 
@@ -2624,7 +2688,6 @@ const InventoryManagerNew: React.FC = () => {
           part={editingPart}
           onClose={() => setEditingPart(null)}
           onSave={(updatedPart) => {
-            console.log("💾 Saving part updates:", updatedPart);
             // Only send fields that are allowed in database schema
             const updates: Partial<Part> = {
               name: updatedPart.name,
@@ -2638,7 +2701,6 @@ const InventoryManagerNew: React.FC = () => {
             if (updatedPart.costPrice) {
               updates.costPrice = updatedPart.costPrice;
             }
-            console.log("📤 Sending updates:", updates);
             updatePartMutation.mutate({
               id: updatedPart.id,
               updates,
@@ -2678,7 +2740,6 @@ const InventoryManagerNew: React.FC = () => {
 
               // OPTIMIZATION: Batch fetch all parts by SKU in one query
               const allSkus = importedData.map((item) => item.sku);
-              console.log(`🔍 Checking ${allSkus.length} SKUs...`);
 
               // Check for duplicate SKUs in import file
               const skuCounts = new Map<string, number>();
@@ -2722,7 +2783,6 @@ const InventoryManagerNew: React.FC = () => {
                 }
               }
 
-              console.log(`✅ Found ${allExistingParts.length} existing parts`);
 
               const existingPartsMap = new Map(
                 allExistingParts.map((p) => [p.sku, p])
@@ -2839,7 +2899,6 @@ const InventoryManagerNew: React.FC = () => {
                   console.error("❌ Batch create error:", createError);
                   throw new Error(`Lỗi tạo phụ tùng: ${createError.message}`);
                 }
-                console.log(`✅ Created ${createdParts?.length || 0} parts`);
               }
 
               // BATCH: Execute all updates
@@ -2868,9 +2927,6 @@ const InventoryManagerNew: React.FC = () => {
                     updateSuccess++;
                   }
                 }
-                console.log(
-                  `✅ Updated ${updateSuccess}/${partsToUpdate.length} parts`
-                );
               }
 
               // BATCH: Create inventory transactions
@@ -2944,7 +3000,7 @@ const InventoryManagerNew: React.FC = () => {
       <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 z-50 safe-area-bottom">
         {/* Backdrop blur effect */}
         <div className="absolute inset-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg -z-10"></div>
-        <div className="grid grid-cols-4 gap-1 px-2 py-2">
+        <div className={`grid ${canViewInventoryHistory ? "grid-cols-3" : "grid-cols-2"} gap-1 px-2 py-2`}>
           <button
             onClick={() => setActiveTab("stock")}
             className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-all duration-200 ${activeTab === "stock"
@@ -2986,38 +3042,33 @@ const InventoryManagerNew: React.FC = () => {
               Đặt hàng
             </span>
           </button>
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-all duration-200 ${activeTab === "history"
-              ? "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 scale-105"
-              : "text-slate-500 dark:text-slate-400 active:scale-95"
-              }`}
-          >
-            <FileText
-              className={`w-5 h-5 ${activeTab === "history" ? "scale-110" : ""
-                } transition-transform`}
-            />
-            <span
-              className={`text-[10px] font-medium ${activeTab === "history" ? "font-semibold" : ""
+          {canViewInventoryHistory && (
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-all duration-200 ${activeTab === "history"
+                ? "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 scale-105"
+                : "text-slate-500 dark:text-slate-400 active:scale-95"
                 }`}
             >
-              Lịch sử
-            </span>
-          </button>
+              <FileText
+                className={`w-5 h-5 ${activeTab === "history" ? "scale-110" : ""
+                  } transition-transform`}
+              />
+              <span
+                className={`text-[10px] font-medium ${activeTab === "history" ? "font-semibold" : ""
+                  }`}
+              >
+                Lịch sử
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Create Purchase Order Modal */}
       {(showCreatePO || editingPO) && (
         <>
-          {console.log(
-            "About to render CreatePOModal, showCreatePO:",
-            showCreatePO,
-            "editingPO:",
-            editingPO,
-            "selectedItems:",
-            selectedItems
-          )}
+          {}
           <CreatePOModal
             isOpen={!!(showCreatePO || editingPO)}
             onClose={() => {

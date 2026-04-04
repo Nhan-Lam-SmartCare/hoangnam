@@ -314,12 +314,6 @@ export const CreatePOModal: React.FC<CreatePOModalProps> = ({
 
   if (!isOpen) return null;
 
-  console.log("CreatePOModal rendering:", {
-    isOpen,
-    prefilledPartIds,
-    itemsCount: items.length,
-    filteredPartsCount: filteredParts.length,
-  });
 
   return (
     <>

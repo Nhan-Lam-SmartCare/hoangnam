@@ -119,12 +119,9 @@ export async function fetchPinBalanceSummary(branchId: string = "CN1"): Promise<
     .filter((t) => t.type === "expense" && isBank(t))
     .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0);
 
-  console.log("[PinSupabase] Cash delta: income=", cashIncome, "expense=", cashExpense, "net=", cashIncome - cashExpense);
-  console.log("[PinSupabase] Bank delta: income=", bankIncome, "expense=", bankExpense, "net=", bankIncome - bankExpense);
 
   // Lấy số dư ban đầu
   const initialBalance = await fetchPinInitialBalance(branchId);
-  console.log("[PinSupabase] Initial balance: cash=", initialBalance.cash, "bank=", initialBalance.bank);
 
   // Tính số dư thực tế = Số dư ban đầu + Biến động
   const cashBalance = initialBalance.cash + (cashIncome - cashExpense);

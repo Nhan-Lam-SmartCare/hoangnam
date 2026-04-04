@@ -14,6 +14,13 @@ import {
 import LoadingSpinner from "../common/LoadingSpinner";
 import { MFASetup } from "../auth/MFASetup";
 import {
+  APP_ACTION_OPTIONS,
+  canDo,
+  normalizePermissionMap,
+  type AppAction,
+  type PermissionMap,
+} from "../../utils/permissions";
+import {
   Lock,
   Settings as SettingsIcon,
   Save,
@@ -70,6 +77,9 @@ interface StaffMember {
   email: string;
   name: string;
   role: "owner" | "manager" | "staff";
+  permissions?: PermissionMap;
+  custom_permissions?: PermissionMap;
+  permission_overrides?: PermissionMap;
   branch_id: string;
   department?: string;
   position?: string;
@@ -88,12 +98,24 @@ type StaffOverridesMap = Record<
     department?: string;
     position?: string;
     base_salary?: number;
+    permissions?: PermissionMap;
   }
 >;
 
 const STAFF_DEPARTMENTS = ["Kỹ thuật", "Bán hàng", "Quản lý"] as const;
 const STAFF_OVERRIDES_STORAGE_KEY = "staff_overrides_v1";
 const BRANCH_OVERRIDES_STORAGE_KEY = "branch_overrides_v1";
+
+const PERMISSION_GROUPS: Array<{
+  key: "sales" | "service" | "inventory" | "finance" | "admin";
+  label: string;
+}> = [
+  { key: "sales", label: "Bán hàng" },
+  { key: "service", label: "Sửa chữa" },
+  { key: "inventory", label: "Kho" },
+  { key: "finance", label: "Tài chính" },
+  { key: "admin", label: "Quản trị" },
+];
 
 interface SettingsManagerProps {
   initialTab?: "general" | "branding" | "banking" | "invoice" | "security" | "staff";
@@ -134,11 +156,17 @@ export const SettingsManager = ({
   const [newStaffPosition, setNewStaffPosition] = useState("");
   const [newStaffBaseSalary, setNewStaffBaseSalary] = useState("0");
   const [newStaffPassword, setNewStaffPassword] = useState("");
+  const [newStaffPermissions, setNewStaffPermissions] =
+    useState<PermissionMap>({});
   const [resettingStaff, setResettingStaff] = useState(false);
   const [resetTargetStaff, setResetTargetStaff] = useState<StaffMember | null>(
     null
   );
   const [resetStaffPassword, setResetStaffPassword] = useState("");
+  const [permissionTargetStaff, setPermissionTargetStaff] =
+    useState<StaffMember | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<PermissionMap>({});
+  const [savingPermissionDraft, setSavingPermissionDraft] = useState(false);
   const [savingStaff, setSavingStaff] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [staffDepartmentFilter, setStaffDepartmentFilter] = useState("all");
@@ -406,6 +434,27 @@ export const SettingsManager = ({
         setStaffList(
           (rpcData as StaffMember[]).map((staff) => ({
             ...staff,
+            permissions: normalizePermissionMap(
+              (staff as any).permissions ||
+                (staff as any).custom_permissions ||
+                (staff as any).permission_overrides ||
+                staffOverrides[staff.id]?.permissions ||
+                {}
+            ),
+            custom_permissions: normalizePermissionMap(
+              (staff as any).custom_permissions ||
+                (staff as any).permissions ||
+                (staff as any).permission_overrides ||
+                staffOverrides[staff.id]?.permissions ||
+                {}
+            ),
+            permission_overrides: normalizePermissionMap(
+              (staff as any).permission_overrides ||
+                (staff as any).custom_permissions ||
+                (staff as any).permissions ||
+                staffOverrides[staff.id]?.permissions ||
+                {}
+            ),
             department:
               employeeMap.get(staff.id)?.department ||
               staffOverrides[staff.id]?.department ||
@@ -434,6 +483,27 @@ export const SettingsManager = ({
           setStaffList(
             (profilesData as StaffMember[]).map((staff) => ({
               ...staff,
+              permissions: normalizePermissionMap(
+                (staff as any).permissions ||
+                  (staff as any).custom_permissions ||
+                  (staff as any).permission_overrides ||
+                  staffOverrides[staff.id]?.permissions ||
+                  {}
+              ),
+              custom_permissions: normalizePermissionMap(
+                (staff as any).custom_permissions ||
+                  (staff as any).permissions ||
+                  (staff as any).permission_overrides ||
+                  staffOverrides[staff.id]?.permissions ||
+                  {}
+              ),
+              permission_overrides: normalizePermissionMap(
+                (staff as any).permission_overrides ||
+                  (staff as any).custom_permissions ||
+                  (staff as any).permissions ||
+                  staffOverrides[staff.id]?.permissions ||
+                  {}
+              ),
               department:
                 employeeMap.get(staff.id)?.department ||
                 staffOverrides[staff.id]?.department ||
@@ -460,6 +530,27 @@ export const SettingsManager = ({
                 email: profile.email,
                 name: profile.name || profile.full_name || "",
                 role: profile.role,
+                permissions: normalizePermissionMap(
+                  (profile as any).permissions ||
+                    (profile as any).custom_permissions ||
+                    (profile as any).permission_overrides ||
+                    staffOverrides[profile.id]?.permissions ||
+                    {}
+                ),
+                custom_permissions: normalizePermissionMap(
+                  (profile as any).custom_permissions ||
+                    (profile as any).permissions ||
+                    (profile as any).permission_overrides ||
+                    staffOverrides[profile.id]?.permissions ||
+                    {}
+                ),
+                permission_overrides: normalizePermissionMap(
+                  (profile as any).permission_overrides ||
+                    (profile as any).custom_permissions ||
+                    (profile as any).permissions ||
+                    staffOverrides[profile.id]?.permissions ||
+                    {}
+                ),
                 branch_id: "CN1",
                 department:
                   employeeMap.get(profile.id)?.department ||
@@ -483,9 +574,6 @@ export const SettingsManager = ({
 
           // Show info toast about RPC function
           if (rpcError) {
-            console.log(
-              "RPC not available, using fallback. Run sql/2025-12-02_user_management_rpc.sql to enable full user management."
-            );
           }
         }
       }
@@ -499,6 +587,27 @@ export const SettingsManager = ({
             email: profile.email,
             name: profile.name || profile.full_name || "",
             role: profile.role,
+            permissions: normalizePermissionMap(
+              (profile as any).permissions ||
+                (profile as any).custom_permissions ||
+                (profile as any).permission_overrides ||
+                staffOverrides[profile.id]?.permissions ||
+                {}
+            ),
+            custom_permissions: normalizePermissionMap(
+              (profile as any).custom_permissions ||
+                (profile as any).permissions ||
+                (profile as any).permission_overrides ||
+                staffOverrides[profile.id]?.permissions ||
+                {}
+            ),
+            permission_overrides: normalizePermissionMap(
+              (profile as any).permission_overrides ||
+                (profile as any).custom_permissions ||
+                (profile as any).permissions ||
+                staffOverrides[profile.id]?.permissions ||
+                {}
+            ),
             branch_id: "CN1",
             department: "",
             position: "",
@@ -548,6 +657,12 @@ export const SettingsManager = ({
           department: normalizedDepartment,
           position: editingStaff.position || "",
           base_salary: Number(editingStaff.base_salary || 0),
+          permissions: normalizePermissionMap(
+            editingStaff.permissions ||
+              editingStaff.custom_permissions ||
+              editingStaff.permission_overrides ||
+              {}
+          ),
         }),
       });
 
@@ -568,6 +683,36 @@ export const SettingsManager = ({
                 email: updatedStaffFromApi.email || editedSnapshot.email || staff.email,
                 name: updatedStaffFromApi.name || editedSnapshot.name || staff.name,
                 role: updatedStaffFromApi.role || editedSnapshot.role || staff.role,
+                permissions: normalizePermissionMap(
+                  updatedStaffFromApi.permissions ||
+                    updatedStaffFromApi.custom_permissions ||
+                    updatedStaffFromApi.permission_overrides ||
+                    editedSnapshot.permissions ||
+                    editedSnapshot.custom_permissions ||
+                    editedSnapshot.permission_overrides ||
+                    staff.permissions ||
+                    {}
+                ),
+                custom_permissions: normalizePermissionMap(
+                  updatedStaffFromApi.custom_permissions ||
+                    updatedStaffFromApi.permissions ||
+                    updatedStaffFromApi.permission_overrides ||
+                    editedSnapshot.custom_permissions ||
+                    editedSnapshot.permissions ||
+                    editedSnapshot.permission_overrides ||
+                    staff.custom_permissions ||
+                    {}
+                ),
+                permission_overrides: normalizePermissionMap(
+                  updatedStaffFromApi.permission_overrides ||
+                    updatedStaffFromApi.custom_permissions ||
+                    updatedStaffFromApi.permissions ||
+                    editedSnapshot.permission_overrides ||
+                    editedSnapshot.custom_permissions ||
+                    editedSnapshot.permissions ||
+                    staff.permission_overrides ||
+                    {}
+                ),
                 branch_id:
                   updatedStaffFromApi.branch_id || editedSnapshot.branch_id || staff.branch_id,
                 department:
@@ -590,6 +735,15 @@ export const SettingsManager = ({
           position: updatedStaffFromApi.position || editedSnapshot.position || "",
           base_salary: Number(
             updatedStaffFromApi.base_salary ?? editedSnapshot.base_salary ?? 0
+          ),
+          permissions: normalizePermissionMap(
+            updatedStaffFromApi.permissions ||
+              updatedStaffFromApi.custom_permissions ||
+              updatedStaffFromApi.permission_overrides ||
+              editedSnapshot.permissions ||
+              editedSnapshot.custom_permissions ||
+              editedSnapshot.permission_overrides ||
+              {}
           ),
         },
       }));
@@ -708,6 +862,7 @@ export const SettingsManager = ({
           department: newStaffDepartment,
           position: newStaffPosition.trim(),
           base_salary: Number(newStaffBaseSalary || 0),
+          permissions: normalizePermissionMap(newStaffPermissions),
         }),
       });
 
@@ -728,6 +883,7 @@ export const SettingsManager = ({
             department: newStaffDepartment,
             position: newStaffPosition.trim(),
             base_salary: Number(newStaffBaseSalary || 0),
+            permissions: normalizePermissionMap(newStaffPermissions),
           },
         }));
       }
@@ -817,6 +973,114 @@ export const SettingsManager = ({
     }
   };
 
+  const openPermissionEditor = (staff: StaffMember) => {
+    if (staff.role === "owner") {
+      showToast.error("Không thể chỉnh quyền cho tài khoản chủ cửa hàng");
+      return;
+    }
+
+    setPermissionTargetStaff(staff);
+    setPermissionDraft(
+      normalizePermissionMap(
+        staff.permissions ||
+          staff.custom_permissions ||
+          staff.permission_overrides ||
+          {}
+      )
+    );
+  };
+
+  const closePermissionEditor = () => {
+    setPermissionTargetStaff(null);
+    setPermissionDraft({});
+  };
+
+  const togglePermissionDraft = (action: AppAction, checked: boolean) => {
+    if (!permissionTargetStaff) return;
+
+    setPermissionDraft((prev) => {
+      const roleDefault = canDo(permissionTargetStaff.role, action);
+      const next = { ...prev };
+
+      if (checked === roleDefault) {
+        delete next[action];
+      } else {
+        next[action] = checked;
+      }
+
+      return next;
+    });
+  };
+
+  const handleSavePermissionDraft = async () => {
+    if (!permissionTargetStaff) return;
+
+    setSavingPermissionDraft(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+      }
+
+      const response = await fetch("/api/staff/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: permissionTargetStaff.id,
+          email: permissionTargetStaff.email,
+          name: permissionTargetStaff.name,
+          role: permissionTargetStaff.role,
+          branch_id: permissionTargetStaff.branch_id,
+          department: permissionTargetStaff.department || "Kỹ thuật",
+          position: permissionTargetStaff.position || "",
+          base_salary: Number(permissionTargetStaff.base_salary || 0),
+          permissions: normalizePermissionMap(permissionDraft),
+        }),
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || "Không thể cập nhật phân quyền");
+      }
+
+      setStaffList((prev) =>
+        prev.map((staff) =>
+          staff.id === permissionTargetStaff.id
+            ? {
+                ...staff,
+                permissions: normalizePermissionMap(permissionDraft),
+                custom_permissions: normalizePermissionMap(permissionDraft),
+                permission_overrides: normalizePermissionMap(permissionDraft),
+              }
+            : staff
+        )
+      );
+
+      setStaffOverrides((prev) => ({
+        ...prev,
+        [permissionTargetStaff.id]: {
+          ...(prev[permissionTargetStaff.id] || {}),
+          permissions: normalizePermissionMap(permissionDraft),
+        },
+      }));
+
+      showToast.success("Đã cập nhật phân quyền nhân viên");
+      closePermissionEditor();
+      await refreshStaffScreen();
+    } catch (error: any) {
+      console.error("Error updating staff permissions:", error);
+      showToast.error(error.message || "Không thể cập nhật phân quyền");
+    } finally {
+      setSavingPermissionDraft(false);
+    }
+  };
+
   const resetNewStaffForm = () => {
     setNewStaffEmail("");
     setNewStaffName("");
@@ -826,6 +1090,7 @@ export const SettingsManager = ({
     setNewStaffPosition("");
     setNewStaffBaseSalary("0");
     setNewStaffPassword("");
+    setNewStaffPermissions({});
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -848,6 +1113,45 @@ export const SettingsManager = ({
       default:
         return "Nhân viên";
     }
+  };
+
+  const getEffectivePermission = (
+    role: "owner" | "manager" | "staff",
+    overrides: PermissionMap,
+    action: AppAction
+  ) => {
+    if (typeof overrides[action] === "boolean") {
+      return Boolean(overrides[action]);
+    }
+    return canDo(role, action);
+  };
+
+  const toggleNewStaffPermission = (action: AppAction, checked: boolean) => {
+    setNewStaffPermissions((prev) => {
+      const roleDefault = canDo(newStaffRole, action);
+      const next = { ...prev };
+
+      // Store only overrides that differ from role defaults
+      if (checked === roleDefault) {
+        delete next[action];
+      } else {
+        next[action] = checked;
+      }
+
+      return next;
+    });
+  };
+
+  const applyRoleDefaultPermissions = () => {
+    setNewStaffPermissions({});
+  };
+
+  const allowAllNewStaffPermissions = () => {
+    const next = APP_ACTION_OPTIONS.reduce<PermissionMap>((acc, item) => {
+      acc[item.key] = true;
+      return acc;
+    }, {});
+    setNewStaffPermissions(next);
   };
 
   const formatCurrency = (value: number) =>
@@ -1223,7 +1527,6 @@ export const SettingsManager = ({
     try {
       const previous = { ...settings };
 
-      console.log("Saving settings:", settings);
 
       let payload = buildStoreSettingsPayload(settings);
       payload.id = "default";
@@ -1247,7 +1550,6 @@ export const SettingsManager = ({
           .select();
 
         if (!error) {
-          console.log("Save result:", data);
           saved = true;
           saveError = null;
           break;
@@ -2425,6 +2727,78 @@ export const SettingsManager = ({
                       />
                     </div>
                   </div>
+
+                  <div className="md:col-span-2 rounded-xl border border-white/10 bg-white/5 p-3.5">
+                    <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between mb-3">
+                      <div>
+                        <div className="text-xs md:text-sm font-semibold text-white">
+                          Phân quyền chi tiết
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          Tick quyền theo từng mục để cấp quyền sử dụng cho tài khoản nhân viên.
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={applyRoleDefaultPermissions}
+                          className="px-2.5 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:bg-white/10 text-xs font-medium"
+                        >
+                          Theo vai trò mặc định
+                        </button>
+                        <button
+                          type="button"
+                          onClick={allowAllNewStaffPermissions}
+                          className="px-2.5 py-1.5 rounded-lg border border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/10 text-xs font-medium"
+                        >
+                          Cho phép tất cả
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {PERMISSION_GROUPS.map((group) => {
+                        const actions = APP_ACTION_OPTIONS.filter(
+                          (item) => item.group === group.key
+                        );
+                        if (actions.length === 0) return null;
+
+                        return (
+                          <div key={group.key} className="rounded-lg border border-white/10 bg-slate-900/40 p-2.5">
+                            <div className="text-[11px] uppercase tracking-wide text-slate-300 mb-2">
+                              {group.label}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {actions.map((item) => {
+                                const checked = getEffectivePermission(
+                                  newStaffRole,
+                                  newStaffPermissions,
+                                  item.key
+                                );
+
+                                return (
+                                  <label
+                                    key={item.key}
+                                    className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2.5 py-2 cursor-pointer hover:bg-white/10"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) =>
+                                        toggleNewStaffPermission(item.key, e.target.checked)
+                                      }
+                                      className="h-4 w-4 rounded border-slate-500 text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <span className="text-xs text-slate-200">{item.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <button
@@ -2528,6 +2902,82 @@ export const SettingsManager = ({
                 <p className="text-xs text-slate-400 mt-3">
                   Sau khi đặt lại, nhân viên đăng nhập bằng mật khẩu tạm mới và nên đổi lại mật khẩu riêng.
                 </p>
+              </div>
+            )}
+
+            {permissionTargetStaff && (
+              <div className="overflow-hidden rounded-[28px] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_right,_rgba(6,182,212,0.16),_transparent_32%),linear-gradient(145deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82))] p-5 md:p-6">
+                <h3 className="text-base font-semibold text-white mb-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-cyan-300" />
+                  Phân quyền chi tiết
+                </h3>
+                <p className="text-xs text-slate-400 mb-4">
+                  Tài khoản: {permissionTargetStaff.name || permissionTargetStaff.email}
+                </p>
+
+                <div className="space-y-3">
+                  {PERMISSION_GROUPS.map((group) => {
+                    const actions = APP_ACTION_OPTIONS.filter(
+                      (item) => item.group === group.key
+                    );
+
+                    return (
+                      <div
+                        key={group.key}
+                        className="rounded-xl border border-white/10 bg-white/5 p-3"
+                      >
+                        <div className="text-[11px] uppercase tracking-wide text-slate-300 mb-2">
+                          {group.label}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {actions.map((item) => {
+                            const checked = getEffectivePermission(
+                              permissionTargetStaff.role,
+                              permissionDraft,
+                              item.key
+                            );
+
+                            return (
+                              <label
+                                key={item.key}
+                                className="flex items-center gap-2 rounded-md border border-white/10 bg-slate-900/40 px-2.5 py-2 cursor-pointer hover:bg-white/10"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) =>
+                                    togglePermissionDraft(item.key, e.target.checked)
+                                  }
+                                  className="h-4 w-4 rounded border-slate-500 text-cyan-500 focus:ring-cyan-500"
+                                />
+                                <span className="text-xs text-slate-200">{item.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closePermissionEditor}
+                    disabled={savingPermissionDraft}
+                    className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-slate-300 hover:text-white disabled:opacity-70"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePermissionDraft}
+                    disabled={savingPermissionDraft}
+                    className="w-full sm:w-auto px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-500 text-white rounded-lg text-sm font-medium"
+                  >
+                    {savingPermissionDraft ? "Đang lưu..." : "Lưu phân quyền"}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2826,6 +3276,16 @@ export const SettingsManager = ({
                                 )}
                                 {staff.role !== "owner" && (
                                   <button
+                                    onClick={() => openPermissionEditor(staff)}
+                                    disabled={savingStaff || savingPermissionDraft}
+                                    className="p-2 text-cyan-300 hover:bg-cyan-500/10 rounded-xl disabled:opacity-60"
+                                    title="Phân quyền chi tiết"
+                                  >
+                                    <Shield className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {staff.role !== "owner" && (
+                                  <button
                                     onClick={() => openResetStaffDialog(staff)}
                                     disabled={savingStaff || resettingStaff}
                                     className="p-2 text-amber-300 hover:bg-amber-500/10 rounded-xl disabled:opacity-60"
@@ -3032,12 +3492,23 @@ export const SettingsManager = ({
                                   Sửa
                                 </button>
                                 <button
+                                  onClick={() => openPermissionEditor(staff)}
+                                  disabled={savingStaff || savingPermissionDraft}
+                                  className="px-3 py-2 rounded-lg bg-cyan-600/20 text-cyan-300 border border-cyan-400/30 text-xs font-semibold disabled:opacity-70"
+                                >
+                                  Quyền
+                                </button>
+                                <button
                                   onClick={() => openResetStaffDialog(staff)}
                                   disabled={resettingStaff || savingStaff}
                                   className="px-3 py-2 rounded-lg bg-amber-600/20 text-amber-300 border border-amber-400/30 text-xs font-semibold disabled:opacity-70"
                                 >
                                   Đặt MK
                                 </button>
+                              </div>
+                            )}
+                            {staff.role !== "owner" && (
+                              <div className="pt-2 grid grid-cols-1 gap-2">
                                 <button
                                   onClick={() => handleDeleteStaff(staff)}
                                   disabled={savingStaff}

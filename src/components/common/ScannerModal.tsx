@@ -80,7 +80,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             if (capabilities.zoom) {
                 // @ts-ignore
                 const z = capabilities.zoom;
-                console.log("Zoom capabilities:", z);
                 setMaxZoom(z.max || 3);
                 // Also set initial zoom
                 // @ts-ignore
@@ -270,7 +269,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             // Parse result for IMEI/Serial patterns
             // CRITICAL FIX: Must allow '/' and ':' so that "S/N:" doesn't become "S N "
             const cleanText = text.toUpperCase().replace(/[^A-Z0-9\n\-\.\:\/]/g, " ");
-            console.log("OCR Cleaned:", cleanText);
 
             // Regex for IMEI (15 digits) or general long alphanumeric sequences
             const imeiMatch = cleanText.match(/\b\d{15}\b/);
@@ -342,7 +340,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 if (/\d/.test(val)) {
                     onResult(val.toUpperCase());
                 } else {
-                    // console.log("Ignored non-numeric fallback:", val);
+                    //
                 }
             } else {
                 showToast.info("Không nhận diện được mã. Hãy giữ chắc tay.");

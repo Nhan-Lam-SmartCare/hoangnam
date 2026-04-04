@@ -31,6 +31,8 @@ export const useWorkOrdersFilteredRepo = (options?: {
   daysBack?: number;
   status?: string;
   branchId?: string;
+  ownerUserId?: string;
+  ownerDisplayName?: string;
 }) => {
   return useQuery({
     queryKey: ["workOrdersFiltered", options],

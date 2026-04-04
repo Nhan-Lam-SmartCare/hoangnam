@@ -406,7 +406,6 @@ export const importPartsFromExcelDetailed = (
             // Auto-generate 8-char SKU if missing or invalid
             if (!sku || !isValidSKU(sku)) {
               sku = generateSKU();
-              console.log(`🔄 Generated SKU for "${name}": ${sku}`);
             }
 
             const category = get("category");

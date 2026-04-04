@@ -30,7 +30,6 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     if (hasScannedRef.current) return;
     hasScannedRef.current = true;
 
-    console.log("✅ Barcode scanned:", decodedText);
 
     // Vibrate
     if (navigator.vibrate) {
@@ -178,7 +177,6 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         setTorchOn(!torchOn);
       }
     } catch (e) {
-      console.log("Torch not supported");
     }
   };
 

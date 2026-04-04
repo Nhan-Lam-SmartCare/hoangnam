@@ -130,6 +130,14 @@ const WorkOrderModal: React.FC<{
   paymentSources: any[];
   currentBranchId: string;
   storeSettings?: StoreSettings | null;
+  canUpdateWorkOrderStatus?: boolean;
+  canUpdateWorkOrderPayment?: boolean;
+  canUpdateWorkOrderParts?: boolean;
+  canUpdateWorkOrderLabor?: boolean;
+  canUpdateWorkOrderDiscount?: boolean;
+  canUpdateWorkOrderCustomer?: boolean;
+  canUpdateWorkOrderVehicle?: boolean;
+  canUpdateWorkOrderOutsourceService?: boolean;
   invalidateWorkOrders?: () => void;
 }> = ({
   order,
@@ -145,6 +153,14 @@ const WorkOrderModal: React.FC<{
   paymentSources,
   currentBranchId,
   storeSettings,
+  canUpdateWorkOrderStatus = true,
+  canUpdateWorkOrderPayment = true,
+  canUpdateWorkOrderParts = true,
+  canUpdateWorkOrderLabor = true,
+  canUpdateWorkOrderDiscount = true,
+  canUpdateWorkOrderCustomer = true,
+  canUpdateWorkOrderVehicle = true,
+  canUpdateWorkOrderOutsourceService = true,
   invalidateWorkOrders,
 }) => {
     // Popular electronics devices
@@ -267,6 +283,7 @@ const WorkOrderModal: React.FC<{
     const [devicePassword, setDevicePassword] = useState("");
     const [isPatternMode, setIsPatternMode] = useState(false);
     const [selectedParts, setSelectedParts] = useState<WorkOrderPart[]>([]);
+    const [includeIntegratedLabor, setIncludeIntegratedLabor] = useState(true);
     const [showPartSearch, setShowPartSearch] = useState(false);
     const [partialPayment, setPartialPayment] = useState(0);
     const [showPartialPayment, setShowPartialPayment] = useState(false);
@@ -387,11 +404,9 @@ const WorkOrderModal: React.FC<{
       }
 
       // Sync additional services (Báo giá)
-      console.log('[WorkOrderModal] Syncing additionalServices from order:', order?.additionalServices);
       if (order?.additionalServices && Array.isArray(order.additionalServices) && order.additionalServices.length > 0) {
         setAdditionalServices(order.additionalServices);
       } else {
-        console.log('[WorkOrderModal] Setting additionalServices to empty array');
         setAdditionalServices([]);
       }
 
@@ -773,6 +788,21 @@ const WorkOrderModal: React.FC<{
       return result.data;
     };
 
+    const getPartLaborBase = (partId: string) => {
+      const partRef = parts.find((p) => p.id === partId);
+      return (
+        Number((partRef as any)?.laborCost?.[currentBranchId]) ||
+        Number(partRef?.wholesalePrice?.[currentBranchId]) ||
+        0
+      );
+    };
+
+    // Rule: qty 1 = 100% labor, qty 2 = 150%, qty 3 = 200%, ...
+    const getIntegratedLaborByQuantity = (laborBase: number, quantity: number) => {
+      if (laborBase <= 0 || quantity <= 0) return 0;
+      return laborBase * (1 + 0.5 * (quantity - 1));
+    };
+
     // Calculate totals
     const partsTotal = selectedParts.reduce(
       (sum, p) => sum + (p.price || 0) * (p.quantity || 0),
@@ -786,21 +816,16 @@ const WorkOrderModal: React.FC<{
       (sum, s) => sum + (s.price || 0) * (s.quantity || 0),
       0
     );
-    const effectiveLaborCost = Number(formData.laborCost || 0);
-    const subtotal = effectiveLaborCost + partsTotal + servicesTotal;
+    const partsLaborInfoTotal = selectedParts.reduce((sum, item) => {
+      const laborBase = getPartLaborBase(item.partId);
+      return sum + getIntegratedLaborByQuantity(laborBase, Number(item.quantity || 0));
+    }, 0);
+    const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
+    const subtotal = partsTotal + servicesTotal + effectiveLaborCost;
     const discount = formData.discount || 0;
     const total = Math.max(0, subtotal - discount);
 
     // Debug log
-    console.log("Tinh toan:", {
-      laborCost: effectiveLaborCost,
-      repairLaborTotal,
-      partsTotal,
-      servicesTotal,
-      subtotal,
-      discount,
-      total,
-    });
 
     // Calculate payment summary
     const totalDeposit = depositAmount || order.depositAmount || 0;
@@ -822,14 +847,7 @@ const WorkOrderModal: React.FC<{
     ) => {
       if (remainingAmount <= 0) return;
 
-      console.log("[createCustomerDebtIfNeeded] CALLED with:", {
-        workOrderId: workOrder.id,
-        totalAmount,
-        paidAmount,
-        remainingAmount,
-        customerName: workOrder.customerName,
-        timestamp: new Date().toISOString(),
-      });
+
 
       try {
         const safeCustomerId =
@@ -909,9 +927,7 @@ const WorkOrderModal: React.FC<{
           workOrderId: workOrder.id, // 🔹 Link debt với work order
         };
 
-        console.log("[ServiceManager] createCustomerDebt payload:", payload);
         const result = await createCustomerDebt.mutateAsync(payload as any);
-        console.log("[ServiceManager] createCustomerDebt result:", result);
         showToast.success(
           `Đã tạo/cập nhật công nợ ${remainingAmount.toLocaleString()}đ (Mã: ${result?.id || "N/A"
           })`
@@ -1270,6 +1286,140 @@ const WorkOrderModal: React.FC<{
       }
     };
 
+    const getBlockedDeepEditMessage = (nextAdditionalPayment: number): string | null => {
+      if (!order?.id) return null;
+
+      const normalizeNumber = (value: unknown): number => Number(value || 0);
+
+      const normalizePartsForCompare = (items: any[] = []) =>
+        items
+          .map((item) => ({
+            partId: String(item.partId || ""),
+            partName: String(item.partName || ""),
+            quantity: normalizeNumber(item.quantity),
+            price: normalizeNumber(item.price ?? item.sellingPrice),
+            costPrice: normalizeNumber(item.costPrice),
+          }))
+          .sort((a, b) =>
+            `${a.partId}|${a.partName}`.localeCompare(`${b.partId}|${b.partName}`)
+          );
+
+      const normalizeServicesForCompare = (items: any[] = []) =>
+        items
+          .map((item) => ({
+            description: String(item.description || item.name || ""),
+            quantity: normalizeNumber(item.quantity),
+            price: normalizeNumber(item.price ?? item.sellingPrice),
+            costPrice: normalizeNumber(item.costPrice),
+          }))
+          .sort((a, b) => a.description.localeCompare(b.description));
+
+      const normalizeRepairServicesForCompare = (items: any[] = []) =>
+        items
+          .map((item) => ({
+            serviceId: String(item.serviceId || item.service_id || ""),
+            serviceName: String(item.serviceName || item.service_name || ""),
+            laborAmount: normalizeNumber(item.laborAmount || item.labor_amount),
+            relatedItemIds: (item.relatedItemIds || item.related_items || item.relatedItems || [])
+              .map((related: any) => String(related.partId || related.part_id || ""))
+              .sort(),
+          }))
+          .sort((a, b) =>
+            `${a.serviceId}|${a.serviceName}`.localeCompare(
+              `${b.serviceId}|${b.serviceName}`
+            )
+          );
+
+      const statusChanged = formData.status !== order.status;
+
+      const previousDeposit = normalizeNumber(order.depositAmount);
+      const previousAdditionalPayment = normalizeNumber(order.additionalPayment);
+      const previousPaymentMethod = String(order.paymentMethod || "");
+      const currentPaymentMethod = String(formData.paymentMethod || "");
+      const paymentChanged =
+        previousDeposit !== normalizeNumber(totalDeposit) ||
+        previousAdditionalPayment !== normalizeNumber(nextAdditionalPayment) ||
+        previousPaymentMethod !== currentPaymentMethod;
+
+      const existingPartsSignature = JSON.stringify(
+        normalizePartsForCompare(order.partsUsed as any[])
+      );
+      const currentPartsSignature = JSON.stringify(
+        normalizePartsForCompare(selectedParts as any[])
+      );
+
+      const existingServicesSignature = JSON.stringify(
+        normalizeServicesForCompare(order.additionalServices as any[])
+      );
+      const currentServicesSignature = JSON.stringify(
+        normalizeServicesForCompare(additionalServices as any[])
+      );
+
+      const existingRepairServicesSignature = JSON.stringify(
+        normalizeRepairServicesForCompare(order.repairServices as any[])
+      );
+      const currentRepairServicesSignature = JSON.stringify(
+        normalizeRepairServicesForCompare(repairServices as any[])
+      );
+
+      const customerChanged =
+        String(order.customerName || "") !== String(formData.customerName || "") ||
+        String(order.customerPhone || "") !== String(formData.customerPhone || "");
+
+      const vehicleChanged =
+        String(order.vehicleId || "") !== String(formData.vehicleId || "") ||
+        String(order.vehicleModel || "") !== String(formData.vehicleModel || "") ||
+        String(order.licensePlate || "") !== String(formData.licensePlate || "") ||
+        normalizeNumber(order.currentKm) !== normalizeNumber(formData.currentKm);
+
+      const partsChanged =
+        existingPartsSignature !== currentPartsSignature ||
+        existingRepairServicesSignature !== currentRepairServicesSignature;
+
+      const outsourceServicesChanged =
+        existingServicesSignature !== currentServicesSignature;
+
+      const laborChanged =
+        normalizeNumber(order.laborCost) !== normalizeNumber(effectiveLaborCost);
+
+      const discountChanged =
+        normalizeNumber(order.discount) !== normalizeNumber(discount);
+
+      if (statusChanged && !canUpdateWorkOrderStatus) {
+        return "Bạn không có quyền đổi trạng thái phiếu sửa chữa";
+      }
+
+      if (paymentChanged && !canUpdateWorkOrderPayment) {
+        return "Bạn không có quyền cập nhật thanh toán phiếu sửa chữa";
+      }
+
+      if (partsChanged && !canUpdateWorkOrderParts) {
+        return "Bạn không có quyền sửa phụ tùng trong phiếu sửa chữa";
+      }
+
+      if (laborChanged && !canUpdateWorkOrderLabor) {
+        return "Bạn không có quyền sửa tiền công (labor) phiếu sửa chữa";
+      }
+
+      if (discountChanged && !canUpdateWorkOrderDiscount) {
+        return "Bạn không có quyền sửa giảm giá phiếu sửa chữa";
+      }
+
+      if (customerChanged && !canUpdateWorkOrderCustomer) {
+        return "Bạn không có quyền sửa thông tin khách hàng trong phiếu sửa chữa";
+      }
+
+      if (vehicleChanged && !canUpdateWorkOrderVehicle) {
+        return "Bạn không có quyền sửa thông tin thiết bị/xe trong phiếu sửa chữa";
+      }
+
+      if (outsourceServicesChanged && !canUpdateWorkOrderOutsourceService) {
+        return "Bạn không có quyền tạo/sửa dịch vụ gia công ngoài";
+      }
+
+      return null;
+    };
+
     // 🔹 Function to save work order without payment processing
     const handleSaveOnly = async () => {
       // Validation
@@ -1288,6 +1438,14 @@ const WorkOrderModal: React.FC<{
         return;
       }
 
+      const blockedMessageEarly = getBlockedDeepEditMessage(
+        Number(order?.additionalPayment || 0)
+      );
+      if (blockedMessageEarly) {
+        showToast.error(blockedMessageEarly);
+        return;
+      }
+
       // Note: Không validate total > 0 vì có thể chỉ tiếp nhận thông tin, chưa báo giá
 
       // Add/update customer
@@ -1298,9 +1456,7 @@ const WorkOrderModal: React.FC<{
 
         if (!existingCustomer) {
           // Chỉ tạo khách hàng mới nếu SĐT chưa tồn tại
-          console.log(
-            `[WorkOrderModal] Creating new customer: ${formData.customerName} (${formData.customerPhone})`
-          );
+
 
           const vehicleId = `VEH-${Date.now()}`;
           const vehicles = [];
@@ -1324,9 +1480,7 @@ const WorkOrderModal: React.FC<{
           });
         } else {
           // Khách hàng đã tồn tại - chỉ cập nhật thông tin xe nếu cần
-          console.log(
-            `[WorkOrderModal] Customer exists: ${existingCustomer.name} (${existingCustomer.phone})`
-          );
+
           if (
             formData.vehicleModel &&
             existingCustomer.vehicleModel !== formData.vehicleModel
@@ -1336,9 +1490,6 @@ const WorkOrderModal: React.FC<{
               vehicleModel: formData.vehicleModel,
               licensePlate: formData.licensePlate,
             });
-            console.log(
-              `[WorkOrderModal] Updated vehicle info for existing customer`
-            );
           }
         }
       }
@@ -1418,7 +1569,6 @@ const WorkOrderModal: React.FC<{
             console.error("[UPDATE ERROR]", error);
             throw error;
           }
-          console.log("[UPDATE SUCCESS]", data);
 
           // Update vehicle currentKm if km was provided
           if (
@@ -1426,9 +1576,6 @@ const WorkOrderModal: React.FC<{
             formData.vehicleId &&
             formData.customerPhone
           ) {
-            console.log(
-              `[WorkOrderModal UPDATE] Attempting to update km ${formData.currentKm} for vehicle ${formData.vehicleId}`
-            );
             const customer = customers.find(
               (c) => c.phone === formData.customerPhone
             );
@@ -1458,9 +1605,6 @@ const WorkOrderModal: React.FC<{
                     updateError
                   );
                 } else {
-                  console.log(
-                    `[WorkOrderModal UPDATE] ✅ Updated km ${formData.currentKm} to DB for vehicle ${formData.vehicleId}`
-                  );
                   // Update local context
                   upsertCustomer({
                     ...customer,
@@ -1478,13 +1622,9 @@ const WorkOrderModal: React.FC<{
               );
             }
           } else {
-            console.log(
-              `[WorkOrderModal UPDATE] ⚠️ Skipping km update - currentKm: ${formData.currentKm}, vehicleId: ${formData.vehicleId}, phone: ${formData.customerPhone}`
-            );
           }
         } else {
           // Insert new
-          console.log("[INSERT] Attempting to insert:", workOrderData);
           const { data, error } = await insertWorkOrderWithSchemaFallback(
             workOrderData
           );
@@ -1497,7 +1637,6 @@ const WorkOrderModal: React.FC<{
             );
             throw error;
           }
-          console.log("[INSERT SUCCESS]", data);
 
           // Update vehicle currentKm if km was provided
           if (
@@ -1505,9 +1644,6 @@ const WorkOrderModal: React.FC<{
             formData.vehicleId &&
             formData.customerPhone
           ) {
-            console.log(
-              `[WorkOrderModal CREATE] Attempting to update km ${formData.currentKm} for vehicle ${formData.vehicleId}`
-            );
             const customer = customers.find(
               (c) => c.phone === formData.customerPhone
             );
@@ -1548,11 +1684,6 @@ const WorkOrderModal: React.FC<{
                   updateError
                 );
               } else {
-                console.log(
-                  `[WorkOrderModal CREATE] ✅ ${vehicleExists ? "Updated" : "Added"
-                  } km ${formData.currentKm} to DB for vehicle ${formData.vehicleId
-                  }`
-                );
                 // Update local context
                 upsertCustomer({
                   ...customer,
@@ -1565,9 +1696,6 @@ const WorkOrderModal: React.FC<{
               );
             }
           } else {
-            console.log(
-              `[WorkOrderModal CREATE] ⚠️ Skipping km update - currentKm: ${formData.currentKm}, vehicleId: ${formData.vehicleId}, phone: ${formData.customerPhone}`
-            );
           }
         }
 
@@ -1611,16 +1739,9 @@ const WorkOrderModal: React.FC<{
     // 🔹 Function to handle payment processing
     const handleSave = async (forceFullPayment = false) => {
       // 🔹 DEBUG - Log order info
-      console.log(
-        "[handleSave] Starting - order:",
-        order?.id,
-        "formData.status:",
-        formData.status
-      );
 
       // 🔹 PREVENT DUPLICATE SUBMISSIONS (synchronous check with ref)
       if (submittingRef.current || isSubmitting) {
-        console.log("[handleSave] Already submitting, skipping...");
         return;
       }
       submittingRef.current = true; // Set immediately before async operations
@@ -1646,6 +1767,21 @@ const WorkOrderModal: React.FC<{
           return;
         }
 
+        const additionalPaymentPreview =
+          formData.status === "Trả máy"
+            ? forceFullPayment
+              ? Math.max(0, total - totalDeposit)
+              : showPartialPayment
+                ? partialPayment
+                : 0
+            : 0;
+
+        const blockedMessageEarly = getBlockedDeepEditMessage(additionalPaymentPreview);
+        if (blockedMessageEarly) {
+          showToast.error(blockedMessageEarly);
+          return;
+        }
+
         // 3. Validate total > 0 ONLY if status is "Trả máy"
         if (total <= 0 && formData.status === "Trả máy") {
           showToast.error("Tổng tiền phải lớn hơn 0 khi trả máy");
@@ -1661,9 +1797,7 @@ const WorkOrderModal: React.FC<{
           // 🔹 VALIDATE DUPLICATE PHONE
           if (!existingCustomer) {
             // Chỉ tạo khách hàng mới nếu SĐT chưa tồn tại
-            console.log(
-              `[WorkOrderModal] Creating new customer: ${formData.customerName} (${formData.customerPhone})`
-            );
+
 
             const vehicleId = `VEH-${Date.now()}`;
             const vehicles = [];
@@ -1687,9 +1821,7 @@ const WorkOrderModal: React.FC<{
             });
           } else {
             // Khách hàng đã tồn tại - chỉ cập nhật thông tin xe nếu cần
-            console.log(
-              `[WorkOrderModal] Customer exists: ${existingCustomer.name} (${existingCustomer.phone})`
-            );
+
             if (
               formData.vehicleModel &&
               existingCustomer.vehicleModel !== formData.vehicleModel
@@ -1699,9 +1831,6 @@ const WorkOrderModal: React.FC<{
                 vehicleModel: formData.vehicleModel,
                 licensePlate: formData.licensePlate,
               });
-              console.log(
-                `[WorkOrderModal] Updated vehicle info for existing customer`
-              );
             }
           }
         }
@@ -1714,6 +1843,7 @@ const WorkOrderModal: React.FC<{
                 ? partialPayment
                 : 0
             : 0;
+
         const totalPaidToApply = totalDeposit + additionalPaymentToApply;
         const remainingAmountToApply = Math.max(0, total - totalPaidToApply);
 
@@ -1933,7 +2063,7 @@ const WorkOrderModal: React.FC<{
                   id: paymentTxId,
                   type: "income",
                   category: "service_income",
-                  amount: totalAdditionalPayment,
+                  amount: additionalPaymentToApply,
                   date: new Date().toISOString(),
                   description: `Thu tiền sửa chữa #${(
                     formatWorkOrderId(
@@ -1958,7 +2088,7 @@ const WorkOrderModal: React.FC<{
                         ...ps.balance,
                         [currentBranchId]:
                           (ps.balance[currentBranchId] || 0) +
-                          totalAdditionalPayment,
+                          additionalPaymentToApply,
                       },
                     };
                   }
@@ -1994,11 +2124,6 @@ const WorkOrderModal: React.FC<{
 
                 // Create expense transaction
                 try {
-                  console.log("[Outsourcing] Inserting expense transaction:", {
-                    id: outsourcingTxId,
-                    amount: -totalOutsourcingCost,
-                    branchid: currentBranchId,
-                  });
 
                   // Check if transaction already exists
                   const { data: existingTx } = await supabase
@@ -2009,9 +2134,6 @@ const WorkOrderModal: React.FC<{
                     .maybeSingle();
 
                   if (existingTx) {
-                    console.log(
-                      "[Outsourcing] Transaction already exists, skipping insert"
-                    );
                   } else {
                     const { error: expenseError } = await supabase
                       .from("cash_transactions")
@@ -2037,7 +2159,6 @@ const WorkOrderModal: React.FC<{
                         `Lỗi tạo phiếu chi gia công: ${expenseError.message}`
                       );
                     } else {
-                      console.log("[Outsourcing] Insert SUCCESS");
                       // Update context
                       setCashTransactions((prev: any[]) => [
                         ...prev,
@@ -2093,11 +2214,6 @@ const WorkOrderModal: React.FC<{
                   .substr(2, 9)}`;
 
                 try {
-                  console.log("[Negative Sales] Inserting expense transaction:", {
-                    id: negativeSalesTxId,
-                    amount: -negativeSalesPayment,
-                    branchid: currentBranchId,
-                  });
 
                   const negativeServices = additionalServices.filter(
                     (s) => s.price < 0 && (s.costPrice || 0) === 0
@@ -2112,9 +2228,6 @@ const WorkOrderModal: React.FC<{
                     .maybeSingle();
 
                   if (existingNegTx) {
-                    console.log(
-                      "[Negative Sales] Transaction already exists, skipping insert"
-                    );
                   } else {
                     const { error: negExpenseError } = await supabase
                       .from("cash_transactions")
@@ -2143,7 +2256,6 @@ const WorkOrderModal: React.FC<{
                         `Lỗi tạo phiếu chi (giá bán âm): ${negExpenseError.message}`
                       );
                     } else {
-                      console.log("[Negative Sales] Insert SUCCESS");
                       // Update context
                       setCashTransactions((prev: any[]) => [
                         ...prev,
@@ -2205,9 +2317,6 @@ const WorkOrderModal: React.FC<{
               !responseData?.inventoryDeducted
             ) {
               try {
-                console.log(
-                  "[handleSave] New order is fully paid AND atomic create didn't deduct inventory. Calling completeWorkOrderPayment..."
-                );
                 const result = await completeWorkOrderPayment(
                   orderId,
                   formData.paymentMethod || "cash",
@@ -2229,13 +2338,6 @@ const WorkOrderModal: React.FC<{
 
             // 🔹 Auto-create customer debt ONLY when status is "Trả máy" and there's remaining amount
             if (formData.status === "Trả máy" && remainingAmountToApply > 0) {
-              console.log("[handleSave] Creating debt with finalOrder:", {
-                id: finalOrder.id,
-                customerName: finalOrder.customerName,
-                customerPhone: finalOrder.customerPhone,
-                licensePlate: finalOrder.licensePlate,
-                vehicleModel: finalOrder.vehicleModel,
-              });
               await createCustomerDebtIfNeeded(
                 finalOrder,
                 remainingAmountToApply,
@@ -2255,14 +2357,7 @@ const WorkOrderModal: React.FC<{
 
         // 🔹 If this is an UPDATE (with or without parts), use atomic RPC
         if (order?.id) {
-          console.log(
-            "[handleSave] UPDATE block - Order ID:",
-            order.id,
-            "Status:",
-            formData.status
-          );
           try {
-            console.log("[handleSave] Calling updateWorkOrderAtomicAsync...");
 
             // Prepare issue description with password
             let finalIssueDescription = formData.issueDescription || "";
@@ -2590,10 +2685,6 @@ const WorkOrderModal: React.FC<{
               );
             }
 
-            console.log(
-              "[handleSave] updateWorkOrderAtomicAsync SUCCESS - Response:",
-              responseData
-            );
 
             // 🔹 Force invalidate queries để refresh data mới từ DB
             if (invalidateWorkOrders) {
@@ -2610,9 +2701,6 @@ const WorkOrderModal: React.FC<{
               selectedParts.length > 0
             ) {
               try {
-                console.log(
-                  "[handleSave] Order became fully paid, calling completeWorkOrderPayment to deduct inventory"
-                );
                 const result = await completeWorkOrderPayment(
                   order.id,
                   formData.paymentMethod || "cash",
@@ -3481,30 +3569,6 @@ const WorkOrderModal: React.FC<{
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Phí dịch vụ (Công thợ)
-                    {!canEditPriceAndParts && (
-                      <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
-                        (Không thể sửa)
-                      </span>
-                    )}
-                  </label>
-                  <NumberInput
-                    placeholder="100.000"
-                    value={formData.laborCost || ""}
-                    onChange={(val) =>
-                      setFormData({
-                        ...formData,
-                        laborCost: val,
-                      })
-                    }
-                    disabled={!canEditPriceAndParts}
-                    className={`w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 ${!canEditPriceAndParts ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Ghi chú nội bộ
                   </label>
                   <textarea
@@ -3987,6 +4051,10 @@ const WorkOrderModal: React.FC<{
                       <>
                         {filteredParts.slice(0, 50).map((part) => {
                           const stock = part.stock?.[currentBranchId] || 0;
+                          const partLaborCost =
+                            (part as any)?.laborCost?.[currentBranchId] ||
+                            part.wholesalePrice?.[currentBranchId] ||
+                            0;
                           return (
                             <button
                               key={part.id}
@@ -4002,6 +4070,9 @@ const WorkOrderModal: React.FC<{
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
                                   {part.name}
+                                </div>
+                                <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium mt-0.5">
+                                  Công: {formatCurrency(partLaborCost)}
                                 </div>
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">
@@ -4072,8 +4143,23 @@ const WorkOrderModal: React.FC<{
                       selectedParts.map((part, idx) => (
                         <tr key={idx} className="bg-white dark:bg-slate-800">
                           <td className="px-4 py-2">
+                            {(() => {
+                              const partRef = parts.find((p) => p.id === part.partId);
+                              const laborPerUnit = getPartLaborBase(part.partId);
+                              const integratedLaborLine = getIntegratedLaborByQuantity(
+                                laborPerUnit,
+                                Number(part.quantity || 0)
+                              );
+                              return (
+                                <>
                             <div className="text-sm text-slate-900 dark:text-slate-100 font-medium">
                               {part.partName}
+                            </div>
+                            <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium mt-0.5">
+                              Công: {formatCurrency(laborPerUnit)} / SP
+                            </div>
+                            <div className="text-[10px] text-cyan-500 dark:text-cyan-300 mt-0.5">
+                              Công theo SL: {formatCurrency(integratedLaborLine)}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               {part.sku && (
@@ -4090,6 +4176,9 @@ const WorkOrderModal: React.FC<{
                                 </span>
                               )}
                             </div>
+                                </>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-2 text-center">
                             <input
@@ -4304,7 +4393,6 @@ const WorkOrderModal: React.FC<{
                               // 🔹 FIX: Nếu xóa hết services VÀ đang edit order có sẵn → Update DB ngay
                               if (newServices.length === 0 && order?.id) {
                                 try {
-                                  console.log('[WorkOrderModal] Xóa hết additionalServices, update DB ngay');
                                   await supabase
                                     .from('work_orders')
                                     .update({ additionalservices: null })
@@ -4606,14 +4694,6 @@ const WorkOrderModal: React.FC<{
 
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600 dark:text-slate-400">
-                      Phí dịch vụ:
-                    </span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {formatCurrency(effectiveLaborCost)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600 dark:text-slate-400">
                       Tiền phụ tùng:
                     </span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
@@ -4628,6 +4708,28 @@ const WorkOrderModal: React.FC<{
                       {formatCurrency(servicesTotal)}
                     </span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-cyan-600 dark:text-cyan-400">
+                      Tiền công tích hợp:
+                    </span>
+                    <span
+                      className={`font-medium ${includeIntegratedLabor
+                        ? "text-cyan-600 dark:text-cyan-400"
+                        : "text-slate-400 dark:text-slate-500"
+                        }`}
+                    >
+                      {formatCurrency(effectiveLaborCost)}
+                    </span>
+                  </div>
+                  <label className="flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
+                    <span>Không tính tiền công (khách mang về)</span>
+                    <input
+                      type="checkbox"
+                      checked={!includeIntegratedLabor}
+                      onChange={(e) => setIncludeIntegratedLabor(!e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </label>
 
                   <div className="pt-2 border-t border-slate-300 dark:border-slate-600">
                     <div className="flex justify-between items-center text-sm">
@@ -5027,10 +5129,6 @@ const WorkOrderModal: React.FC<{
 
                       if (!existingCustomer) {
                         // Customer doesn't exist - create new one
-                        console.log(
-                          "[WorkOrderModal] Creating new customer from modal:",
-                          newCustomer.phone
-                        );
 
                         const customerId = `CUST-${Date.now()}`;
                         const vehicleId = `VEH-${Date.now()}`;
@@ -5068,11 +5166,6 @@ const WorkOrderModal: React.FC<{
                         });
                       } else {
                         // Customer exists - just use existing customer and optionally update vehicle
-                        console.log(
-                          "[WorkOrderModal] Customer already exists from modal:",
-                          existingCustomer.id,
-                          existingCustomer.phone
-                        );
 
                         const hasVehicleChange =
                           (newCustomer.vehicleModel &&
@@ -5085,9 +5178,6 @@ const WorkOrderModal: React.FC<{
                         let vehicleIdToUse = existingCustomer.vehicles?.[0]?.id;
 
                         if (hasVehicleChange) {
-                          console.log(
-                            "[WorkOrderModal] Updating vehicle info for existing customer from modal"
-                          );
                           const vehicleId = `VEH-${Date.now()}`;
                           const vehicles = [...(existingCustomer.vehicles || [])];
 

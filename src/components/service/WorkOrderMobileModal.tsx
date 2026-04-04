@@ -78,6 +78,14 @@ interface WorkOrderMobileModalProps {
   upsertCustomer?: (customer: any) => void;
   viewMode?: boolean; // true = xem chi tiết, false = chỉnh sửa
   onSwitchToEdit?: () => void; // callback khi bấm nút chỉnh sửa từ view mode
+  canUpdateWorkOrderStatus?: boolean;
+  canUpdateWorkOrderPayment?: boolean;
+  canUpdateWorkOrderParts?: boolean;
+  canUpdateWorkOrderLabor?: boolean;
+  canUpdateWorkOrderDiscount?: boolean;
+  canUpdateWorkOrderCustomer?: boolean;
+  canUpdateWorkOrderVehicle?: boolean;
+  canUpdateWorkOrderOutsourceService?: boolean;
 }
 
 interface RepairServiceDraftWorker {
@@ -134,6 +142,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   upsertCustomer,
   viewMode = false,
   onSwitchToEdit,
+  canUpdateWorkOrderStatus = true,
+  canUpdateWorkOrderPayment = true,
+  canUpdateWorkOrderParts = true,
+  canUpdateWorkOrderLabor = true,
+  canUpdateWorkOrderDiscount = true,
+  canUpdateWorkOrderCustomer = true,
+  canUpdateWorkOrderVehicle = true,
+  canUpdateWorkOrderOutsourceService = true,
 }) => {
   const { data: serviceConfigs = [] } = useServiceConfigs();
   // Popular electronic devices for repair
@@ -305,9 +321,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
   // Update selectedCustomer and selectedVehicle when workOrder changes
   React.useEffect(() => {
-    console.log("[WorkOrderMobileModal] workOrder:", workOrder);
-    console.log("[WorkOrderMobileModal] initialCustomer:", initialCustomer);
-    console.log("[WorkOrderMobileModal] initialVehicle:", initialVehicle);
 
     if (workOrder) {
       setSelectedCustomer(initialCustomer);
@@ -357,6 +370,8 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         setPartialAmount(0);
         setShowPaymentInput(false);
       }
+
+      setIncludeIntegratedLabor(true);
     } else {
       setSelectedCustomer(null);
       setSelectedVehicle(null);
@@ -366,6 +381,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       setIsDeposit(false);
       setPartialAmount(0);
       setShowPaymentInput(false);
+      setIncludeIntegratedLabor(true);
     }
   }, [workOrder, initialCustomer, initialVehicle]);
 
@@ -438,6 +454,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const [newRepairServiceDraft, setNewRepairServiceDraft] = useState<RepairServiceDraft>(
     createEmptyRepairServiceDraft()
   );
+  const [includeIntegratedLabor, setIncludeIntegratedLabor] = useState(true);
   const [laborCost, setLaborCost] = useState(workOrder?.laborCost || 0);
   const [discount, setDiscount] = useState(workOrder?.discount || 0);
   const [discountType, setDiscountType] = useState<"amount" | "percent">(
@@ -533,6 +550,21 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     const part = selectedParts.find((item) => item.partId === partId);
     if (!part) return 0;
     return Number(part.costPrice || 0) * Number(part.quantity || 0);
+  };
+
+  const getPartLaborBase = (partId: string) => {
+    const partRef = parts.find((p) => p.id === partId);
+    return (
+      Number((partRef as any)?.laborCost?.[currentBranchId]) ||
+      Number(partRef?.wholesalePrice?.[currentBranchId]) ||
+      0
+    );
+  };
+
+  // Keep rule same as desktop: qty1=100%, qty2=150%, qty3=200%...
+  const getIntegratedLaborByQuantity = (laborBase: number, quantity: number) => {
+    if (laborBase <= 0 || quantity <= 0) return 0;
+    return laborBase * (1 + 0.5 * (quantity - 1));
   };
 
   const getRepairServiceLaborAmount = (service: RepairServiceDraft) =>
@@ -726,7 +758,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const servicesTotal = useMemo(() => {
     return additionalServices.reduce((sum, s) => sum + s.sellingPrice * s.quantity, 0);
   }, [additionalServices]);
-  const effectiveLaborCost = laborCost;
+  const partsLaborInfoTotal = useMemo(() => {
+    return selectedParts.reduce((sum, item) => {
+      const laborBase = getPartLaborBase(item.partId);
+      return sum + getIntegratedLaborByQuantity(laborBase, Number(item.quantity || 0));
+    }, 0);
+  }, [selectedParts, parts, currentBranchId]);
+
+  const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
 
   const subtotal = partsTotal + servicesTotal + effectiveLaborCost;
 
@@ -1091,6 +1130,151 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       };
     });
 
+    if (workOrder?.id) {
+      const normalizeNumber = (value: unknown): number => Number(value || 0);
+
+      const normalizePartsForCompare = (items: any[] = []) =>
+        items
+          .map((item) => ({
+            partId: String(item.partId || ""),
+            partName: String(item.partName || ""),
+            quantity: normalizeNumber(item.quantity),
+            price: normalizeNumber(item.price ?? item.sellingPrice),
+            costPrice: normalizeNumber(item.costPrice),
+          }))
+          .sort((a, b) =>
+            `${a.partId}|${a.partName}`.localeCompare(`${b.partId}|${b.partName}`)
+          );
+
+      const normalizeServicesForCompare = (items: any[] = []) =>
+        items
+          .map((item) => ({
+            description: String(item.description || item.name || ""),
+            quantity: normalizeNumber(item.quantity),
+            price: normalizeNumber(item.price ?? item.sellingPrice),
+            costPrice: normalizeNumber(item.costPrice),
+          }))
+          .sort((a, b) => a.description.localeCompare(b.description));
+
+      const normalizeRepairServicesForCompare = (items: any[] = []) =>
+        items
+          .map((item) => ({
+            serviceId: String(item.service_id || item.serviceId || ""),
+            serviceName: String(item.service_name || item.serviceName || ""),
+            laborAmount: normalizeNumber(item.labor_amount || item.laborAmount),
+            relatedItemIds: (item.related_items || item.relatedItems || [])
+              .map((related: any) => String(related.part_id || related.partId || ""))
+              .sort(),
+          }))
+          .sort((a, b) =>
+            `${a.serviceId}|${a.serviceName}`.localeCompare(
+              `${b.serviceId}|${b.serviceName}`
+            )
+          );
+
+      const statusChanged = status !== workOrder.status;
+
+      const previousDeposit = normalizeNumber(workOrder.depositAmount);
+      const previousAdditionalPayment = normalizeNumber(workOrder.additionalPayment);
+      const previousPaymentMethod = String(workOrder.paymentMethod || "");
+      const currentPaymentMethod = String(paymentMethod || "");
+      const paymentChanged =
+        previousDeposit !== totalDeposit ||
+        previousAdditionalPayment !== additionalPayment ||
+        previousPaymentMethod !== currentPaymentMethod;
+
+      const existingPartsSignature = JSON.stringify(
+        normalizePartsForCompare(workOrder.partsUsed as any[])
+      );
+      const currentPartsSignature = JSON.stringify(
+        normalizePartsForCompare(transformedParts)
+      );
+
+      const existingServicesSignature = JSON.stringify(
+        normalizeServicesForCompare(workOrder.additionalServices as any[])
+      );
+      const currentServicesSignature = JSON.stringify(
+        normalizeServicesForCompare(transformedServices)
+      );
+
+      const existingRepairServicesSignature = JSON.stringify(
+        normalizeRepairServicesForCompare(workOrder.repairServices as any[])
+      );
+      const currentRepairServicesSignature = JSON.stringify(
+        normalizeRepairServicesForCompare(transformedRepairServices)
+      );
+
+      const customerChanged =
+        String(workOrder.customerName || "") !== String(selectedCustomer?.name || "") ||
+        String(workOrder.customerPhone || "") !== String(selectedCustomer?.phone || "");
+
+      const vehicleChanged =
+        String(workOrder.vehicleId || "") !== String(selectedVehicle?.id || "") ||
+        String(workOrder.vehicleModel || "") !== String(selectedVehicle?.model || "") ||
+        String(workOrder.licensePlate || "") !== String(selectedVehicle?.licensePlate || "");
+
+      const partsChanged =
+        existingPartsSignature !== currentPartsSignature ||
+        existingRepairServicesSignature !== currentRepairServicesSignature;
+
+      const outsourceServicesChanged =
+        existingServicesSignature !== currentServicesSignature;
+
+      const laborChanged =
+        normalizeNumber(workOrder.laborCost) !== normalizeNumber(effectiveLaborCost);
+
+      const discountChanged =
+        normalizeNumber(workOrder.discount) !== normalizeNumber(discountAmount);
+
+      if (statusChanged && !canUpdateWorkOrderStatus) {
+        showToast.error("Bạn không có quyền đổi trạng thái phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (paymentChanged && !canUpdateWorkOrderPayment) {
+        showToast.error("Bạn không có quyền cập nhật thanh toán phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (partsChanged && !canUpdateWorkOrderParts) {
+        showToast.error("Bạn không có quyền sửa phụ tùng trong phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (laborChanged && !canUpdateWorkOrderLabor) {
+        showToast.error("Bạn không có quyền sửa tiền công (labor) phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (discountChanged && !canUpdateWorkOrderDiscount) {
+        showToast.error("Bạn không có quyền sửa giảm giá phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (customerChanged && !canUpdateWorkOrderCustomer) {
+        showToast.error("Bạn không có quyền sửa thông tin khách hàng trong phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (vehicleChanged && !canUpdateWorkOrderVehicle) {
+        showToast.error("Bạn không có quyền sửa thông tin thiết bị/xe trong phiếu sửa chữa");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (outsourceServicesChanged && !canUpdateWorkOrderOutsourceService) {
+        showToast.error("Bạn không có quyền tạo/sửa dịch vụ gia công ngoài");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const workOrderData = {
       status,
       technicianId: selectedTechnicianId,
@@ -1114,14 +1298,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       remainingAmount,
     };
 
-    console.log(
-      "[WorkOrderMobileModal] currentKm state:",
-      currentKm,
-      "parsed:",
-      parseInt(currentKm),
-      "final:",
-      workOrderData.currentKm
-    );
+
 
     // Execute save callback with offline fallback
     try {
@@ -2350,6 +2527,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                   key={part.partId}
                                   className="p-4 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/30 rounded-2xl shadow-sm"
                                 >
+                                  {(() => {
+                                    const laborBase = getPartLaborBase(part.partId);
+                                    const lineLabor = getIntegratedLaborByQuantity(
+                                      laborBase,
+                                      Number(part.quantity || 0)
+                                    );
+                                    return (
+                                      <>
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                       <div className="text-sm font-bold text-slate-900 dark:text-white truncate">
@@ -2357,6 +2542,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                       </div>
                                       <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                                         {part.sku}
+                                      </div>
+                                      <div className="text-[10px] text-cyan-500 font-semibold mt-1">
+                                        Công: {formatCurrency(laborBase)} / món
+                                      </div>
+                                      <div className="text-[10px] text-cyan-400 mt-0.5">
+                                        Công theo SL: {formatCurrency(lineLabor)}
                                       </div>
                                       <div className="mt-2 flex items-center gap-2">
                                         <span className="text-[10px] text-slate-500">Giá:</span>
@@ -2404,6 +2595,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                       </div>
                                     </div>
                                   </div>
+                                      </>
+                                    );
+                                  })()}
                                   <div className="mt-3 pt-3 border-t border-slate-700/30 flex justify-between items-center">
                                     <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Thành tiền</span>
                                     <span className="text-sm font-bold text-emerald-400">
@@ -2562,22 +2756,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                       </h3>
 
                       <div className="p-4 bg-[#1e1e2d] rounded-lg space-y-2">
-                        {/* Labor Cost */}
-                        <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">
-                            Tiền công
-                          </label>
-                          <input
-                            type="text"
-                            value={formatNumberWithDots(laborCost)}
-                            onChange={(e) =>
-                              setLaborCost(parseFormattedNumber(e.target.value))
-                            }
-                            placeholder="0"
-                            inputMode="numeric"
-                            className="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-[#2b2b40] rounded-lg text-slate-900 dark:text-white text-xs"
-                          />
-                        </div>
 
                         {/* Deposit Toggle */}
                         <div className="pt-2">
@@ -2846,12 +3024,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
                           <div className="space-y-2.5">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs text-slate-500 dark:text-slate-400">Phí dịch vụ:</span>
-                              <span className="text-xs font-bold text-slate-900 dark:text-white">
-                                {formatCurrency(effectiveLaborCost)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
                               <span className="text-xs text-slate-500 dark:text-slate-400">Tiền linh kiện:</span>
                               <span className="text-xs font-bold text-slate-900 dark:text-white">
                                 {formatCurrency(partsTotal)}
@@ -2864,11 +3036,27 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                               </span>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-xs text-slate-500 dark:text-slate-400">Công sửa:</span>
-                              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                              <span className="text-xs text-cyan-600 dark:text-cyan-400 font-bold">Tiền công tích hợp:</span>
+                              <span
+                                className={`text-xs font-bold ${includeIntegratedLabor
+                                  ? "text-cyan-600 dark:text-cyan-400"
+                                  : "text-slate-400 dark:text-slate-500"
+                                  }`}
+                              >
                                 {formatCurrency(effectiveLaborCost)}
                               </span>
                             </div>
+                            <label className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                Không tính tiền công (khách mang về)
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={!includeIntegratedLabor}
+                                onChange={(e) => setIncludeIntegratedLabor(!e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            </label>
 
                             {/* Discount Row */}
                             <div className="pt-2.5 border-t border-slate-700/50 flex items-center justify-between">
@@ -3172,6 +3360,10 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                   {filteredParts.slice(0, 50).map((part) => {
                     const stock = part.stock?.[currentBranchId] || 0;
                     const price = part.retailPrice?.[currentBranchId] || 0;
+                    const partLaborCost =
+                      Number((part as any)?.laborCost?.[currentBranchId]) ||
+                      Number(part.wholesalePrice?.[currentBranchId]) ||
+                      0;
                     return (
                       <div
                         key={part.id}
@@ -3191,6 +3383,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             </div>
                             <div className="text-[11px] text-blue-400 font-mono mt-0.5">
                               SKU: {part.sku} • Tồn: {stock}
+                            </div>
+                            <div className="text-[11px] text-cyan-400 mt-0.5">
+                              Công: {formatCurrency(partLaborCost)}
                             </div>
                             {part.category && (
                               <span

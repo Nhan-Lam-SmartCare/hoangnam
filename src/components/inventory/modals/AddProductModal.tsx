@@ -80,10 +80,10 @@ const AddProductModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-[9999] p-0 sm:p-4">
-      <div className="bg-white dark:bg-slate-800 w-full sm:rounded-xl sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] overflow-hidden flex flex-col rounded-t-2xl">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-[2px] flex items-end sm:items-center justify-center z-[9999] p-0 sm:p-4">
+      <div className="bg-white dark:bg-slate-800 w-full sm:rounded-2xl sm:max-w-4xl max-h-[95vh] sm:max-h-[92vh] overflow-hidden flex flex-col rounded-t-2xl border border-slate-200/70 dark:border-slate-700/70 shadow-2xl">
         {/* Header - Mobile optimized */}
-        <div className="flex justify-between items-center px-4 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-600 to-blue-700 sm:bg-none sm:from-transparent sm:to-transparent">
+        <div className="flex justify-between items-center px-4 py-3 sm:py-3 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-600 to-blue-700 sm:bg-slate-50 sm:dark:bg-slate-800">
           <h2 className="text-lg font-bold text-white sm:text-slate-900 sm:dark:text-slate-100">
             ➕ Thêm sản phẩm mới
           </h2>
@@ -96,16 +96,16 @@ const AddProductModal: React.FC<{
         </div>
 
         {/* Form Content */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 bg-slate-50 dark:bg-slate-900/50">
-          <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-3 bg-slate-50 dark:bg-slate-900/50">
+          <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-3">
             {/* Card: Thông tin sản phẩm */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-3 shadow-sm sm:col-span-7 border border-slate-100 dark:border-slate-700/60">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 sm:mb-1.5 flex items-center gap-2">
                 📦 Thông tin sản phẩm
               </h3>
 
               {/* Tên sản phẩm */}
-              <div className="mb-3">
+              <div className="mb-2.5 sm:mb-2">
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   Tên sản phẩm <span className="text-red-500">*</span>
                 </label>
@@ -113,13 +113,13 @@ const AddProductModal: React.FC<{
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Nhập tên sản phẩm"
                 />
               </div>
 
               {/* Danh mục */}
-              <div className="mb-3">
+              <div className="mb-2.5 sm:mb-2">
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   Danh mục sản phẩm
                 </label>
@@ -127,7 +127,7 @@ const AddProductModal: React.FC<{
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="flex-1 px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">-- Chọn danh mục --</option>
                     {categories.map((c: any) => (
@@ -139,7 +139,7 @@ const AddProductModal: React.FC<{
                   <button
                     type="button"
                     onClick={() => setShowInlineCat(true)}
-                    className="w-12 h-12 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-xl hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+                    className="w-12 h-12 sm:h-9 sm:w-10 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-xl hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
                     aria-label="Thêm danh mục mới"
                   >
                     <span className="text-2xl text-blue-600 dark:text-blue-400">
@@ -150,7 +150,7 @@ const AddProductModal: React.FC<{
               </div>
 
               {/* Barcode */}
-              <div>
+              <div className="sm:mb-0.5">
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                   Mã vạch / SKU
                 </label>
@@ -158,7 +158,7 @@ const AddProductModal: React.FC<{
                   type="text"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
-                  className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập mã vạch (nếu có)"
                 />
               </div>
@@ -166,7 +166,7 @@ const AddProductModal: React.FC<{
 
             {/* Inline category form */}
             {showInlineCat && (
-              <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-3 shadow-sm sm:col-span-12 border border-slate-100 dark:border-slate-700/60">
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
@@ -190,7 +190,7 @@ const AddProductModal: React.FC<{
                       showToast.error(err?.message || "Lỗi tạo danh mục");
                     }
                   }}
-                  className="space-y-3"
+                  className="space-y-2"
                 >
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
                     Tạo danh mục mới
@@ -201,12 +201,12 @@ const AddProductModal: React.FC<{
                     value={inlineCatName}
                     onChange={(e) => setInlineCatName(e.target.value)}
                     placeholder="Nhập tên danh mục mới"
-                    className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                    className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                   />
                   <div className="flex gap-2">
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium"
+                      className="flex-1 px-4 py-2.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm"
                     >
                       Lưu danh mục
                     </button>
@@ -216,7 +216,7 @@ const AddProductModal: React.FC<{
                         setShowInlineCat(false);
                         setInlineCatName("");
                       }}
-                      className="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                      className="flex-1 px-4 py-2.5 sm:py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm"
                     >
                       Hủy
                     </button>
@@ -226,28 +226,28 @@ const AddProductModal: React.FC<{
             )}
 
             {/* Card: Mô tả */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-3 shadow-sm sm:col-span-5 border border-slate-100 dark:border-slate-700/60">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 sm:mb-1.5 flex items-center gap-2">
                 📝 Mô tả sản phẩm
               </h3>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                rows={6}
+                className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
                 placeholder="Mô tả chi tiết sản phẩm (tùy chọn)"
               />
             </div>
 
             {/* Card: Thông tin nhập kho */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-3 shadow-sm sm:col-span-12 border border-slate-100 dark:border-slate-700/60">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 sm:mb-1.5 flex items-center gap-2">
                 💰 Thông tin nhập kho
               </h3>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-12 gap-3">
                 {/* Số lượng */}
-                <div>
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                     Số lượng
                   </label>
@@ -259,12 +259,12 @@ const AddProductModal: React.FC<{
                         result.warnings.forEach((w) => showToast.warning(w));
                       setQuantity(Math.max(1, result.clean.quantity));
                     }}
-                    className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-center font-bold"
+                    className="w-full sm:max-w-[110px] px-3 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-center font-semibold"
                   />
                 </div>
 
                 {/* Giá nhập */}
-                <div>
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                     Giá nhập (đ)
                   </label>
@@ -281,23 +281,12 @@ const AddProductModal: React.FC<{
                         );
                       }
                     }}
-                    className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                    Tiền công (đ)
-                  </label>
-                  <FormattedNumberInput
-                    value={laborCost}
-                    onValue={(v) => setLaborCost(Math.max(0, Math.round(v)))}
-                    className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
+                    className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
                   />
                 </div>
 
                 {/* Giá bán lẻ */}
-                <div>
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                     Giá bán lẻ (đ)
                   </label>
@@ -307,12 +296,24 @@ const AddProductModal: React.FC<{
                       setRetailPrice(Math.max(0, Math.round(v)));
                       setRetailOverridden(true);
                     }}
-                    className="w-full px-4 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
+                    className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
+                  />
+                </div>
+
+                {/* Tiền công */}
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                    Tiền công (đ)
+                  </label>
+                  <FormattedNumberInput
+                    value={laborCost}
+                    onValue={(v) => setLaborCost(Math.max(0, Math.round(v)))}
+                    className="w-full px-4 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
                   />
                 </div>
 
                 {/* Bảo hành */}
-                <div>
+                <div className="col-span-2 sm:col-span-4">
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                     Bảo hành
                   </label>
@@ -320,12 +321,12 @@ const AddProductModal: React.FC<{
                     <FormattedNumberInput
                       value={warranty}
                       onValue={(v) => setWarranty(Math.max(0, Math.floor(v)))}
-                      className="w-16 px-2 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-center"
+                      className="w-16 px-2 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-center"
                     />
                     <select
                       value={warrantyUnit}
                       onChange={(e) => setWarrantyUnit(e.target.value)}
-                      className="flex-1 px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      className="flex-1 px-3 py-3 sm:py-2 text-base sm:text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                     >
                       <option value="tháng">tháng</option>
                       <option value="năm">năm</option>
@@ -339,10 +340,10 @@ const AddProductModal: React.FC<{
         </div>
 
         {/* Footer - Fixed at bottom */}
-        <div className="px-4 py-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
           <button
             onClick={handleSubmit}
-            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-4 rounded-xl font-bold text-lg shadow-lg active:scale-98 transition-all"
+            className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-3 rounded-xl font-bold text-base shadow-lg active:scale-98 transition-all"
           >
             ✓ Lưu và Thêm vào giỏ hàng
           </button>

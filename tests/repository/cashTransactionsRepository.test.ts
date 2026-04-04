@@ -12,6 +12,32 @@ const mockInsert = vi.fn();
 
 vi.spyOn(client, "supabase", "get").mockReturnValue({ from: mockFrom } as any);
 
+function makeOrderedQuery(data: any = [], error: any = null) {
+  return {
+    data,
+    error,
+    eq() {
+      return this;
+    },
+    gte() {
+      return this;
+    },
+    lte() {
+      return this;
+    },
+    limit() {
+      return this;
+    },
+  } as any;
+}
+
+function makeSelectResult(data: any = [], error: any = null) {
+  return {
+    order: () => makeOrderedQuery(data, error),
+    limit: () => ({ data, error }),
+  } as any;
+}
+
 mockFrom.mockImplementation((table: string) => {
   return {
     select: () => mockSelect(table),
@@ -20,19 +46,13 @@ mockFrom.mockImplementation((table: string) => {
 });
 
 // Success defaults
-mockSelect.mockImplementation((_table: string) => ({
-  data: [],
-  error: null,
-  order: () => ({ data: [], error: null }),
-}));
-mockInsert.mockImplementation((_table: string, rows: any[]) => ({
-  select: () => ({ single: () => ({ data: rows[0], error: null }) }),
-}));
+mockSelect.mockImplementation((_table: string) => makeSelectResult([], null));
+mockInsert.mockImplementation((_table: string, _rows: any[]) => ({ error: null }));
 
 function injectSelectErrorOnce(errorMsg: string) {
-  mockSelect.mockImplementationOnce((_table: string) => ({
-    order: () => ({ data: null, error: { message: errorMsg } }),
-  }));
+  mockSelect.mockImplementationOnce((_table: string) =>
+    makeSelectResult(null, { message: errorMsg })
+  );
 }
 
 describe("cashTransactionsRepository", () => {

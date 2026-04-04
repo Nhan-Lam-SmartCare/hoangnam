@@ -10,6 +10,8 @@ import {
   Search,
   History,
 } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { canDo } from "../../utils/permissions";
 
 interface QuickAccessCardProps {
   to: string;
@@ -60,6 +62,9 @@ const QuickAccessCard: React.FC<QuickAccessCardProps> = ({
 };
 
 export const StaffDashboard: React.FC = () => {
+  const { profile } = useAuth();
+  const canViewReports = canDo(profile, "reports.view");
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 md:p-6">
       <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
@@ -134,13 +139,15 @@ export const StaffDashboard: React.FC = () => {
             color="slate"
           />
 
-          <QuickAccessCard
-            to="/reports"
-            icon={<FileText className="w-6 h-6" />}
-            label="Báo cáo"
-            description="Xem báo cáo cơ bản"
-            color="indigo"
-          />
+          {canViewReports && (
+            <QuickAccessCard
+              to="/reports"
+              icon={<FileText className="w-6 h-6" />}
+              label="Báo cáo"
+              description="Xem báo cáo cơ bản"
+              color="indigo"
+            />
+          )}
         </div>
       </div>
     </div>

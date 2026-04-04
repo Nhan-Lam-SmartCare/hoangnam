@@ -25,6 +25,7 @@ import Dashboard from "./components/dashboard/Dashboard";
 import RepoErrorPanel from "./components/common/RepoErrorPanel";
 import { lazyImport } from "./utils/lazyImport";
 import { canAccessInventorySection } from "./utils/inventoryAccess";
+import { canDo } from "./utils/permissions";
 
 // Lazy load large components for code splitting
 // Lazy load large components for code splitting
@@ -204,7 +205,10 @@ const MainLayout: React.FC = () => {
           <Route
             path="/reports"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute
+                allow={({ profile }) => canDo(profile, "reports.view")}
+                denyMessage="Bạn không có quyền xem báo cáo."
+              >
                 <ReportsPage />
               </ProtectedRoute>
             }
@@ -212,7 +216,12 @@ const MainLayout: React.FC = () => {
           <Route
             path="/cash-book"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute
+                allow={({ profile }) =>
+                  canDo(profile, "cashbook.view") || canDo(profile, "finance.view")
+                }
+                denyMessage="Bạn không có quyền xem sổ quỹ."
+              >
                 <CashBook />
               </ProtectedRoute>
             }
@@ -242,7 +251,17 @@ const MainLayout: React.FC = () => {
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/lookup" element={<LookupPage />} />
           <Route path="/service" element={<Service />} />
-          <Route path="/service-history" element={<ServiceHistoryPage />} />
+          <Route
+            path="/service-history"
+            element={
+              <ProtectedRoute
+                allow={({ profile }) => canDo(profile, "work_order.history.view")}
+                denyMessage="Bạn không có quyền xem lịch sử sửa chữa."
+              >
+                <ServiceHistoryPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/warranty" element={<WarrantyPage />} />
           <Route path="/customers" element={<Customers />} />
           <Route
@@ -309,7 +328,7 @@ export default function App() {
                     }
                   />
                 </Routes>
-                <ReactQueryDevtools initialIsOpen={false} />
+                {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
                 {/* Dev-only repository error panel */}
                 {import.meta.env.DEV && <RepoErrorPanel />}
               </ErrorBoundary>

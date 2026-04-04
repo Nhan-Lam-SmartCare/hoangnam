@@ -223,16 +223,6 @@ export default function ServiceManager() {
 
   // Sync fetched work orders to context
   useEffect(() => {
-    console.log(
-      "[ServiceManager] fetchedWorkOrders:",
-      fetchedWorkOrders?.length,
-      fetchedWorkOrders
-    );
-    console.log(
-      "[ServiceManager] workOrders from context:",
-      workOrders?.length,
-      workOrders
-    );
     if (fetchedWorkOrders) {
       setWorkOrders(fetchedWorkOrders);
     }
@@ -862,7 +852,6 @@ export default function ServiceManager() {
       if (error) {
         console.error("❌ Error creating notification:", error);
       } else {
-        console.log("✅ Notification created for work order:", orderId);
       }
     } catch (err) {
       console.error("❌ Error in createWorkOrderNotification:", err);
@@ -914,12 +903,6 @@ export default function ServiceManager() {
         vehicles: updatedVehicles,
       });
 
-      console.log("[updateVehicleKmAndMaintenance] Updated vehicle:", {
-        vehicleId,
-        currentKm,
-        maintenanceTypes,
-        updatedVehicle,
-      });
     } catch (err) {
       console.error("[updateVehicleKmAndMaintenance] Error:", err);
       // Don't throw - this is a non-critical update
@@ -935,14 +918,7 @@ export default function ServiceManager() {
   ) => {
     if (remainingAmount <= 0) return;
 
-    console.log("[createCustomerDebtIfNeeded] CALLED with:", {
-      workOrderId: workOrder.id,
-      totalAmount,
-      paidAmount,
-      remainingAmount,
-      customerName: workOrder.customerName,
-      timestamp: new Date().toISOString(),
-    });
+
 
     try {
       const safeCustomerId =
@@ -1022,9 +998,7 @@ export default function ServiceManager() {
         workOrderId: workOrder.id, // 🔹 Link debt với work order
       };
 
-      console.log("[ServiceManager] createCustomerDebt payload:", payload);
       const result = await createCustomerDebt.mutateAsync(payload as any);
-      console.log("[ServiceManager] createCustomerDebt result:", result);
       showToast.success(
         `Đã tạo/cập nhật công nợ ${remainingAmount.toLocaleString()}đ (Mã: ${result?.id || "N/A"
         })`
@@ -1044,7 +1018,6 @@ export default function ServiceManager() {
   // 🔹 Handle Mobile Save - Similar to desktop handleSave
   const handleMobileSave = async (workOrderData: any) => {
     try {
-      console.log("[handleMobileSave] Mobile Work Order Data:", workOrderData);
 
       // Validate required fields
       if (!workOrderData.customer?.name) {
@@ -1108,10 +1081,6 @@ export default function ServiceManager() {
               vehicleModel: vehicle.model || existingCustomer.vehicleModel,
             };
 
-            console.log(
-              "[handleMobileSave] Adding new vehicle to customer:",
-              updatedCustomer
-            );
             upsertCustomer(updatedCustomer);
           } else if (currentKm > 0) {
             // Vehicle exists, just update currentKm if provided
@@ -1124,10 +1093,6 @@ export default function ServiceManager() {
               ...existingCustomer,
               vehicles: updatedVehicles,
             };
-            console.log(
-              "[handleMobileSave] Updating vehicle km:",
-              updatedCustomer
-            );
             upsertCustomer(updatedCustomer);
           }
         } else {
@@ -1145,10 +1110,6 @@ export default function ServiceManager() {
             licensePlate: vehicle.licensePlate,
             vehicleModel: vehicle.model,
           };
-          console.log(
-            "[handleMobileSave] Creating new customer with vehicle:",
-            newCustomer
-          );
           upsertCustomer(newCustomer);
         }
       }
@@ -1275,9 +1236,6 @@ export default function ServiceManager() {
           parts.length > 0
         ) {
           try {
-            console.log(
-              "[handleMobileSave] Order became fully paid, calling completeWorkOrderPayment to deduct inventory"
-            );
             await completeWorkOrderPayment(
               editingOrder.id,
               paymentMethod || "cash",
@@ -1410,7 +1368,6 @@ export default function ServiceManager() {
                       })
                       .eq("id", currentCustomer.id);
 
-                    console.log(`[WorkOrder] Updated stats for ${customer.name}`);
                   }
                 }
               } catch (err) {
@@ -1452,18 +1409,12 @@ export default function ServiceManager() {
     }
 
     try {
-      console.log(
-        "[handleConfirmRefund] Starting refund for order:",
-        refundingOrder.id
-      );
-      console.log("[handleConfirmRefund] Refund reason:", refundReason);
 
       const result = await refundWorkOrderAsync({
         orderId: refundingOrder.id,
         refundReason: refundReason,
       });
 
-      console.log("[handleConfirmRefund] Refund result:", result);
 
       // Check if mutation succeeded
       if (!result || (result as any).error) {

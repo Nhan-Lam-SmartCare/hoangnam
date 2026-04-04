@@ -8,6 +8,7 @@ import NotificationDropdown from "../common/NotificationDropdown";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { NavLink, MobileDrawerLink } from "./index";
 import { canAccessInventorySection } from "../../utils/inventoryAccess";
+import { canDo } from "../../utils/permissions";
 import {
   LayoutDashboard,
   Wrench,
@@ -64,8 +65,11 @@ export function Nav() {
   const isOwnerOrManager =
     role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
   const canViewInventory = canAccessInventorySection(profile, user);
+  const canViewReports = canDo(profile, "reports.view");
+  const canViewCashBook =
+    canDo(profile, "cashbook.view") || canDo(profile, "finance.view");
   const can = {
-    viewFinance: false,
+    viewFinance: canViewCashBook,
     viewPayroll: false,
     viewAnalytics: false,
     viewDebt: false,
@@ -73,7 +77,7 @@ export function Nav() {
     viewSettings: isOwnerOrManager,
     viewInventory: canViewInventory,
     viewDashboard: isOwnerOrManager,
-    viewReports: true,
+    viewReports: canViewReports,
   } as const;
 
   useEffect(() => {
@@ -356,12 +360,14 @@ export function Nav() {
                 label="Báo cáo"
               />
             )}
-            <NavLink
-              to="/cash-book"
-              colorKey="teal"
-              icon={<Landmark className="w-4 h-4" />}
-              label="Sổ quỹ"
-            />
+            {can.viewFinance && (
+              <NavLink
+                to="/cash-book"
+                colorKey="teal"
+                icon={<Landmark className="w-4 h-4" />}
+                label="Sổ quỹ"
+              />
+            )}
             {/* Removed unrelated links: Finance, Debt, Analytics, Promotions */}
           </div>
 

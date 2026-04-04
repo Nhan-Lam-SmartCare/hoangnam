@@ -9,7 +9,7 @@
  * ```typescript
  * const result = await fetchParts();
  * if (result.ok) {
- *   console.log(result.data); // Type: Part[]
+ * // Type: Part[]
  * } else {
  *   console.error(result.error.message);
  * }

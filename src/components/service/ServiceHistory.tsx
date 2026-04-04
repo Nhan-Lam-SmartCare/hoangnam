@@ -53,8 +53,6 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
   // Sync fetched work orders to context
   useEffect(() => {
     if (fetchedWorkOrders) {
-      console.log("[ServiceHistory] Fetched work orders:", fetchedWorkOrders);
-      console.log("[ServiceHistory] Sample order:", fetchedWorkOrders[0]);
       setWorkOrders(fetchedWorkOrders);
     }
   }, [fetchedWorkOrders, setWorkOrders]);

@@ -382,20 +382,13 @@ const CustomerManager: React.FC = () => {
   // Auto-open edit form if editCustomerId is in localStorage (from SalesManager)
   useEffect(() => {
     const editCustomerId = localStorage.getItem("editCustomerId");
-    console.log("[CustomerManager] Checking editCustomerId:", editCustomerId);
-    console.log("[CustomerManager] Customers loaded:", customers.length);
 
     if (editCustomerId && customers.length > 0) {
       const customerToEdit = customers.find((c) => c.id === editCustomerId);
-      console.log("[CustomerManager] Found customer to edit:", customerToEdit);
 
       if (customerToEdit) {
         setEditCustomer(customerToEdit);
         localStorage.removeItem("editCustomerId"); // Clear after using
-        console.log(
-          "[CustomerManager] Opened edit form for:",
-          customerToEdit.name
-        );
       }
     }
   }, [customers]);
@@ -404,23 +397,14 @@ const CustomerManager: React.FC = () => {
   useEffect(() => {
     const checkAndOpenEdit = () => {
       const editCustomerId = localStorage.getItem("editCustomerId");
-      console.log(
-        "[CustomerManager MOUNT] Checking editCustomerId:",
-        editCustomerId
-      );
 
       if (editCustomerId && customers.length > 0) {
         const customerToEdit = customers.find((c) => c.id === editCustomerId);
-        console.log("[CustomerManager MOUNT] Found customer:", customerToEdit);
 
         if (customerToEdit) {
           setTimeout(() => {
             setEditCustomer(customerToEdit);
             localStorage.removeItem("editCustomerId");
-            console.log(
-              "[CustomerManager MOUNT] Opened edit form for:",
-              customerToEdit.name
-            );
           }, 100);
         }
       }

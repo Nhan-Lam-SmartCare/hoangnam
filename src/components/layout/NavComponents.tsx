@@ -23,6 +23,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { useTheme } from "../../contexts/ThemeContext";
 import { canAccessInventorySection } from "../../utils/inventoryAccess";
+import { canDo } from "../../utils/permissions";
 
 // Color types and constants
 export type ColorKey =
@@ -183,6 +184,9 @@ export const BottomNav: React.FC = () => {
   const isOwnerOrManager =
     role === USER_ROLES.OWNER || role === USER_ROLES.MANAGER;
   const canViewInventory = canAccessInventorySection(profile, user);
+  const canViewReports = canDo(profile, "reports.view");
+  const canViewCashBook =
+    canDo(profile, "cashbook.view") || canDo(profile, "finance.view");
   const [showMenu, setShowMenu] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
@@ -380,20 +384,24 @@ export const BottomNav: React.FC = () => {
                     color="emerald"
                     onClick={() => setShowMenu(false)}
                   />
-                  <MobileDrawerLink
-                    to="/reports"
-                    icon={<FileText className="w-5 h-5" />}
-                    label="Báo cáo tổng quan"
-                    color="fuchsia"
-                    onClick={() => setShowMenu(false)}
-                  />
-                  <MobileDrawerLink
-                    to="/cash-book"
-                    icon={<Landmark className="w-5 h-5" />}
-                    label="Sổ quỹ"
-                    color="teal"
-                    onClick={() => setShowMenu(false)}
-                  />
+                  {canViewReports && (
+                    <MobileDrawerLink
+                      to="/reports"
+                      icon={<FileText className="w-5 h-5" />}
+                      label="Báo cáo tổng quan"
+                      color="fuchsia"
+                      onClick={() => setShowMenu(false)}
+                    />
+                  )}
+                  {canViewCashBook && (
+                    <MobileDrawerLink
+                      to="/cash-book"
+                      icon={<Landmark className="w-5 h-5" />}
+                      label="Sổ quỹ"
+                      color="teal"
+                      onClick={() => setShowMenu(false)}
+                    />
+                  )}
                 </div>
 
                 <div className="border-t border-slate-100 dark:border-slate-800 my-2"></div>

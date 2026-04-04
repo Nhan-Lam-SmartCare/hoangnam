@@ -16,6 +16,9 @@ export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
+  permissions?: Record<string, boolean>;
+  custom_permissions?: Record<string, boolean>;
+  permission_overrides?: Record<string, boolean>;
   name?: string;
   full_name?: string; // legacy fallback
   avatar_url?: string;
@@ -55,6 +58,25 @@ const normalizeEmail = (email?: string | null) =>
 
 const isForcedOwnerEmail = (email?: string | null) =>
   FORCE_OWNER_EMAILS.includes(normalizeEmail(email));
+
+const getPermissionMetadata = (rawUser: any): Record<string, boolean> => {
+  const metadata = rawUser?.user_metadata || {};
+  const candidates = [
+    metadata.permissions,
+    metadata.custom_permissions,
+    metadata.permission_overrides,
+  ];
+
+  return candidates.reduce<Record<string, boolean>>((acc, value) => {
+    if (!value || typeof value !== "object") return acc;
+    Object.entries(value).forEach(([key, flag]) => {
+      if (typeof flag === "boolean") {
+        acc[key] = flag;
+      }
+    });
+    return acc;
+  }, {});
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -124,6 +146,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loadUserProfile = async (userId: string, userEmail?: string) => {
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      const authUser = authData?.user || user;
+
       // Ưu tiên bảng profiles trước, sau đó fallback sang user_profiles nếu không có hoặc bảng không tồn tại
       let { data, error } = await supabase
         .from("profiles")
@@ -149,23 +174,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) throw error;
       const resolvedEmail = normalizeEmail(userEmail || user?.email || (data as any)?.email);
+      const metadataPermissions = getPermissionMetadata(authUser);
 
       if (!data) {
         // Nếu không có profile, tạo một profile mặc định để tránh stuck
         console.warn('No profile found for user, creating default profile');
         const defaultProfile: UserProfile = {
           id: userId,
-          email: userEmail || user?.email || 'unknown',
+          email: userEmail || authUser?.email || user?.email || 'unknown',
           role: isForcedOwnerEmail(resolvedEmail) ? 'owner' : 'staff', // default role
+          permissions: metadataPermissions,
+          custom_permissions: metadataPermissions,
+          permission_overrides: metadataPermissions,
           created_at: new Date().toISOString(),
         };
         setProfile(defaultProfile);
       } else {
+        const profilePermissions =
+          ((data as any)?.custom_permissions as Record<string, boolean> | undefined) ||
+          ((data as any)?.permission_overrides as Record<string, boolean> | undefined) ||
+          ((data as any)?.permissions as Record<string, boolean> | undefined) ||
+          {};
         const normalizedProfile = {
           ...(data as any),
           role: isForcedOwnerEmail(resolvedEmail)
             ? ("owner" as const)
             : (data as any).role,
+          permissions: {
+            ...profilePermissions,
+            ...metadataPermissions,
+          },
+          custom_permissions: {
+            ...profilePermissions,
+            ...metadataPermissions,
+          },
+          permission_overrides: {
+            ...profilePermissions,
+            ...metadataPermissions,
+          },
         };
         setProfile(normalizedProfile as UserProfile);
       }
@@ -173,13 +219,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Error loading user profile:", error);
       // Suppress toast for missing table/row, just use default profile
       const resolvedEmail = normalizeEmail(userEmail || user?.email);
+      const { data: authData } = await supabase.auth.getUser();
+      const authUser = authData?.user || user;
+      const metadataPermissions = getPermissionMetadata(authUser);
       const defaultProfile: UserProfile = {
         id: userId,
-        email: userEmail || user?.email || 'unknown',
+        email: userEmail || authUser?.email || user?.email || 'unknown',
         role: isForcedOwnerEmail(resolvedEmail)
           ? 'owner'
-          : ((user?.user_metadata?.role as UserRole) || 'staff'),
-        name: user?.user_metadata?.name || user?.email?.split("@")[0],
+          : ((authUser?.user_metadata?.role as UserRole) || (user?.user_metadata?.role as UserRole) || 'staff'),
+        permissions: metadataPermissions,
+        custom_permissions: metadataPermissions,
+        permission_overrides: metadataPermissions,
+        name: authUser?.user_metadata?.name || authUser?.email?.split("@")?.[0] || user?.email?.split("@")[0],
         created_at: new Date().toISOString(),
         branch_id: "CN1"
       };

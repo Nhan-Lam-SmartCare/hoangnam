@@ -26,7 +26,17 @@ import { getCategoryColor } from '../../utils/categoryColors';
 
 const InventoryHistorySection: React.FC<{
   transactions: InventoryTransaction[];
-}> = ({ transactions }) => {
+  canViewImportPrice?: boolean;
+  canEditReceipt?: boolean;
+  canDeleteReceipt?: boolean;
+  canPrintBarcode?: boolean;
+}> = ({
+  transactions,
+  canViewImportPrice = true,
+  canEditReceipt = false,
+  canDeleteReceipt = false,
+  canPrintBarcode = false,
+}) => {
   const { profile } = useAuth();
   const { currentBranchId: branchId } = useAppContext();
   const queryClient = useQueryClient();
@@ -53,10 +63,6 @@ const InventoryHistorySection: React.FC<{
 
   const filteredTransactions = useMemo(() => {
     // CHỈ LẤY GIAO DỊCH NHẬP KHO
-    console.log(
-      "📦 [InventoryHistorySection] Tổng số giao dịch:",
-      transactions.length
-    );
     let filtered = transactions.filter((t) => {
       const rawType = String(t.type || "").toLowerCase();
       const rawNotes = String(t.notes || "").toLowerCase();
@@ -77,10 +83,6 @@ const InventoryHistorySection: React.FC<{
 
       return isImportType || hasReceiptHint || likelyImportRow;
     });
-    console.log(
-      "📦 [InventoryHistorySection] Giao dịch 'Nhập kho':",
-      filtered.length
-    );
     const now = new Date();
 
     // Apply time filter
@@ -264,6 +266,11 @@ const InventoryHistorySection: React.FC<{
 
   // Xóa phiếu nhập kho đã chọn
   const handleDeleteSelectedReceipts = async () => {
+    if (!canDeleteReceipt) {
+      showToast.error("Bạn không có quyền xóa phiếu nhập kho");
+      return;
+    }
+
     if (selectedReceipts.size === 0) {
       showToast.warning("Vui lòng chọn ít nhất một phiếu nhập kho");
       return;
@@ -338,7 +345,7 @@ const InventoryHistorySection: React.FC<{
           if (updateError) {
             console.warn(`Could not update stock for ${tx.part_id}:`, updateError);
           } else {
-            console.log(`✅ Trừ tồn kho: ${tx.part_name || tx.part_id} - Số lượng: ${tx.quantity_change} (${branchStock} → ${newBranchStock})`);
+
           }
         }
       }
@@ -370,7 +377,6 @@ const InventoryHistorySection: React.FC<{
         if (cashError) {
           console.warn(`Could not delete cash transaction for ${receiptCode}:`, cashError);
         } else {
-          console.log(`✅ Đã xóa giao dịch sổ quỹ cho phiếu ${receiptCode}`);
         }
       }
 
@@ -471,20 +477,24 @@ const InventoryHistorySection: React.FC<{
             {/* Nút in mã vạch và xóa phiếu đã chọn */}
             {selectedReceipts.size > 0 && (
               <>
-                <button
-                  onClick={() => setShowPrintBarcodeModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
-                >
-                  <Printer className="w-4 h-4" />
-                  In mã vạch ({partsForBarcodePrint.length} SP)
-                </button>
-                <button
-                  onClick={handleDeleteSelectedReceipts}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Xóa {selectedReceipts.size} phiếu
-                </button>
+                {canPrintBarcode && (
+                  <button
+                    onClick={() => setShowPrintBarcodeModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Printer className="w-4 h-4" />
+                    In mã vạch ({partsForBarcodePrint.length} SP)
+                  </button>
+                )}
+                {canDeleteReceipt && (
+                  <button
+                    onClick={handleDeleteSelectedReceipts}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Xóa {selectedReceipts.size} phiếu
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -622,16 +632,20 @@ const InventoryHistorySection: React.FC<{
                                 <span className="font-semibold">
                                   {item.quantity} x {item.partName}
                                 </span>
-                                <div className="text-xs text-slate-400">
-                                  {formatCurrency(item.unitPrice || 0)} / sản
-                                  phẩm
-                                </div>
+                                  {canViewImportPrice && (
+                                    <div className="text-xs text-slate-400">
+                                      {formatCurrency(item.unitPrice || 0)} / sản
+                                      phẩm
+                                    </div>
+                                  )}
                               </div>
-                              <span className="font-bold text-slate-900 dark:text-white">
-                                {formatCurrency(
-                                  item.quantity * (item.unitPrice || 0)
-                                )}
-                              </span>
+                              {canViewImportPrice && (
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                  {formatCurrency(
+                                    item.quantity * (item.unitPrice || 0)
+                                  )}
+                                </span>
+                              )}
                             </div>
                           ))}
                           {hasMore && (
@@ -695,17 +709,19 @@ const InventoryHistorySection: React.FC<{
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-3 border-t border-dashed border-slate-200 dark:border-slate-700">
-                    <button
-                      onClick={() =>
-                        setEditingReceipt({
-                          ...receipt,
-                          date: new Date(receipt.date),
-                        })
-                      }
-                      className="flex-1 min-w-[120px] px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-medium"
-                    >
-                      Chỉnh sửa
-                    </button>
+                    {canEditReceipt && (
+                      <button
+                        onClick={() =>
+                          setEditingReceipt({
+                            ...receipt,
+                            date: new Date(receipt.date),
+                          })
+                        }
+                        className="flex-1 min-w-[120px] px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-medium"
+                      >
+                        Chỉnh sửa
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -794,10 +810,12 @@ const InventoryHistorySection: React.FC<{
                                     {item.quantity} x
                                   </span>{" "}
                                   {item.partName}
-                                  <span className="text-slate-400 ml-1">
-                                    (Nhập: {formatCurrency(item.unitPrice || 0)}
-                                    )
-                                  </span>
+                                  {canViewImportPrice && (
+                                    <span className="text-slate-400 ml-1">
+                                      (Nhập: {formatCurrency(item.unitPrice || 0)}
+                                      )
+                                    </span>
+                                  )}
                                   {sellingPrice > 0 && (
                                     <span className="text-emerald-600 dark:text-emerald-400 ml-1">
                                       • Bán: {formatCurrency(sellingPrice)}
@@ -892,30 +910,32 @@ const InventoryHistorySection: React.FC<{
 
                   {/* Cột 5: Thao tác */}
                   <div className="col-span-1">
-                    <button
-                      onClick={() =>
-                        setEditingReceipt({
-                          ...receipt,
-                          date: new Date(receipt.date),
-                        })
-                      }
-                      className="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded transition-colors"
-                      title="Chỉnh sửa"
-                    >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                    {canEditReceipt && (
+                      <button
+                        onClick={() =>
+                          setEditingReceipt({
+                            ...receipt,
+                            date: new Date(receipt.date),
+                          })
+                        }
+                        className="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded transition-colors"
+                        title="Chỉnh sửa"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1198,7 +1218,7 @@ const InventoryHistorySection: React.FC<{
       />
 
       {/* Print Barcode Modal for selected receipts */}
-      {showPrintBarcodeModal && partsForBarcodePrint.length > 0 && (
+      {showPrintBarcodeModal && canPrintBarcode && partsForBarcodePrint.length > 0 && (
         <BatchPrintBarcodeModal
           parts={partsForBarcodePrint}
           currentBranchId={currentBranchId || ''}

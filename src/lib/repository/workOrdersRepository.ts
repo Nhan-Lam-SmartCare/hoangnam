@@ -154,13 +154,6 @@ async function syncTechnicianAndLaborFallback(
 function normalizeWorkOrder(row: any): WorkOrder {
   // DEBUG LOG
   if (row.id && (row.notes || row.issuedescription || row.partsused)) {
-    console.log("[normalizeWorkOrder] Row Data:", {
-      id: row.id,
-      notes: row.notes,
-      issueDesc: row.issuedescription,
-      mappedNotes: row.notes || "",
-      mappedIssueDesc: row.issuedescription || row.issueDescription || row.notes || ""
-    });
   }
   return {
     id: row.id,
@@ -275,12 +268,6 @@ export async function fetchWorkOrders(): Promise<RepoResult<WorkOrder[]>> {
       .order("creationDate", { ascending: false }) // Fixed casing
       .limit(100); // Only load 100 most recent orders
 
-    console.log("[fetchWorkOrders] Raw data from DB:", data);
-    console.log(
-      "[fetchWorkOrders] Status values:",
-      data?.map((d) => ({ id: d.id, status: d.status }))
-    );
-
     if (error)
       return failure({
         code: "supabase",
@@ -304,6 +291,8 @@ export async function fetchWorkOrdersFiltered(options?: {
   daysBack?: number;
   status?: string;
   branchId?: string;
+  ownerUserId?: string;
+  ownerDisplayName?: string;
 }): Promise<RepoResult<WorkOrder[]>> {
   try {
     const {
@@ -311,38 +300,106 @@ export async function fetchWorkOrdersFiltered(options?: {
       daysBack = 7, // Default 7 days back
       status,
       branchId,
+      ownerUserId,
+      ownerDisplayName,
     } = options || {};
 
-    let query = supabase
-      .from(WORK_ORDERS_TABLE)
-      .select("*")
-      .order("creationDate", { ascending: false }) // Fixed casing
-      .limit(limit);
+    const normalizedOwnerId = String(ownerUserId || "").trim();
+    const normalizedOwnerName = String(ownerDisplayName || "").trim().toLowerCase();
 
-    // Filter by date (last N days) - if daysBack is 0, load all
-    if (daysBack > 0) {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - daysBack);
-      query = query.gte("creationDate", startDate.toISOString()); // Fixed casing
+    const applyCommonFilters = (query: any) => {
+      let nextQuery = query
+        .order("creationDate", { ascending: false }) // Fixed casing
+        .limit(limit);
+
+      // Filter by date (last N days) - if daysBack is 0, load all
+      if (daysBack > 0) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - daysBack);
+        nextQuery = nextQuery.gte("creationDate", startDate.toISOString()); // Fixed casing
+      }
+
+      // Filter by status
+      if (status && status !== "all") {
+        nextQuery = nextQuery.eq("status", status);
+      }
+
+      // Filter by branch
+      if (branchId && branchId !== "all") {
+        nextQuery = nextQuery.eq("branchId", branchId); // Fixed casing
+      }
+
+      return nextQuery;
+    };
+
+    const isMissingColumnError = (err: any, columnName: string) => {
+      const code = String(err?.code || "").toUpperCase();
+      const message = String(err?.message || "").toLowerCase();
+      const details = String(err?.details || "").toLowerCase();
+      const hint = String(err?.hint || "").toLowerCase();
+      const needle = columnName.toLowerCase();
+      return (
+        code === "PGRST204" ||
+        message.includes("column") ||
+        details.includes("column") ||
+        hint.includes("column")
+      ) && (message.includes(needle) || details.includes(needle) || hint.includes(needle));
+    };
+
+    let data: any[] | null = null;
+    let error: any = null;
+
+    if (normalizedOwnerId) {
+      const ownerColumns = ["created_by", "createdBy", "createdby"];
+
+      for (let i = 0; i < ownerColumns.length; i++) {
+        const ownerColumn = ownerColumns[i];
+        const query = applyCommonFilters(
+          supabase.from(WORK_ORDERS_TABLE).select("*")
+        ).eq(ownerColumn, normalizedOwnerId);
+
+        const res = await query;
+        data = res.data;
+        error = res.error;
+
+        if (!error) {
+          break;
+        }
+
+        // Try next ownership column when current schema does not have this column.
+        if (isMissingColumnError(error, ownerColumn) && i < ownerColumns.length - 1) {
+          continue;
+        }
+
+        break;
+      }
+
+      // Final fallback for old schema: filter by assigned technician name to avoid showing all tickets.
+      if (error && isMissingColumnError(error, "createdby")) {
+        const fallbackRes = await applyCommonFilters(
+          supabase.from(WORK_ORDERS_TABLE).select("*")
+        );
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+        if (!error) {
+          if (!normalizedOwnerName) {
+            data = [];
+          } else {
+            const allOrders = (data || []).map(normalizeWorkOrder);
+            const filteredByTechnician = allOrders.filter(
+              (order) => String(order.technicianName || "").trim().toLowerCase() === normalizedOwnerName
+            );
+            return success(await attachRepairServices(filteredByTechnician));
+          }
+        }
+      }
+    } else {
+      const res = await applyCommonFilters(
+        supabase.from(WORK_ORDERS_TABLE).select("*")
+      );
+      data = res.data;
+      error = res.error;
     }
-
-    // Filter by status
-    if (status && status !== "all") {
-      query = query.eq("status", status);
-    }
-
-    // Filter by branch
-    if (branchId && branchId !== "all") {
-      query = query.eq("branchId", branchId); // Fixed casing
-    }
-
-    const { data, error } = await query;
-
-    console.log(
-      `[fetchWorkOrdersFiltered] Loaded ${data?.length || 0
-      } orders (limit: ${limit}, daysBack: ${daysBack === 0 ? "ALL" : daysBack
-      })`
-    );
 
     if (error)
       return failure({
@@ -382,6 +439,8 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
     // 🔹 FALLBACK: Use direct insert since RPC function is missing/broken on user's DB
     // Map input to DB columns (based on supabase_complete_setup.sql)
+    const creatorId = (input as any).created_by || (input as any).createdBy || null;
+
     const newOrder = {
       id: input.id,
       "creationDate": input.creationDate || new Date().toISOString(),
@@ -410,11 +469,35 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       // For now, simpler insert to ensure SAVE works.
     };
 
-    const { data, error } = await supabase
-      .from(WORK_ORDERS_TABLE)
-      .insert(newOrder)
-      .select()
-      .single();
+    const insertPayloads: Array<Record<string, any>> = creatorId
+      ? [
+        { ...newOrder, created_by: creatorId },
+        { ...newOrder, createdBy: creatorId },
+        { ...newOrder, createdby: creatorId },
+        { ...newOrder },
+      ]
+      : [{ ...newOrder }];
+
+    let data: any = null;
+    let error: any = null;
+
+    for (const payload of insertPayloads) {
+      const sanitizedPayload = Object.fromEntries(
+        Object.entries(payload).filter(([, value]) => value !== undefined)
+      );
+      const res = await supabase
+        .from(WORK_ORDERS_TABLE)
+        .insert(sanitizedPayload)
+        .select()
+        .single();
+
+      data = res.data;
+      error = res.error;
+
+      if (!error) {
+        break;
+      }
+    }
 
     if (error) {
       console.error("[createWorkOrderAtomic] Insert Error:", error);

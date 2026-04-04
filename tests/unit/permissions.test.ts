@@ -47,8 +47,8 @@ describe("Permissions", () => {
     describe("staff role", () => {
       const role: UserRole = "staff";
 
-      it("should only have access to reports.view", () => {
-        expect(canDo(role, "reports.view")).toBe(true);
+      it("should not have default admin/report privileges", () => {
+        expect(canDo(role, "reports.view")).toBe(false);
       });
 
       it("should NOT have access to restricted actions", () => {

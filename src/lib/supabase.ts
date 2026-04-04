@@ -229,13 +229,7 @@ export const supabaseHelpers = {
 
     if (error) throw error;
 
-    console.log(
-      "[supabase.getCashTransactions] Raw data from DB:",
-      data?.length,
-      "records"
-    );
     if (data?.length) {
-      console.log("[supabase.getCashTransactions] Sample record:", data[0]);
     }
 
     // Map DB columns to TypeScript interface (handle both lowercase and camelCase)
@@ -258,11 +252,6 @@ export const supabaseHelpers = {
           : "expense"),
     }));
 
-    console.log(
-      "[supabase.getCashTransactions] Mapped data:",
-      mapped?.length,
-      "records"
-    );
     return mapped;
   },
 

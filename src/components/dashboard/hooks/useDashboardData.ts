@@ -400,7 +400,6 @@ export const useDashboardData = (
         const startDateStr = formatLocalDate(startDate);
         const endDateStr = formatLocalDate(endDate);
 
-        console.log(`[TopProducts] Filter range: ${startDateStr} to ${endDateStr}`);
 
         const productSales: Record<string, { name: string; quantity: number }> = {};
 
@@ -418,7 +417,6 @@ export const useDashboardData = (
 
                 // DEBUG: Trace specific product
                 if (pName.toLowerCase().includes("elf")) {
-                    console.log(`[TopProducts-DEBUG] Found ELF in Sale: ${sale.id} | Date: ${sale.date} | Item: ${pName} | Qty: ${item.quantity} | ID: ${pId}`);
                 }
 
                 if (!pId) return;
@@ -433,7 +431,6 @@ export const useDashboardData = (
             });
         });
 
-        console.log(`[TopProducts] Processed ${filteredSales.length} sales`);
 
         // From work orders (filtered)
         const filteredWOs = workOrders.filter((wo: any) => {
@@ -457,7 +454,6 @@ export const useDashboardData = (
 
                     // DEBUG: Trace specific product
                     if (partName && partName.toLowerCase().includes("elf")) {
-                        console.log(`[TopProducts-DEBUG] Found ELF in WO: ${wo.id} | Date: ${wo.creationDate || wo.creationdate} | Item: ${partName} | Qty: ${qty} | ID: ${partId}`);
                     }
 
                     if (partId && partName) {
@@ -473,13 +469,11 @@ export const useDashboardData = (
             }
         });
 
-        console.log(`[TopProducts] Processed ${filteredWOs.length} work orders`);
 
         const result = Object.values(productSales)
             .sort((a, b) => b.quantity - a.quantity)
             .slice(0, 10); // Show top 10
 
-        console.log("[TopProducts] Result:", result);
         return result;
 
     }, [sales, workOrders, reportFilter]);

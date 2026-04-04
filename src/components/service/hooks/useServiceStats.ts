@@ -107,15 +107,26 @@ export function useServiceStats({
             (o) => o.status === "Trả máy"
         ).length;
 
-        // Calculate revenue from paid orders
+        // Calculate realized revenue from paid/partial orders
         const filteredRevenue = dateFilteredOrders
-            .filter((o) => o.paymentStatus === "paid")
-            .reduce((sum, o) => sum + o.total, 0);
-
-        // Calculate profit = Revenue - Cost (parts + services)
-        const filteredProfit = dateFilteredOrders
-            .filter((o) => o.paymentStatus === "paid")
+            .filter((o) => o.paymentStatus === "paid" || (o.paymentStatus === "partial" && Number(o.totalPaid || 0) > 0))
             .reduce((sum, o) => {
+                const recognizedRevenue = Number(
+                    o.paymentStatus === "paid" ? (o.total || 0) : (o.totalPaid || 0)
+                );
+                return sum + recognizedRevenue;
+            }, 0);
+
+        // Calculate recognized profit = recognized revenue - recognized cost
+        const filteredProfit = dateFilteredOrders
+            .filter((o) => o.paymentStatus === "paid" || (o.paymentStatus === "partial" && Number(o.totalPaid || 0) > 0))
+            .reduce((sum, o) => {
+                const recognizedRevenue = Number(
+                    o.paymentStatus === "paid" ? (o.total || 0) : (o.totalPaid || 0)
+                );
+                const orderTotal = Number(o.total || 0);
+                const recognitionRatio = orderTotal > 0 ? Math.min(1, recognizedRevenue / orderTotal) : 0;
+
                 // Parts cost with fallback lookup
                 const partsCost = o.partsUsed?.reduce(
                     (s: number, p: WorkOrderPart) => {
@@ -136,7 +147,8 @@ export function useServiceStats({
                     0
                 ) || 0;
 
-                return sum + (o.total - partsCost - servicesCost);
+                const recognizedCost = (partsCost + servicesCost) * recognitionRatio;
+                return sum + (recognizedRevenue - recognizedCost);
             }, 0);
 
         return {

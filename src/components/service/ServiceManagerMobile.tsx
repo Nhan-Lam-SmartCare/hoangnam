@@ -34,7 +34,6 @@ import {
   formatWorkOrderId,
 } from "../../utils/format";
 import { useAuth } from "../../contexts/AuthContext";
-import { canDo } from "../../utils/permissions";
 import { ServiceHistory } from "./ServiceHistory";
 import { useRepairTemplates, type RepairTemplate } from "../../hooks/useRepairTemplatesRepository";
 
@@ -44,6 +43,11 @@ import Skeleton, { CardSkeleton } from "../common/Skeleton";
 
 interface ServiceManagerMobileProps {
   workOrders: WorkOrder[];
+  canCreateWorkOrder?: boolean;
+  canUpdateWorkOrder?: boolean;
+  canDeleteWorkOrder?: boolean;
+  canPrintWorkOrder?: boolean;
+  canViewServiceHistory?: boolean;
   onCreateWorkOrder: () => void;
   onEditWorkOrder: (workOrder: WorkOrder) => void;
   onDeleteWorkOrder: (workOrder: WorkOrder) => void;
@@ -74,6 +78,8 @@ const WorkOrderCard = React.memo(({
   onCall,
   onPrint,
   onDelete,
+  canEdit,
+  canPrint,
   canDelete,
 }: {
   workOrder: WorkOrder;
@@ -81,6 +87,8 @@ const WorkOrderCard = React.memo(({
   onCall: (phone: string) => void;
   onPrint: (wo: WorkOrder) => void;
   onDelete: (wo: WorkOrder) => void;
+  canEdit: boolean;
+  canPrint: boolean;
   canDelete: boolean;
 }) => {
   const getStatusMeta = (status: string) => {
@@ -208,16 +216,18 @@ const WorkOrderCard = React.memo(({
         </button>
         <button
           onClick={() => onPrint(workOrder)}
-          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
-          title="In"
+          disabled={!canPrint}
+          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50 disabled:text-slate-600"
+          title={canPrint ? "In" : "Không có quyền in"}
         >
           <Printer className="w-3.5 h-3.5" />
           <span className="text-[11px] font-medium">In</span>
         </button>
         <button
           onClick={() => onEdit(workOrder)}
-          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
-          title="Sửa"
+          disabled={!canEdit}
+          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50 disabled:text-slate-600"
+          title={canEdit ? "Sửa" : "Không có quyền sửa"}
         >
           <Edit2 className="w-3.5 h-3.5" />
           <span className="text-[11px] font-medium">Sửa</span>
@@ -332,6 +342,11 @@ const WorkOrderActionDrawer = ({
 
 export function ServiceManagerMobile({
   workOrders,
+  canCreateWorkOrder = true,
+  canUpdateWorkOrder = true,
+  canDeleteWorkOrder = true,
+  canPrintWorkOrder = true,
+  canViewServiceHistory = true,
   onCreateWorkOrder,
   onEditWorkOrder,
   onDeleteWorkOrder,
@@ -372,6 +387,7 @@ export function ServiceManagerMobile({
 
   // Debounced create work order handler to prevent duplicate creation
   const handleCreateWorkOrder = useCallback(() => {
+    if (!canCreateWorkOrder) return;
     if (isCreating) return;
 
     setIsCreating(true);
@@ -381,7 +397,7 @@ export function ServiceManagerMobile({
     setTimeout(() => {
       setIsCreating(false);
     }, 2000);
-  }, [isCreating, onCreateWorkOrder]);
+  }, [canCreateWorkOrder, isCreating, onCreateWorkOrder]);
 
   // Filter work orders by date first
   const dateFilteredWorkOrders = useMemo(() => {
@@ -430,33 +446,29 @@ export function ServiceManagerMobile({
         case "Trả máy": traMay++; break;
       }
 
-      // Calculate Revenue & Profit for paid orders
+      // Realized revenue/profit: include paid and partial orders with collected amount.
       if (w.paymentStatus === "paid" || (w.paymentStatus === "partial" && (w.totalPaid || 0) > 0)) {
-        // Fix: Use totalPaid for partial payments, total for fully paid
-        // Actually for revenue typically we want realized revenue (cash in)
-        // But the previous code used w.total. Let's stick to w.total for consistency with desktop 
-        // if desktop uses total. But wait, previous mobile code used w.total ONLY if paid.
-        // Let's stick to previous logic: only count if "paid".
-        // MODIFY: Also count if partial? The user screenshot shows "paid" icon.
+        const recognizedRevenue = Number(
+          w.paymentStatus === "paid" ? (w.total || 0) : (w.totalPaid || 0)
+        );
+        doanhThu += recognizedRevenue;
 
-        // Reverting to previous logic strictly but ensuring we use the date filtered list
-        if (w.paymentStatus === "paid") {
-          const total = w.total || 0;
-          doanhThu += total;
+        // Estimate recognized cost proportionally for partial collection.
+        const total = Number(w.total || 0);
+        const recognitionRatio = total > 0 ? Math.min(1, recognizedRevenue / total) : 0;
 
-          // Calculate costs
-          const partsCost = w.partsUsed?.reduce(
-            (s, p) => s + (p.costPrice || 0) * (p.quantity || 1),
-            0
-          ) || 0;
+        const partsCost = w.partsUsed?.reduce(
+          (s, p) => s + (p.costPrice || 0) * (p.quantity || 1),
+          0
+        ) || 0;
 
-          const servicesCost = w.additionalServices?.reduce(
-            (s, svc) => s + (svc.costPrice || 0) * (svc.quantity || 1),
-            0
-          ) || 0;
+        const servicesCost = w.additionalServices?.reduce(
+          (s, svc) => s + (svc.costPrice || 0) * (svc.quantity || 1),
+          0
+        ) || 0;
 
-          loiNhuan += (total - partsCost - servicesCost);
-        }
+        const recognizedCost = (partsCost + servicesCost) * recognitionRatio;
+        loiNhuan += recognizedRevenue - recognizedCost;
       }
     });
 
@@ -507,8 +519,6 @@ export function ServiceManagerMobile({
     });
   }, [dateFilteredWorkOrders, statusFilter, searchQuery]);
 
-  const canDeleteWorkOrder = canDo(profile?.role, "work_order.delete");
-
   return (
     <div className="md:hidden flex flex-col h-[100dvh] bg-[#0f131b]">
       {/* SEARCH BAR & TAB NAVIGATION - Always visible */}
@@ -517,9 +527,15 @@ export function ServiceManagerMobile({
           <button onClick={() => setActiveTab('orders')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'orders' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Phiếu SC
           </button>
-          <button onClick={() => setActiveTab('history')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'history' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
-            Lịch sử
-          </button>
+          {canViewServiceHistory ? (
+            <button onClick={() => setActiveTab('history')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'history' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
+              Lịch sử
+            </button>
+          ) : (
+            <button disabled className="py-1.5 text-[11px] font-semibold rounded-lg transition-all border bg-transparent text-slate-600 border-[#27364e] opacity-60">
+              Lịch sử
+            </button>
+          )}
           <button onClick={() => setActiveTab('templates')} className={`py-1.5 text-[11px] font-semibold rounded-lg transition-all border ${activeTab === 'templates' ? 'bg-[#193a63] text-[#5cb3ff] border-[#2f6ea8]' : 'bg-transparent text-slate-400 border-[#27364e]'}`}>
             Mẫu SC
           </button>
@@ -749,13 +765,15 @@ export function ServiceManagerMobile({
                       <p className="text-slate-600 dark:text-gray-500 mb-6">
                         Hãy tạo phiếu đầu tiên để quản lý dịch vụ sửa chữa
                       </p>
-                      <button
-                        onClick={handleCreateWorkOrder}
-                        disabled={isCreating}
-                        className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        + Tạo phiếu mới
-                      </button>
+                      {canCreateWorkOrder && (
+                        <button
+                          onClick={handleCreateWorkOrder}
+                          disabled={isCreating}
+                          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          + Tạo phiếu mới
+                        </button>
+                      )}
                     </div>
                   ) : (
                     filteredWorkOrders.map((workOrder) => (
@@ -766,6 +784,8 @@ export function ServiceManagerMobile({
                         onCall={onCallCustomer}
                         onPrint={onPrintWorkOrder}
                         onDelete={onDeleteWorkOrder}
+                        canEdit={canUpdateWorkOrder}
+                        canPrint={canPrintWorkOrder}
                         canDelete={canDeleteWorkOrder}
                       />
                     ))
@@ -775,22 +795,30 @@ export function ServiceManagerMobile({
             </PullToRefresh>
 
             {/* FAB (Floating Action Button) */}
-            <button
-              onClick={handleCreateWorkOrder}
-              disabled={isCreating}
-              className="fixed bottom-[4.25rem] right-3 w-11 h-11 bg-gradient-to-br from-[#009ef7] to-[#0077b6] rounded-full shadow-xl shadow-[#009ef7]/50 flex items-center justify-center hover:from-[#0077b6] hover:to-[#005a8a] transition-all z-[60] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Tạo phiếu mới"
-            >
-              <Plus className="w-4 h-4 text-white" />
-            </button>
+            {canCreateWorkOrder && (
+              <button
+                onClick={handleCreateWorkOrder}
+                disabled={isCreating}
+                className="fixed bottom-[4.25rem] right-3 w-11 h-11 bg-gradient-to-br from-[#009ef7] to-[#0077b6] rounded-full shadow-xl shadow-[#009ef7]/50 flex items-center justify-center hover:from-[#0077b6] hover:to-[#005a8a] transition-all z-[60] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Tạo phiếu mới"
+              >
+                <Plus className="w-4 h-4 text-white" />
+              </button>
+            )}
           </>
         )}
 
         {/* HISTORY TAB */}
         {activeTab === "history" && (
-          <div className="h-full overflow-y-auto pb-24 scrollbar-hide">
-            <ServiceHistory currentBranchId={currentBranchId} />
-          </div>
+          canViewServiceHistory ? (
+            <div className="h-full overflow-y-auto pb-24 scrollbar-hide">
+              <ServiceHistory currentBranchId={currentBranchId} />
+            </div>
+          ) : (
+            <div className="h-full overflow-y-auto pb-24 scrollbar-hide flex items-center justify-center text-slate-500 text-sm">
+              Bạn không có quyền xem lịch sử sửa chữa
+            </div>
+          )
         )}
 
         {/* TEMPLATES TAB */}

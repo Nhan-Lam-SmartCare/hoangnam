@@ -23,7 +23,6 @@ export class ErrorBoundary extends React.Component<
       error.message.includes("Loading chunk");
 
     if (isChunkError) {
-      console.log("Chunk load error detected. Attempting to reload...");
       // Check last reload to prevent infinite loop
       const lastReload = parseInt(sessionStorage.getItem('last_chunk_error_reload') || '0');
       const now = Date.now();

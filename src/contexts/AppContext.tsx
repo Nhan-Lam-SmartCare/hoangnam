@@ -388,12 +388,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             // Nếu tìm thấy khách hàng với cùng SĐT - CẬP NHẬT thay vì báo lỗi
             if (duplicates && duplicates.length > 0) {
               const existingId = duplicates[0].id;
-              console.log(
-                "Khách hàng đã tồn tại với SĐT này, chuyển sang UPDATE:",
-                customer.phone,
-                "ID:",
-                existingId
-              );
 
               // Cập nhật thông tin khách hàng hiện có (merge vehicles nếu cần)
               const existingVehicles = duplicates[0].vehicles || [];
@@ -439,7 +433,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               if (updateError) {
                 console.error("Lỗi cập nhật khách hàng:", updateError);
               } else {
-                console.log("Đã cập nhật khách hàng:", existingId);
               }
 
               // Cập nhật local state với ID thực của khách hàng

@@ -55,6 +55,8 @@ interface Props {
   setShowAddProductModal: (show: boolean) => void;
   onAddNewProduct: (productData: any) => void;
   currentBranchId: string;
+  canViewImportPrice?: boolean;
+  canCreatePart?: boolean;
   isSubmitting?: boolean;
 }
 
@@ -83,6 +85,8 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
   setShowAddProductModal,
   onAddNewProduct,
   currentBranchId,
+  canViewImportPrice = true,
+  canCreatePart = false,
   isSubmitting = false,
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
@@ -93,12 +97,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
   const [showBarcodeInput, setShowBarcodeInput] = useState(false);
   const { data: suppliers = [] } = useSuppliers();
 
-  console.log(
-    "🔍 GoodsReceiptMobileModal - parts:",
-    parts?.length || 0,
-    parts?.slice(0, 2)
-  );
-  console.log("🔍 searchTerm:", searchTerm);
+
 
   const filteredParts =
     parts?.filter((part) => {
@@ -110,7 +109,6 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
       );
     }) || [];
 
-  console.log("🔍 filteredParts:", filteredParts?.length || 0);
 
   const addToReceipt = (part: Part) => {
     const existing = receiptItems.find((item) => item.partId === part.id);
@@ -131,7 +129,9 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
           partName: part.name,
           sku: part.sku,
           quantity: 1,
-          importPrice: part.costPrice?.[currentBranchId] || 0,
+          importPrice: canViewImportPrice
+            ? part.costPrice?.[currentBranchId] || 0
+            : 0,
           sellingPrice: part.retailPrice?.[currentBranchId] || 0,
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
         },
@@ -166,15 +166,16 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
           autoClose: 3000,
         }
       );
-      setTimeout(() => {
-        setShowAddProductModal(true);
-      }, 500);
+      if (canCreatePart) {
+        setTimeout(() => {
+          setShowAddProductModal(true);
+        }, 500);
+      }
     }
   };
 
   // Handle camera scan result - Modal tự đóng sau khi quét
   const handleCameraScan = (barcode: string) => {
-    console.log("📷 Camera scanned:", barcode);
 
     // Normalize barcode để so sánh - loại bỏ dấu gạch, khoảng trắng
     const normalizeCode = (code: string): string =>
@@ -232,7 +233,9 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
             partName: foundPart.name,
             sku: foundPart.sku,
             quantity: 1,
-            importPrice: foundPart.costPrice?.[currentBranchId] || 0,
+            importPrice: canViewImportPrice
+              ? foundPart.costPrice?.[currentBranchId] || 0
+              : 0,
             sellingPrice: foundPart.retailPrice?.[currentBranchId] || 0,
             wholesalePrice: foundPart.wholesalePrice?.[currentBranchId] || 0,
           },
@@ -244,9 +247,11 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
       // Sản phẩm chưa có trong kho - mở form thêm mới
       showToast.info(`Sản phẩm mã ${barcode} chưa có.`);
       setBarcodeInput(barcode);
-      setTimeout(() => {
-        setShowAddProductModal(true);
-      }, 500);
+      if (canCreatePart) {
+        setTimeout(() => {
+          setShowAddProductModal(true);
+        }, 500);
+      }
     }
   };
 
@@ -522,6 +527,17 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                     </svg>
                   </button>
                 </div>
+
+                {/* Quick add new product at top for faster operation */}
+                {canCreatePart && (
+                  <button
+                    onClick={() => setShowAddProductModal(true)}
+                    className="w-full py-2.5 border-2 border-dashed border-blue-300 dark:border-blue-700 rounded-xl text-blue-600 dark:text-blue-400 hover:border-blue-500 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center justify-center gap-2 bg-blue-50/50 dark:bg-blue-900/10"
+                  >
+                    <span className="text-lg leading-none">+</span>
+                    <span className="font-semibold text-sm">Tạo sản phẩm mới</span>
+                  </button>
+                )}
               </div>
 
               {/* Product List */}
@@ -571,16 +587,18 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                                 )}
                               </div>
                               <div className="mt-2 flex gap-3 text-xs">
-                                <div>
-                                  <span className="text-slate-500 dark:text-slate-400">
-                                    Nhập:{" "}
-                                  </span>
-                                  <span className="font-medium text-orange-600 dark:text-orange-400">
-                                    {formatCurrency(
-                                      part.costPrice?.[currentBranchId] || 0
-                                    )}
-                                  </span>
-                                </div>
+                                {canViewImportPrice && (
+                                  <div>
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                      Nhập:{" "}
+                                    </span>
+                                    <span className="font-medium text-orange-600 dark:text-orange-400">
+                                      {formatCurrency(
+                                        part.costPrice?.[currentBranchId] || 0
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
                                 <div>
                                   <span className="text-slate-500 dark:text-slate-400">
                                     Bán:{" "}
@@ -595,8 +613,10 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                               {inCart && (
                                 <div className="mt-2 text-sm">
                                   <span className="text-blue-600 dark:text-blue-400 font-medium">
-                                    Đã thêm: {inCart.quantity} ×{" "}
-                                    {formatCurrency(inCart.importPrice)}
+                                    Đã thêm: {inCart.quantity}
+                                    {canViewImportPrice
+                                      ? ` × ${formatCurrency(inCart.importPrice)}`
+                                      : ""}
                                   </span>
                                 </div>
                               )}
@@ -613,15 +633,6 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                     })}
                   </div>
                 )}
-
-                {/* Add New Product Button */}
-                <button
-                  onClick={() => setShowAddProductModal(true)}
-                  className="w-full mt-3 py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <span className="text-2xl">+</span>
-                  <span className="font-medium">Tạo sản phẩm mới</span>
-                </button>
               </div>
 
               {/* Floating Cart Footer */}
