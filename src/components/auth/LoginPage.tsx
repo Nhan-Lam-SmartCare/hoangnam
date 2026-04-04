@@ -59,7 +59,7 @@ export const LoginPage = () => {
       }
 
       showToast.success("Đăng nhập thành công!");
-      navigate("/dashboard");
+      navigate("/");
     } catch (err: unknown) {
       console.error("Login error:", err);
       const errorMessage =
@@ -116,7 +116,7 @@ export const LoginPage = () => {
   const handleMFASuccess = () => {
     completeMFAVerification();
     showToast.success("Đăng nhập thành công!");
-    navigate("/dashboard");
+    navigate("/");
   };
 
   const handleMFACancel = async () => {

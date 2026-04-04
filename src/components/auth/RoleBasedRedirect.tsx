@@ -20,7 +20,7 @@ export const RoleBasedRedirect: React.FC = () => {
 
     // Redirect based on role
     if (profile?.role === "staff") {
-        return <Navigate to="/staff-dashboard" replace />;
+        return <Navigate to="/service" replace />;
     }
 
     // Default for owner, manager, and others

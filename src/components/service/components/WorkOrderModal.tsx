@@ -255,6 +255,36 @@ const WorkOrderModal: React.FC<{
       useUpdateWorkOrderAtomicRepo();
     const { data: serviceConfigs = [] } = useServiceConfigs();
     const employeeOptions = employees as Employee[];
+    const defaultTechnicianName = useMemo(() => {
+      const normalizedProfileEmail = String(profile?.email || "")
+        .trim()
+        .toLowerCase();
+      const normalizedProfileName = String(profile?.name || profile?.full_name || "")
+        .trim()
+        .toLowerCase();
+
+      if (!normalizedProfileEmail && !normalizedProfileName) return "";
+
+      const activeEmployees = (employees || []).filter(
+        (emp) => emp?.status === "active"
+      );
+
+      const matchedByEmail = activeEmployees.find(
+        (emp) =>
+          String(emp?.email || "")
+            .trim()
+            .toLowerCase() === normalizedProfileEmail
+      );
+      if (matchedByEmail?.name) return matchedByEmail.name;
+
+      const matchedByName = activeEmployees.find(
+        (emp) =>
+          String(emp?.name || "")
+            .trim()
+            .toLowerCase() === normalizedProfileName
+      );
+      return matchedByName?.name || "";
+    }, [employees, profile?.email, profile?.name, profile?.full_name]);
 
     const [formData, setFormData] = useState<Partial<WorkOrder>>(() => {
       if (order?.id) return order;
@@ -267,7 +297,7 @@ const WorkOrderModal: React.FC<{
         vehicleId: order?.vehicleId || "",
         currentKm: order?.currentKm || undefined,
         issueDescription: order?.issueDescription || "",
-        technicianName: order?.technicianName || "",
+        technicianName: order?.technicianName || defaultTechnicianName,
         status: order?.status || "Tiếp nhận",
         laborCost: order?.laborCost || 0,
         discount: order?.discount || 0,
@@ -444,6 +474,19 @@ const WorkOrderModal: React.FC<{
       setEditCustomerName("");
       setEditCustomerPhone("");
     }, [order]);
+
+    useEffect(() => {
+      if (order?.id) return;
+      if (!defaultTechnicianName) return;
+
+      setFormData((prev) => {
+        if (String(prev.technicianName || "").trim()) return prev;
+        return {
+          ...prev,
+          technicianName: defaultTechnicianName,
+        };
+      });
+    }, [order?.id, defaultTechnicianName]);
 
     // Search customers from Supabase when search term changes
     useEffect(() => {
