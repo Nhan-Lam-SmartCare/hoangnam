@@ -6,6 +6,11 @@ import { useSuppliers } from "../../hooks/useSuppliers";
 import { showToast } from "../../utils/toast";
 import BarcodeScannerModal from "../common/BarcodeScannerModal";
 import { NumberInput } from "../common/NumberInput";
+import {
+  calcSellingFromRule,
+  getCategoryPricingRule,
+  type RoundingRule,
+} from "../../utils/categoryPricingRules";
 
 interface Part {
   id: string;
@@ -28,7 +33,16 @@ interface ReceiptItem {
   laborCost?: number;
   sellingPrice: number;
   wholesalePrice: number;
+  markupPercent: number;
+  roundingRule: RoundingRule;
 }
+
+const DEFAULT_MARKUP_PERCENT = 50;
+
+const calcMarkupPercent = (importPrice: number, sellingPrice: number) => {
+  if (importPrice <= 0 || sellingPrice <= 0) return DEFAULT_MARKUP_PERCENT;
+  return Math.max(0, Math.round(((sellingPrice / importPrice) - 1) * 100));
+};
 
 interface Props {
   isOpen: boolean;
@@ -122,6 +136,10 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
       );
       showToast.success(`Đã tăng số lượng ${part.name}`);
     } else {
+      const rule = getCategoryPricingRule(part.category || "");
+      const importPrice = canViewImportPrice
+        ? part.costPrice?.[currentBranchId] || 0
+        : 0;
       setReceiptItems((items) => [
         ...items,
         {
@@ -129,11 +147,15 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
           partName: part.name,
           sku: part.sku,
           quantity: 1,
-          importPrice: canViewImportPrice
-            ? part.costPrice?.[currentBranchId] || 0
-            : 0,
-          sellingPrice: part.retailPrice?.[currentBranchId] || 0,
+          importPrice,
+          sellingPrice: calcSellingFromRule(
+            importPrice,
+            rule.markupPercent,
+            rule.roundingRule
+          ),
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
+          markupPercent: rule.markupPercent,
+          roundingRule: rule.roundingRule,
         },
       ]);
       showToast.success(`Đã thêm ${part.name} vào phiếu nhập`);
@@ -226,6 +248,10 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
         );
       } else {
         // Thêm mới - chỉ hiện 1 toast
+        const rule = getCategoryPricingRule(foundPart.category || "");
+        const importPrice = canViewImportPrice
+          ? foundPart.costPrice?.[currentBranchId] || 0
+          : 0;
         setReceiptItems((items) => [
           ...items,
           {
@@ -233,11 +259,15 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
             partName: foundPart.name,
             sku: foundPart.sku,
             quantity: 1,
-            importPrice: canViewImportPrice
-              ? foundPart.costPrice?.[currentBranchId] || 0
-              : 0,
-            sellingPrice: foundPart.retailPrice?.[currentBranchId] || 0,
+            importPrice,
+            sellingPrice: calcSellingFromRule(
+              importPrice,
+              rule.markupPercent,
+              rule.roundingRule
+            ),
             wholesalePrice: foundPart.wholesalePrice?.[currentBranchId] || 0,
+            markupPercent: rule.markupPercent,
+            roundingRule: rule.roundingRule,
           },
         ]);
         showToast.success(`Đã thêm ${foundPart.name}`);
@@ -747,10 +777,53 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                               onChange={(val) => {
                                 const updated = [...receiptItems];
                                 updated[index].importPrice = val;
+                                updated[index].sellingPrice = calcSellingFromRule(
+                                  val,
+                                  Number(
+                                    updated[index].markupPercent ||
+                                      DEFAULT_MARKUP_PERCENT
+                                  ),
+                                  updated[index].roundingRule || "integer"
+                                );
                                 setReceiptItems(updated);
                               }}
                               className="w-20 px-1 py-0.5 text-right text-sm border-b border-dashed border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500"
                             />
+                          </div>
+                          <div className="flex justify-end items-center gap-1 mb-1">
+                            <span className="text-xs text-slate-400">Tỷ lệ %:</span>
+                            <NumberInput
+                              value={item.markupPercent}
+                              onChange={(val) => {
+                                const targetCategory =
+                                  parts.find((p) => p.id === item.partId)?.category || "";
+                                const updated = [...receiptItems];
+                                const markupPercent = Math.max(0, Math.round(val));
+                                updated.forEach((entry, entryIndex) => {
+                                  const entryCategory =
+                                    parts.find((p) => p.id === entry.partId)?.category || "";
+                                  if (
+                                    entryIndex === index ||
+                                    (targetCategory && entryCategory === targetCategory)
+                                  ) {
+                                    entry.markupPercent = markupPercent;
+                                    entry.sellingPrice = calcSellingFromRule(
+                                      Number(entry.importPrice || 0),
+                                      markupPercent,
+                                      entry.roundingRule || "integer"
+                                    );
+                                  }
+                                });
+                                setReceiptItems(updated);
+                              }}
+                              className="w-16 px-1 py-0.5 text-right text-sm border-b border-dashed border-violet-300 dark:border-violet-700 bg-transparent text-violet-700 dark:text-violet-300 focus:outline-none focus:border-violet-500"
+                            />
+                          </div>
+                          <div className="flex justify-end items-center gap-1 mb-1">
+                            <span className="text-xs text-slate-400">Giá bán:</span>
+                            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                              {formatCurrency(item.sellingPrice || 0)}
+                            </span>
                           </div>
                           <div className="font-bold text-orange-600 dark:text-orange-400">
                             {formatCurrency(

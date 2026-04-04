@@ -11,6 +11,7 @@ import { useCategories, useCreateCategory } from '../../../hooks/useCategories';
 import { useSuppliers } from '../../../hooks/useSuppliers';
 import { canDo } from '../../../utils/permissions';
 import { useAuth } from '../../../contexts/AuthContext';
+import { calcSellingFromRule, getCategoryPricingRule } from '../../../utils/categoryPricingRules';
 // Add New Product Modal Component
 const AddProductModal: React.FC<{
   isOpen: boolean;
@@ -43,6 +44,16 @@ const AddProductModal: React.FC<{
   const createCategory = useCreateCategory();
   const [showInlineCat, setShowInlineCat] = useState(false);
   const [inlineCatName, setInlineCatName] = useState("");
+
+  const getSuggestedRetailPrice = (nextImportPrice: number, nextCategory: string) => {
+    const rule = getCategoryPricingRule(nextCategory || "");
+    return calcSellingFromRule(nextImportPrice, rule.markupPercent, rule.roundingRule);
+  };
+
+  useEffect(() => {
+    if (retailOverridden) return;
+    setRetailPrice(getSuggestedRetailPrice(importPrice, category));
+  }, [category, importPrice, retailOverridden]);
 
   const handleSubmit = () => {
     if (!name.trim()) {
@@ -277,7 +288,7 @@ const AddProductModal: React.FC<{
                       setImportPrice(result.clean.importPrice);
                       if (!retailOverridden) {
                         setRetailPrice(
-                          Math.round(result.clean.importPrice * 1.5)
+                          getSuggestedRetailPrice(result.clean.importPrice, category)
                         );
                       }
                     }}

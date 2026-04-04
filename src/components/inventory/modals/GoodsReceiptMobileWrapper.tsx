@@ -5,6 +5,7 @@ import { GoodsReceiptMobileModal } from '../../inventory/GoodsReceiptMobileModal
 import { showToast } from '../../../utils/toast';
 import { generateSKU } from '../../../utils/sku';
 import { useCreatePartRepo } from '../../../hooks/usePartsRepository';
+import { getCategoryPricingRule, type RoundingRule } from '../../../utils/categoryPricingRules';
 import AddProductModal from './AddProductModal';
 import type { Part } from '../../../types';
 
@@ -46,6 +47,9 @@ const GoodsReceiptMobileWrapper: React.FC<{
       importPrice: number;
       sellingPrice: number;
       wholesalePrice: number;
+      markupPercent: number;
+      laborCost?: number;
+      roundingRule: RoundingRule;
     }>
   >([]);
   const [selectedSupplier, setSelectedSupplier] = useState("");
@@ -91,6 +95,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const tempSku =
       productData.barcode?.trim() || productData.sku || generateSKU();
+    const pricingRule = getCategoryPricingRule(String(productData.category || ""));
 
     // Add to receipt items with temporary ID (marked as new product)
     setReceiptItems((items) => [
@@ -104,6 +109,19 @@ const GoodsReceiptMobileWrapper: React.FC<{
         laborCost: productData.laborCost || 0,
         sellingPrice: productData.retailPrice,
         wholesalePrice: productData.wholesalePrice || 0,
+        markupPercent:
+          Number(productData.importPrice || 0) > 0
+            ? Math.max(
+              0,
+              Math.round(
+                ((Number(productData.retailPrice || 0) /
+                  Number(productData.importPrice || 0) -
+                  1) *
+                  100)
+              )
+            )
+            : 50,
+        roundingRule: pricingRule.roundingRule,
         // Store product data for later creation when receipt is finalized
         _isNewProduct: true,
         _productData: {

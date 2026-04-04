@@ -385,6 +385,29 @@ export function ServiceManagerMobile({
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [actionOrder, setActionOrder] = useState<WorkOrder | null>(null);
 
+  const isOwnWorkOrder = useCallback(
+    (order: WorkOrder) => {
+      if (!order?.id) return true;
+
+      const currentUserId = String(profile?.id || "").trim();
+      if (!currentUserId) return false;
+
+      const creatorId = String(
+        order.created_by || order.createdBy || order.createdby || ""
+      ).trim();
+      if (creatorId) return creatorId === currentUserId;
+
+      const profileName = String(profile?.name || profile?.full_name || "")
+        .trim()
+        .toLowerCase();
+      const technicianName = String(order.technicianName || "")
+        .trim()
+        .toLowerCase();
+      return !!profileName && !!technicianName && profileName === technicianName;
+    },
+    [profile?.id, profile?.name, profile?.full_name]
+  );
+
   // Debounced create work order handler to prevent duplicate creation
   const handleCreateWorkOrder = useCallback(() => {
     if (!canCreateWorkOrder) return;
@@ -618,15 +641,15 @@ export function ServiceManagerMobile({
                     </button>
                   </div>
 
-                  {/* Doanh thu & Lợi nhuận */}
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="relative overflow-hidden rounded-xl border border-[#27364e] bg-[#171b2a] p-2.5 text-white">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-semibold text-slate-300">
-                          Doanh thu {getDateLabel()}
-                        </span>
-                        <div className="flex items-center gap-1 text-[#79dfbe]">
-                          {isOwner && (
+                  {/* Doanh thu & Lợi nhuận - chỉ chủ shop */}
+                  {isOwner && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="relative overflow-hidden rounded-xl border border-[#27364e] bg-[#171b2a] p-2.5 text-white">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-semibold text-slate-300">
+                            Doanh thu {getDateLabel()}
+                          </span>
+                          <div className="flex items-center gap-1 text-[#79dfbe]">
                             <button
                               onClick={() => setShowFinancials(!showFinancials)}
                               className="p-1 hover:bg-white/10 rounded transition-colors"
@@ -638,21 +661,19 @@ export function ServiceManagerMobile({
                                 <EyeOff className="w-3.5 h-3.5" />
                               )}
                             </button>
-                          )}
-                          <DollarSign className="w-4 h-4" />
+                            <DollarSign className="w-4 h-4" />
+                          </div>
+                        </div>
+                        <div className="text-sm font-black text-emerald-300">
+                          {showFinancials ? formatCurrency(kpis.doanhThu) : "•••••••"}
                         </div>
                       </div>
-                      <div className="text-sm font-black text-emerald-300">
-                        {showFinancials ? formatCurrency(kpis.doanhThu) : "•••••••"}
-                      </div>
-                    </div>
-                    <div className="relative overflow-hidden rounded-xl border border-[#27364e] bg-[#171b2a] p-2.5 text-white">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[11px] font-semibold text-slate-300">
-                          Lợi nhuận {getDateLabel()}
-                        </span>
-                        <div className="flex items-center gap-1 text-[#66bbff]">
-                          {isOwner && (
+                      <div className="relative overflow-hidden rounded-xl border border-[#27364e] bg-[#171b2a] p-2.5 text-white">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] font-semibold text-slate-300">
+                            Lợi nhuận {getDateLabel()}
+                          </span>
+                          <div className="flex items-center gap-1 text-[#66bbff]">
                             <button
                               onClick={() => setShowFinancials(!showFinancials)}
                               className="p-1 hover:bg-white/10 rounded transition-colors"
@@ -664,15 +685,15 @@ export function ServiceManagerMobile({
                                 <EyeOff className="w-3.5 h-3.5" />
                               )}
                             </button>
-                          )}
-                          <TrendingUp className="w-4 h-4" />
+                            <TrendingUp className="w-4 h-4" />
+                          </div>
+                        </div>
+                        <div className="text-sm font-black text-blue-300">
+                          {showFinancials ? formatCurrency(kpis.loiNhuan) : "•••••••"}
                         </div>
                       </div>
-                      <div className="text-sm font-black text-blue-300">
-                        {showFinancials ? formatCurrency(kpis.loiNhuan) : "•••••••"}
-                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="mt-2 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -784,9 +805,9 @@ export function ServiceManagerMobile({
                         onCall={onCallCustomer}
                         onPrint={onPrintWorkOrder}
                         onDelete={onDeleteWorkOrder}
-                        canEdit={canUpdateWorkOrder}
+                        canEdit={canUpdateWorkOrder && isOwnWorkOrder(workOrder)}
                         canPrint={canPrintWorkOrder}
-                        canDelete={canDeleteWorkOrder}
+                        canDelete={canDeleteWorkOrder && isOwnWorkOrder(workOrder)}
                       />
                     ))
                   )}

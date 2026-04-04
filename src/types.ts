@@ -248,6 +248,9 @@ export interface WorkOrder {
   notes?: string;
   total: number; // labor + parts - discount
   branchId: string;
+  created_by?: string | null;
+  createdBy?: string | null;
+  createdby?: string | null;
 
   // Deposit (Đặt cọc)
   depositAmount?: number; // Số tiền đặt cọc

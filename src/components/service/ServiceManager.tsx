@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useRef } from "react";
+﻿import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -198,8 +198,8 @@ export default function ServiceManager() {
     limit: fetchLimit,
     daysBack: dateRangeDays,
     branchId: currentBranchId,
-    ownerUserId: profile?.id,
-    ownerDisplayName: profile?.name || profile?.full_name,
+    ownerUserId: undefined,
+    ownerDisplayName: undefined,
   });
 
   // Use context data directly for better performance
@@ -332,13 +332,41 @@ export default function ServiceManager() {
   useEffect(() => {
     const state = location.state as { editOrder?: WorkOrder } | null;
     if (state?.editOrder) {
+      const currentUserId = String(profile?.id || "").trim();
+      const creatorId = String(
+        state.editOrder.created_by ||
+          state.editOrder.createdBy ||
+          state.editOrder.createdby ||
+          ""
+      ).trim();
+      const profileName = String(profile?.name || profile?.full_name || "")
+        .trim()
+        .toLowerCase();
+      const technicianName = String(state.editOrder.technicianName || "")
+        .trim()
+        .toLowerCase();
+      const isOwnerOrder = creatorId
+        ? !!currentUserId && creatorId === currentUserId
+        : !!profileName && !!technicianName && profileName === technicianName;
+
+      if (!(canUpdateWorkOrder && isOwnerOrder)) {
+        showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
+        window.history.replaceState({}, document.title);
+        return;
+      }
       // Set the editing order and open modal
       setEditingOrder(state.editOrder);
       setShowModal(true);
       // Clear the navigation state to prevent re-opening on re-render
       window.history.replaceState({}, document.title);
     }
-  }, [location.state]);
+  }, [
+    location.state,
+    canUpdateWorkOrder,
+    profile?.id,
+    profile?.name,
+    profile?.full_name,
+  ]);
 
   // State for print preview modal
   const [printOrder, setPrintOrder] = useState<WorkOrder | null>(null);
@@ -356,6 +384,39 @@ export default function ServiceManager() {
   const [refundingOrder, setRefundingOrder] = useState<WorkOrder | null>(null);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [refundReason, setRefundReason] = useState("");
+
+  const isOwnWorkOrder = useCallback(
+    (order?: Partial<WorkOrder>) => {
+      if (!order?.id) return true;
+
+      const currentUserId = String(profile?.id || "").trim();
+      if (!currentUserId) return false;
+
+      const creatorId = String(
+        order.created_by || order.createdBy || order.createdby || ""
+      ).trim();
+      if (creatorId) return creatorId === currentUserId;
+
+      const profileName = String(profile?.name || profile?.full_name || "")
+        .trim()
+        .toLowerCase();
+      const technicianName = String(order.technicianName || "")
+        .trim()
+        .toLowerCase();
+      return !!profileName && !!technicianName && profileName === technicianName;
+    },
+    [profile?.id, profile?.name, profile?.full_name]
+  );
+
+  const canModifyOrder = useCallback(
+    (order?: Partial<WorkOrder>) => canUpdateWorkOrder && isOwnWorkOrder(order),
+    [canUpdateWorkOrder, isOwnWorkOrder]
+  );
+
+  const canDeleteOrder = useCallback(
+    (order?: Partial<WorkOrder>) => canDeleteWorkOrder && isOwnWorkOrder(order),
+    [canDeleteWorkOrder, isOwnWorkOrder]
+  );
 
   // Share invoice as image function
   const handleShareInvoice = async () => {
@@ -579,8 +640,8 @@ export default function ServiceManager() {
   const statusSnapshotCards = getStatusSnapshotCards(stats);
 
   const handleOpenModal = (order?: WorkOrder) => {
-    if (order && !canUpdateWorkOrder) {
-      showToast.error("Bạn không có quyền sửa phiếu sửa chữa");
+    if (order && !canModifyOrder(order)) {
+      showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
       return;
     }
 
@@ -883,6 +944,10 @@ export default function ServiceManager() {
   // 🔹 Handle Mobile Save - Similar to desktop handleSave
   const handleMobileSave = async (workOrderData: any) => {
     try {
+      if (editingOrder?.id && !isOwnWorkOrder(editingOrder)) {
+        showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
+        throw new Error("UNAUTHORIZED_WORK_ORDER_OWNER");
+      }
 
       // Validate required fields
       if (!workOrderData.customer?.name) {
@@ -1444,8 +1509,8 @@ export default function ServiceManager() {
 
   // Handle delete work order - using hook for proper query invalidation
   const handleDelete = async (workOrder: WorkOrder) => {
-    if (!canDeleteWorkOrder) {
-      showToast.error("Bạn không có quyền xóa phiếu sửa chữa");
+    if (!canDeleteOrder(workOrder)) {
+      showToast.error("Bạn chỉ có thể xóa phiếu do chính bạn tạo");
       return;
     }
 
@@ -1537,8 +1602,8 @@ export default function ServiceManager() {
             setShowMobileModal(true);
           }}
           onEditWorkOrder={(workOrder) => {
-            if (!canUpdateWorkOrder) {
-              showToast.error("Bạn không có quyền sửa phiếu sửa chữa");
+            if (!canModifyOrder(workOrder)) {
+              showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
               return;
             }
 
@@ -1573,7 +1638,11 @@ export default function ServiceManager() {
           currentBranchId={currentBranchId}
           upsertCustomer={upsertCustomer}
           viewMode={mobileModalViewMode}
-          onSwitchToEdit={canUpdateWorkOrder ? () => setMobileModalViewMode(false) : undefined}
+          onSwitchToEdit={
+            editingOrder && canModifyOrder(editingOrder)
+              ? () => setMobileModalViewMode(false)
+              : undefined
+          }
           canUpdateWorkOrderStatus={canUpdateWorkOrderStatus}
           canUpdateWorkOrderPayment={canUpdateWorkOrderPayment}
           canUpdateWorkOrderParts={canUpdateWorkOrderParts}
@@ -1642,7 +1711,7 @@ export default function ServiceManager() {
   return (
     <div className="space-y-3 mx-auto w-full max-w-[1800px] px-3 sm:px-4 xl:px-6 2xl:px-8">
       {/* Desktop insight cards */}
-      <div className="grid gap-3 lg:grid-cols-[2fr,1fr]">
+      <div className={`grid gap-3 ${isOwner ? "lg:grid-cols-[2fr,1fr]" : "lg:grid-cols-1"}`}>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1706,46 +1775,48 @@ export default function ServiceManager() {
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <div className="rounded-lg bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 p-3 text-white shadow-lg">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wide text-white/80">
-                  Doanh thu {getDateFilterLabel(dateFilter)}
-                </p>
-                <p className="mt-1 text-xl font-semibold">
-                  {formatCurrency(stats.filteredRevenue)}
-                </p>
+        {isOwner && (
+          <div className="grid gap-2">
+            <div className="rounded-lg bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 p-3 text-white shadow-lg">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-white/80">
+                    Doanh thu {getDateFilterLabel(dateFilter)}
+                  </p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {formatCurrency(stats.filteredRevenue)}
+                  </p>
+                </div>
+                <HandCoins className="w-6 h-6 text-white/80" />
               </div>
-              <HandCoins className="w-6 h-6 text-white/80" />
+              <p className="mt-1.5 text-[10px] text-white/80">
+                Bao gồm các phiếu đã thanh toán {getDateFilterLabel(dateFilter)}
+              </p>
             </div>
-            <p className="mt-1.5 text-[10px] text-white/80">
-              Bao gồm các phiếu đã thanh toán {getDateFilterLabel(dateFilter)}
-            </p>
-          </div>
 
-          <div className="rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-                  Lợi nhuận {getDateFilterLabel(dateFilter)}
-                </p>
-                <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
-                  {formatCurrency(stats.filteredProfit)}
-                </p>
+            <div className="rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                    Lợi nhuận {getDateFilterLabel(dateFilter)}
+                  </p>
+                  <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {formatCurrency(stats.filteredProfit)}
+                  </p>
+                </div>
+                <TrendingUp className="w-6 h-6 text-blue-500" />
               </div>
-              <TrendingUp className="w-6 h-6 text-blue-500" />
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-[10px]">
-              <span className="text-slate-500 dark:text-slate-400">
-                Biên lợi nhuận
-              </span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                {profitMargin}%
-              </span>
+              <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                <span className="text-slate-500 dark:text-slate-400">
+                  Biên lợi nhuận
+                </span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {profitMargin}%
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Quick status filters - Hidden on desktop (lg+) since we have the stat cards above */}
@@ -2145,11 +2216,11 @@ export default function ServiceManager() {
                     <tr
                       key={order.id}
                       onClick={() => {
-                        if (canUpdateWorkOrder) {
+                        if (canModifyOrder(order)) {
                           handleOpenModal(order);
                         }
                       }}
-                      className={`group bg-white dark:bg-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-700/50 transition-all duration-150 hover:shadow-sm border-l-4 border-transparent hover:border-blue-500 ${canUpdateWorkOrder ? "cursor-pointer" : "cursor-default"}`}
+                      className={`group bg-white dark:bg-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-700/50 transition-all duration-150 hover:shadow-sm border-l-4 border-transparent hover:border-blue-500 ${canModifyOrder(order) ? "cursor-pointer" : "cursor-default"}`}
                     >
                       {/* Column 1: Mã phiếu */}
                       <td className="px-4 py-4 align-top">
@@ -2461,7 +2532,7 @@ export default function ServiceManager() {
                                 }}
                               >
                                 <div className="py-1">
-                                  {canUpdateWorkOrder && (
+                                  {canModifyOrder(order) && (
                                     <button
                                       onClick={() => {
                                         handleOpenModal(order);

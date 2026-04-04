@@ -8,6 +8,11 @@ import { formatCurrency } from '../../../utils/format';
 import { getCategoryColor } from '../../../utils/categoryColors';
 import { validatePriceAndQty } from '../../../utils/validation';
 import { generateSKU } from '../../../utils/sku';
+import {
+  calcSellingFromRule,
+  getCategoryPricingRule,
+  type RoundingRule,
+} from '../../../utils/categoryPricingRules';
 import FormattedNumberInput from '../../common/FormattedNumberInput';
 import BarcodeScannerModal from '../../common/BarcodeScannerModal';
 import SupplierModal from '../../inventory/components/SupplierModal';
@@ -40,6 +45,13 @@ interface PaymentInfo {
   paidAmount: number;
   notes?: string;
 }
+
+const DEFAULT_MARKUP_PERCENT = 50;
+
+const calcMarkupPercent = (importPrice: number, sellingPrice: number) => {
+  if (importPrice <= 0 || sellingPrice <= 0) return DEFAULT_MARKUP_PERCENT;
+  return Math.max(0, Math.round(((sellingPrice / importPrice) - 1) * 100));
+};
 
 // Goods Receipt Modal Component (Ảnh 2)
 const GoodsReceiptModal: React.FC<{
@@ -89,6 +101,8 @@ const GoodsReceiptModal: React.FC<{
       laborCost?: number;
       sellingPrice: number;
       wholesalePrice: number;
+      markupPercent: number;
+      roundingRule: RoundingRule;
     }>
   >([]);
 
@@ -127,7 +141,24 @@ const GoodsReceiptModal: React.FC<{
                 } sản phẩm).\n\nBạn có muốn khôi phục không?`
               );
               if (shouldRestore) {
-                setReceiptItems(draft.receiptItems || []);
+                setReceiptItems(
+                  (draft.receiptItems || []).map((item: any) => {
+                    const importPrice = Number(item.importPrice || 0);
+                    const sellingPrice = Number(item.sellingPrice || 0);
+                    return {
+                      ...item,
+                      markupPercent:
+                        typeof item.markupPercent === "number"
+                          ? item.markupPercent
+                          : calcMarkupPercent(importPrice, sellingPrice),
+                      roundingRule:
+                        item.roundingRule === "hundred" ||
+                        item.roundingRule === "thousand"
+                          ? item.roundingRule
+                          : "integer",
+                    };
+                  })
+                );
                 setSelectedSupplier(draft.selectedSupplier || "");
                 setDiscount(draft.discount || 0);
                 setDiscountType(draft.discountType || "amount");
@@ -207,6 +238,9 @@ const GoodsReceiptModal: React.FC<{
       );
       // Không hiện toast khi tăng số lượng để tránh spam
     } else {
+      const rule = getCategoryPricingRule(part.category || "");
+      const importPrice =
+        canViewImportPrice ? part.costPrice?.[currentBranchId] || 0 : 0;
       setReceiptItems([
         ...receiptItems,
         {
@@ -214,15 +248,19 @@ const GoodsReceiptModal: React.FC<{
           partName: part.name,
           sku: part.sku,
           quantity: 1,
-            importPrice: canViewImportPrice
-              ? part.costPrice?.[currentBranchId] || 0
-              : 0,
+          importPrice,
           laborCost:
             (part as any).laborCost?.[currentBranchId] ||
             part.wholesalePrice?.[currentBranchId] ||
             0,
-          sellingPrice: part.retailPrice[currentBranchId] || 0,
+          sellingPrice: calcSellingFromRule(
+            importPrice,
+            rule.markupPercent,
+            rule.roundingRule
+          ),
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
+          markupPercent: rule.markupPercent,
+          roundingRule: rule.roundingRule,
         },
       ]);
       showToast.success(`Đã thêm ${part.name} vào phiếu nhập`);
@@ -298,6 +336,9 @@ const GoodsReceiptModal: React.FC<{
         );
       } else {
         // Thêm mới - chỉ hiện 1 toast
+        const rule = getCategoryPricingRule(foundPart.category || "");
+        const importPrice =
+          canViewImportPrice ? foundPart.costPrice?.[currentBranchId] || 0 : 0;
         setReceiptItems((items) => [
           ...items,
           {
@@ -305,15 +346,19 @@ const GoodsReceiptModal: React.FC<{
             partName: foundPart.name,
             sku: foundPart.sku,
             quantity: 1,
-            importPrice: canViewImportPrice
-              ? foundPart.costPrice?.[currentBranchId] || 0
-              : 0,
+            importPrice,
             laborCost:
               (foundPart as any).laborCost?.[currentBranchId] ||
               foundPart.wholesalePrice?.[currentBranchId] ||
               0,
-            sellingPrice: foundPart.retailPrice[currentBranchId] || 0,
+            sellingPrice: calcSellingFromRule(
+              importPrice,
+              rule.markupPercent,
+              rule.roundingRule
+            ),
             wholesalePrice: foundPart.wholesalePrice?.[currentBranchId] || 0,
+            markupPercent: rule.markupPercent,
+            roundingRule: rule.roundingRule,
           },
         ]);
         showToast.success(`Đã thêm ${foundPart.name}`);
@@ -333,7 +378,12 @@ const GoodsReceiptModal: React.FC<{
 
   const updateReceiptItem = (
     partId: string,
-    field: "quantity" | "importPrice" | "sellingPrice" | "wholesalePrice",
+    field:
+      | "quantity"
+      | "importPrice"
+      | "sellingPrice"
+      | "wholesalePrice"
+      | "markupPercent",
     value: number
   ) => {
     setReceiptItems((items) =>
@@ -443,6 +493,13 @@ const GoodsReceiptModal: React.FC<{
             laborCost: productData.laborCost || 0,
             sellingPrice: productData.retailPrice,
             wholesalePrice: productData.wholesalePrice || 0,
+            markupPercent: calcMarkupPercent(
+              Number(productData.importPrice || 0),
+              Number(productData.retailPrice || 0)
+            ),
+            roundingRule: getCategoryPricingRule(
+              String(productData.category || "")
+            ).roundingRule,
           },
         ]);
         showToast.success("Đã tạo phụ tùng mới và thêm vào phiếu nhập");
@@ -1023,21 +1080,18 @@ const GoodsReceiptModal: React.FC<{
                                 item.quantity
                               );
                               const newImport = clean.importPrice;
-                              const autoPrice = Math.round(newImport * 1.5);
+                              const autoPrice = calcSellingFromRule(
+                                newImport,
+                                Number(item.markupPercent || DEFAULT_MARKUP_PERCENT),
+                                item.roundingRule || "integer"
+                              );
                               setReceiptItems((items) =>
                                 items.map((it) =>
                                   it.partId === item.partId
                                     ? {
                                       ...it,
                                       importPrice: newImport,
-                                      sellingPrice:
-                                        it.sellingPrice === 0 ||
-                                          it.sellingPrice ===
-                                          Math.round(
-                                            (it.importPrice || 0) * 1.5
-                                          )
-                                          ? autoPrice
-                                          : it.sellingPrice,
+                                      sellingPrice: autoPrice,
                                     }
                                     : it
                                 )
@@ -1047,16 +1101,54 @@ const GoodsReceiptModal: React.FC<{
                             placeholder="Giá nhập"
                           />
 
+                          {/* Markup percent */}
+                          <FormattedNumberInput
+                            value={item.markupPercent}
+                            onValue={(val) => {
+                              const markupPercent = Math.max(0, Math.round(val));
+                              const targetCategory = originalPart?.category || "";
+                              setReceiptItems((items) =>
+                                items.map((it) =>
+                                  (() => {
+                                    if (it.partId === item.partId) return true;
+                                    if (!targetCategory) return false;
+                                    const itPart = parts.find((p) => p.id === it.partId);
+                                    return (itPart?.category || "") === targetCategory;
+                                  })()
+                                    ? {
+                                      ...it,
+                                      markupPercent,
+                                      sellingPrice: calcSellingFromRule(
+                                        Number(it.importPrice || 0),
+                                        markupPercent,
+                                        it.roundingRule || "integer"
+                                      ),
+                                    }
+                                    : it
+                                )
+                              );
+                            }}
+                            className="w-16 flex-shrink-0 px-2 py-1 border border-violet-300 dark:border-violet-700 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-violet-500"
+                            placeholder="%"
+                          />
+
                           {/* Selling price */}
                           <FormattedNumberInput
                             value={item.sellingPrice}
-                            onValue={(val) =>
-                              updateReceiptItem(
-                                item.partId,
-                                "sellingPrice",
-                                Math.max(0, Math.round(val))
-                              )
-                            }
+                            onValue={(val) => {
+                              const sellingPrice = Math.max(0, Math.round(val));
+                              const markupPercent = calcMarkupPercent(
+                                Number(item.importPrice || 0),
+                                sellingPrice
+                              );
+                              setReceiptItems((items) =>
+                                items.map((it) =>
+                                  it.partId === item.partId
+                                    ? { ...it, sellingPrice, markupPercent }
+                                    : it
+                                )
+                              );
+                            }}
                             className="min-w-[70px] max-w-[110px] flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-emerald-500"
                             placeholder="Giá bán"
                           />

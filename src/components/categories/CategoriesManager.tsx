@@ -31,6 +31,11 @@ import {
   Edit2,
   Trash2,
 } from "lucide-react";
+import {
+  getAllCategoryPricingRules,
+  setCategoryPricingRule,
+  type RoundingRule,
+} from "../../utils/categoryPricingRules";
 
 const CategoriesManager: React.FC = () => {
   const navigate = useNavigate();
@@ -51,6 +56,9 @@ const CategoriesManager: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedColor, setSelectedColor] = useState("#3b82f6");
   const [selectedIcon, setSelectedIcon] = useState("package");
+  const [pricingRules, setPricingRules] = useState(() =>
+    getAllCategoryPricingRules()
+  );
 
   // Confirm dialog hook
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
@@ -80,6 +88,11 @@ const CategoriesManager: React.FC = () => {
         name: c.name,
         icon: c.icon || "package",
         color: c.color || "#3b82f6",
+        pricingRule:
+          pricingRules[c.name.trim().toLowerCase()] || {
+            markupPercent: 50,
+            roundingRule: "integer" as RoundingRule,
+          },
         count: categoryParts.length,
         totalStock,
         totalValue,
@@ -91,7 +104,31 @@ const CategoriesManager: React.FC = () => {
         lowStockCount: lowStockParts.length,
       };
     });
-  }, [categoriesData, parts, currentBranchId]);
+  }, [categoriesData, parts, currentBranchId, pricingRules]);
+
+  const handleUpdateCategoryRule = (
+    categoryName: string,
+    patch: Partial<{ markupPercent: number; roundingRule: RoundingRule }>
+  ) => {
+    const key = categoryName.trim().toLowerCase();
+    const currentRule =
+      pricingRules[key] ||
+      ({ markupPercent: 50, roundingRule: "integer" } as {
+        markupPercent: number;
+        roundingRule: RoundingRule;
+      });
+
+    const nextRule = {
+      markupPercent:
+        patch.markupPercent != null
+          ? Math.max(0, Math.round(Number(patch.markupPercent || 0)))
+          : currentRule.markupPercent,
+      roundingRule: patch.roundingRule || currentRule.roundingRule,
+    };
+
+    setCategoryPricingRule(categoryName, nextRule);
+    setPricingRules((prev) => ({ ...prev, [key]: nextRule }));
+  };
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -282,6 +319,12 @@ const CategoriesManager: React.FC = () => {
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider w-[150px]">
                   Giá trị tồn
                 </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider w-[140px]">
+                  % mặc định
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider w-[140px]">
+                  Làm tròn
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Sản phẩm sắp hết (≤2)
                 </th>
@@ -380,6 +423,45 @@ const CategoriesManager: React.FC = () => {
                       <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                         {formatCurrency(category.totalValue)}
                       </span>
+                    </td>
+
+                    {/* Default markup percent */}
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={category.pricingRule.markupPercent}
+                        onChange={(e) =>
+                          handleUpdateCategoryRule(category.name, {
+                            markupPercent: Number(e.target.value || 0),
+                          })
+                        }
+                        className="w-24 px-2 py-1 text-center border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+                      />
+                    </td>
+
+                    {/* Rounding rule */}
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <select
+                        value={category.pricingRule.roundingRule}
+                        onChange={(e) =>
+                          handleUpdateCategoryRule(category.name, {
+                            roundingRule: e.target.value as RoundingRule,
+                          })
+                        }
+                        className="w-28 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800"
+                      >
+                        <option value="integer">Số nguyên</option>
+                        <option value="hundred">Hàng trăm</option>
+                        <option value="thousand">Hàng nghìn</option>
+                      </select>
                     </td>
 
                     {/* Low Stock Products */}
