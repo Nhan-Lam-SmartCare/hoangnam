@@ -48,9 +48,6 @@ import { showToast } from "../../utils/toast";
 import { useConfirm } from "../../hooks/useConfirm";
 import ConfirmModal from "../common/ConfirmModal";
 import CategoriesManager from "../categories/CategoriesManager";
-import LookupManager from "../lookup/LookupManager";
-import ExternalPartsLookup from "../inventory/ExternalPartsLookup";
-import LookupManagerMobile from "../lookup/LookupManagerMobile";
 import {
   useInventoryTxRepo,
   useCreateInventoryTxRepo,
@@ -151,7 +148,7 @@ const InventoryManagerNew: React.FC = () => {
     branchId: currentBranchId,
   });
   const { data: supplierDebts = [] } = useSupplierDebtsRepo();
-  const [activeTab, setActiveTab] = useState("stock"); // stock, categories, lookup, history, purchase-orders
+  const [activeTab, setActiveTab] = useState("stock"); // stock, categories, history, purchase-orders
   const [showGoodsReceipt, setShowGoodsReceipt] = useState(false);
   const [showCreatePO, setShowCreatePO] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -197,6 +194,12 @@ const InventoryManagerNew: React.FC = () => {
     top: 0,
     right: 0,
   });
+
+  useEffect(() => {
+    if (activeTab === "lookup" || activeTab === "external-lookup") {
+      setActiveTab("stock");
+    }
+  }, [activeTab]);
 
 
 
@@ -467,9 +470,15 @@ const InventoryManagerNew: React.FC = () => {
         } else if (sortField === "retailPrice") {
           aVal = a.retailPrice?.[branchKey] || 0;
           bVal = b.retailPrice?.[branchKey] || 0;
-        } else if (sortField === "wholesalePrice") {
-          aVal = a.wholesalePrice?.[branchKey] || 0;
-          bVal = b.wholesalePrice?.[branchKey] || 0;
+        } else if (sortField === "laborCost") {
+          const hasLaborA = Object.prototype.hasOwnProperty.call(a, "laborCost");
+          const hasLaborB = Object.prototype.hasOwnProperty.call(b, "laborCost");
+          aVal = hasLaborA
+            ? (a as any).laborCost?.[branchKey] || 0
+            : a.wholesalePrice?.[branchKey] || 0;
+          bVal = hasLaborB
+            ? (b as any).laborCost?.[branchKey] || 0
+            : b.wholesalePrice?.[branchKey] || 0;
         } else if (sortField === "totalValue") {
           const stockA = a.stock?.[branchKey] || 0;
           const stockB = b.stock?.[branchKey] || 0;
@@ -604,6 +613,7 @@ const InventoryManagerNew: React.FC = () => {
         partName: string;
         quantity: number;
         importPrice: number;
+        laborCost?: number;
         sellingPrice: number;
         wholesalePrice?: number;
         _isNewProduct?: boolean;
@@ -614,6 +624,7 @@ const InventoryManagerNew: React.FC = () => {
           category: string;
           description: string;
           importPrice: number;
+          laborCost?: number;
           retailPrice: number;
           wholesalePrice: number;
         };
@@ -693,13 +704,15 @@ const InventoryManagerNew: React.FC = () => {
                   costPrice: {
                     [currentBranchId]: item._productData.importPrice,
                   },
+                  laborCost: {
+                    [currentBranchId]: Number(item._productData.laborCost || 0),
+                  } as any,
                   retailPrice: {
                     [currentBranchId]: item._productData.retailPrice,
                   },
                   wholesalePrice: {
                     [currentBranchId]:
-                      item._productData.wholesalePrice ||
-                      Math.round(item._productData.retailPrice * 0.9),
+                      Number(item._productData.laborCost || 0),
                   },
                 });
 
@@ -735,6 +748,7 @@ const InventoryManagerNew: React.FC = () => {
                   partName: item.partName,
                   quantity: item.quantity,
                   importPrice: item.importPrice,
+                  laborCost: Number(item.laborCost || item._productData.laborCost || 0),
                   sellingPrice: item.sellingPrice,
                   wholesalePrice: item.wholesalePrice || 0,
                 };
@@ -751,6 +765,7 @@ const InventoryManagerNew: React.FC = () => {
               partName: item.partName,
               quantity: item.quantity,
               importPrice: item.importPrice,
+              laborCost: Number(item.laborCost || 0),
               sellingPrice: item.sellingPrice,
               wholesalePrice: item.wholesalePrice || 0,
             };
@@ -782,11 +797,17 @@ const InventoryManagerNew: React.FC = () => {
             const currentCost = Number(existing?.costPrice?.[currentBranchId] || 0);
             const currentRetail = Number(existing?.retailPrice?.[currentBranchId] || 0);
             const currentWholesale = Number(existing?.wholesalePrice?.[currentBranchId] || 0);
+            const currentLabor = Number((existing as any)?.laborCost?.[currentBranchId] || 0);
 
             const nextCost = Number(item.importPrice || 0) > 0 ? Number(item.importPrice) : currentCost;
             const nextRetail = Number(item.sellingPrice || 0) > 0 ? Number(item.sellingPrice) : currentRetail;
             const nextWholesale =
-              Number(item.wholesalePrice || 0) > 0 ? Number(item.wholesalePrice) : currentWholesale;
+              Number(item.laborCost || 0) > 0
+                ? Number(item.laborCost)
+                : Number(item.wholesalePrice || 0) > 0
+                  ? Number(item.wholesalePrice)
+                  : currentWholesale;
+            const nextLabor = Number(item.laborCost || 0) > 0 ? Number(item.laborCost) : currentLabor;
 
             const updateRes = await updatePart(item.partId, {
               costPrice: {
@@ -801,6 +822,10 @@ const InventoryManagerNew: React.FC = () => {
                 ...(existing?.wholesalePrice || {}),
                 [currentBranchId]: nextWholesale,
               },
+              laborCost: {
+                ...((existing as any)?.laborCost || {}),
+                [currentBranchId]: nextLabor,
+              } as any,
             } as any);
 
             if (!updateRes.ok) {
@@ -819,73 +844,117 @@ const InventoryManagerNew: React.FC = () => {
         // OPTIMIZATION: Run Cash Transaction and Debt Creation in parallel
         // Track failures for consolidated notification
         let paymentFailed = false;
+        let paymentErrorDetail = "";
         let debtFailed = false;
 
         await Promise.all([
           // 1. Ghi chi tiền vào sổ quỹ
           (async () => {
             if (paidAmount > 0 && paymentInfo) {
-              const resolvePaymentSourceId = async (
+              const resolvePaymentSourceCandidates = async (
                 paymentMethod: "cash" | "bank"
-              ): Promise<string> => {
+              ): Promise<string[]> => {
                 const preferred = paymentMethod === "bank" ? "bank" : "cash";
                 const tableCandidates = ["payment_sources", "paymentsources"];
+                const candidates: string[] = [];
+
+                const pushCandidate = (value: unknown) => {
+                  const id = String(value || "").trim();
+                  if (!id) return;
+                  if (!candidates.includes(id)) {
+                    candidates.push(id);
+                  }
+                };
 
                 for (const tableName of tableCandidates) {
                   const { data, error } = await supabase
                     .from(tableName)
-                    .select("id,type,name")
+                    .select("*")
                     .limit(100);
 
                   if (error || !data || data.length === 0) continue;
 
                   const normalized = data.map((row: any) => ({
-                    id: String(row?.id || ""),
+                    id: String(
+                      row?.id ||
+                      row?.paymentSourceId ||
+                      row?.paymentsourceid ||
+                      row?.payment_source_id ||
+                      ""
+                    ),
                     type: String(row?.type || "").toLowerCase(),
                     name: String(row?.name || "").toLowerCase(),
                   }));
 
                   const exactById = normalized.find((row) => row.id === preferred);
-                  if (exactById?.id) return exactById.id;
+                  if (exactById?.id) pushCandidate(exactById.id);
 
                   const byType = normalized.find((row) => row.type === preferred);
-                  if (byType?.id) return byType.id;
+                  if (byType?.id) pushCandidate(byType.id);
 
                   const byName = normalized.find((row) =>
                     preferred === "bank"
                       ? row.name.includes("ngan hang") || row.name.includes("bank")
                       : row.name.includes("tien mat") || row.name.includes("cash")
                   );
-                  if (byName?.id) return byName.id;
+                  if (byName?.id) pushCandidate(byName.id);
 
-                  if (normalized[0]?.id) return normalized[0].id;
+                  if (normalized[0]?.id) pushCandidate(normalized[0].id);
                 }
 
-                return preferred;
+                if (candidates.length === 0) {
+                  candidates.push(preferred);
+                }
+                return candidates;
               };
 
-              const paymentSourceId = await resolvePaymentSourceId(
+              const isLikelyPaymentSourceError = (err: any): boolean => {
+                const text = `${err?.message || ""} ${err?.details || ""}`.toLowerCase();
+                return (
+                  text.includes("paymentsource") ||
+                  text.includes("payment source") ||
+                  text.includes("foreign key") ||
+                  text.includes("violates")
+                );
+              };
+
+              const paymentSourceCandidates = await resolvePaymentSourceCandidates(
                 paymentInfo.paymentMethod
               );
-              const cashTxResult = await createCashTransaction({
-                type: "expense",
-                amount: paidAmount,
-                branchId: currentBranchId,
-                paymentSourceId: paymentSourceId,
-                date: today.toISOString(),
-                notes: `Chi trả NCC ${supplierName} - Phiếu nhập ${receiptCode}`,
-                category: "supplier_payment",
-                supplierId: supplierId,
-                recipient: supplierName,
-              });
+              let cashTxResult: any = null;
+              let usedPaymentSourceId = "";
+
+              for (const candidateId of paymentSourceCandidates) {
+                usedPaymentSourceId = candidateId;
+                cashTxResult = await createCashTransaction({
+                  type: "expense",
+                  amount: paidAmount,
+                  branchId: currentBranchId,
+                  paymentSourceId: candidateId,
+                  date: today.toISOString(),
+                  notes: `Chi trả NCC ${supplierName} - Phiếu nhập ${receiptCode}`,
+                  category: "inventory_purchase",
+                  supplierId: supplierId,
+                  recipient: supplierName,
+                });
+
+                if (cashTxResult.ok) break;
+                if (!isLikelyPaymentSourceError(cashTxResult.error)) break;
+              }
 
               if (cashTxResult.ok) {
                 console.log(
-                  `✅ Đã ghi chi tiền ${paidAmount.toLocaleString()} đ vào sổ quỹ (${paymentSourceId})`
+                  `✅ Đã ghi chi tiền ${paidAmount.toLocaleString()} đ vào sổ quỹ (${usedPaymentSourceId})`
                 );
               } else {
                 console.error("❌ Lỗi ghi sổ quỹ:", cashTxResult.error);
                 paymentFailed = true;
+                paymentErrorDetail = String(
+                  cashTxResult?.error?.message ||
+                  cashTxResult?.error?.details ||
+                  cashTxResult?.error?.code ||
+                  "Unknown"
+                );
               }
             }
           })(),
@@ -928,8 +997,11 @@ const InventoryManagerNew: React.FC = () => {
           const failedParts = [];
           if (paymentFailed) failedParts.push("sổ quỹ");
           if (debtFailed) failedParts.push("công nợ");
+          const detailText = paymentErrorDetail
+            ? ` [Chi tiết sổ quỹ: ${paymentErrorDetail}]`
+            : "";
           showToast.error(
-            `⚠️ Nhập kho OK nhưng chưa ghi được ${failedParts.join(" và ")}! Mã phiếu: ${receiptCode}. Vui lòng vào Lịch sử nhập kho → Chỉnh sửa → Tạo phiếu chi để bổ sung.`,
+            `⚠️ Nhập kho OK nhưng chưa ghi được ${failedParts.join(" và ")}! Mã phiếu: ${receiptCode}.${detailText} Vui lòng vào Lịch sử nhập kho → Chỉnh sửa → Tạo phiếu chi để bổ sung.`,
             { autoClose: 10000 } // Keep visible longer
           );
         }
@@ -1292,6 +1364,16 @@ const InventoryManagerNew: React.FC = () => {
   const advancedFiltersActive =
     stockFilter !== "all" || categoryFilter !== "all" || showDuplicatesOnly;
 
+  useEffect(() => {
+    if (categoryFilter === "all") return;
+    const hasCategory = (allCategories || []).some(
+      (cat: any) => cat?.name === categoryFilter
+    );
+    if (!hasCategory) {
+      setCategoryFilter("all");
+    }
+  }, [categoryFilter, allCategories]);
+
   const shouldShowLowStockBanner =
     stockHealth.lowStock > 0 && stockFilter !== "low-stock";
 
@@ -1358,19 +1440,9 @@ const InventoryManagerNew: React.FC = () => {
                 icon: <Package className="w-3.5 h-3.5" />,
               },
               {
-                key: "lookup",
-                label: "Tra cứu",
-                icon: <Search className="w-3.5 h-3.5" />,
-              },
-              {
                 key: "history",
                 label: "Lịch sử",
                 icon: <FileText className="w-3.5 h-3.5" />,
-              },
-              {
-                key: "external-lookup",
-                label: "Tra cứu ngoài",
-                icon: <Search className="w-3.5 h-3.5" />,
               },
             ].map((tab) => (
               <button
@@ -1592,8 +1664,39 @@ const InventoryManagerNew: React.FC = () => {
               >
                 <Filter className="w-3.5 h-3.5" />
                 Bộ lọc nâng cao
+                {advancedFiltersActive && (
+                  <span className="inline-flex h-2 w-2 rounded-full bg-orange-500" />
+                )}
               </button>
+              {advancedFiltersActive && (
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-orange-300 text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100"
+                >
+                  Xóa lọc
+                </button>
+              )}
             </div>
+
+            {advancedFiltersActive && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {stockFilter !== "all" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[11px] font-medium">
+                    Tồn kho: {stockFilter}
+                  </span>
+                )}
+                {categoryFilter !== "all" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 px-2 py-0.5 text-[11px] font-medium">
+                    Danh mục: {categoryFilter}
+                  </span>
+                )}
+                {showDuplicatesOnly && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 px-2 py-0.5 text-[11px] font-medium">
+                    Đang lọc trùng mã
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Row 2: Quick filters as horizontal pills + Low stock warning inline */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -1707,6 +1810,11 @@ const InventoryManagerNew: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-2 sm:p-3">
         {activeTab === "stock" && (
           <div className="space-y-2">
+            {!partsLoading && totalParts === 0 && historyTransactions.length > 0 && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                Lịch sử nhập kho đang có dữ liệu nhưng danh sách tồn kho đang rỗng. Nguyên nhân thường gặp: bộ lọc đang bật hoặc dữ liệu sản phẩm đã bị thiếu. Hãy thử "Xóa lọc" để kiểm tra trước.
+              </div>
+            )}
             {/* Duplicate Warning Banner - More compact */}
             {duplicateSkus.size > 0 && (
               <div className="bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500 px-3 py-2 rounded-lg flex items-center justify-between">
@@ -1948,11 +2056,11 @@ const InventoryManagerNew: React.FC = () => {
                       </th>
                       <th
                         className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[110px]"
-                        onClick={() => handleSort("wholesalePrice")}
+                        onClick={() => handleSort("laborCost")}
                       >
                         <div className="flex items-center justify-end gap-1.5">
-                          <span>Giá bán sỉ</span>
-                          {sortField === "wholesalePrice" && (
+                          <span>Tiền công</span>
+                          {sortField === "laborCost" && (
                             <span className="text-blue-500">
                               {sortDirection === "asc" ? "↑" : "↓"}
                             </span>
@@ -1998,8 +2106,10 @@ const InventoryManagerNew: React.FC = () => {
                         const reserved = part.reserved?.[branchKey] || 0;
                         const available = stock - reserved; // ✅ Calculate available stock
                         const retailPrice = part.retailPrice?.[branchKey] || 0;
-                        const wholesalePrice =
-                          part.wholesalePrice?.[branchKey] || 0;
+                        const hasLaborCost = Object.prototype.hasOwnProperty.call(part, "laborCost");
+                        const laborCost = hasLaborCost
+                          ? (part as any).laborCost?.[branchKey] || 0
+                          : part.wholesalePrice?.[branchKey] || 0;
                         const costPrice =
                           Number(part.costPrice?.[branchKey] || 0) ||
                           Number(latestImportPriceByPart[part.id] || 0);
@@ -2147,7 +2257,7 @@ const InventoryManagerNew: React.FC = () => {
                               {formatCurrency(retailPrice)}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-right text-xs text-slate-600 dark:text-slate-300">
-                              {formatCurrency(wholesalePrice)}
+                              {formatCurrency(laborCost)}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-semibold text-slate-900 dark:text-slate-100">
                               {formatCurrency(value)}
@@ -2319,24 +2429,6 @@ const InventoryManagerNew: React.FC = () => {
           </div>
         )}
 
-        {activeTab === "lookup" && (
-          <div className="bg-[#0f172a] -m-3 sm:-m-6">
-            {/* Desktop Version */}
-            <div className="hidden sm:block">
-              <LookupManager />
-            </div>
-            {/* Mobile Version */}
-            <div className="sm:hidden">
-              <LookupManagerMobile />
-            </div>
-          </div>
-        )}
-
-        {activeTab === "external-lookup" && (
-          <div className="bg-white dark:bg-slate-800 -m-3 sm:-m-6 h-full">
-            <ExternalPartsLookup />
-          </div>
-        )}
       </div>
 
       {/* Modals */}
@@ -2892,29 +2984,6 @@ const InventoryManagerNew: React.FC = () => {
                 }`}
             >
               Đặt hàng
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab("external-lookup")}
-            className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-all duration-200 ${activeTab === "external-lookup"
-              ? "bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 scale-105"
-              : "text-slate-500 dark:text-slate-400 active:scale-95"
-              }`}
-          >
-            <svg
-              className={`w-5 h-5 ${activeTab === "external-lookup" ? "scale-110" : ""
-                } transition-transform`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-            </svg>
-            <span
-              className={`text-[10px] font-medium ${activeTab === "external-lookup" ? "font-semibold" : ""
-                }`}
-            >
-              Tra cứu
             </span>
           </button>
           <button

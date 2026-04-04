@@ -14,6 +14,7 @@ export interface AddProductModalProps {
     category: string;
     quantity: number;
     importPrice: number;
+    laborCost: number;
     retailPrice: number;
     warranty: number;
     warrantyUnit: string;
@@ -31,6 +32,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
   const [category, setCategory] = useState("");
   const [quantity, setQuantity] = useState<number>(1);
   const [importPrice, setImportPrice] = useState<number>(0);
+  const [laborCost, setLaborCost] = useState<number>(0);
   const [retailPrice, setRetailPrice] = useState<number>(0);
   const [warranty, setWarranty] = useState<number>(0);
   const [warrantyUnit, setWarrantyUnit] = useState("tháng");
@@ -53,6 +55,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
       category: category || "Chưa phân loại",
       quantity: Number(quantity) || 1,
       importPrice: Number(importPrice) || 0,
+      laborCost: Number(laborCost) || 0,
       retailPrice: Number(retailPrice) || 0,
       warranty: Number(warranty) || 0,
       warrantyUnit,
@@ -65,6 +68,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
     setCategory("");
     setQuantity(1);
     setImportPrice(0);
+    setLaborCost(0);
     setRetailPrice(0);
     setWarranty(0);
     setRetailOverridden(false);
@@ -273,6 +277,16 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                         );
                       }
                     }}
+                    className="w-full px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1 font-medium">
+                    Tiền công
+                  </label>
+                  <FormattedNumberInput
+                    value={laborCost}
+                    onValue={(v) => setLaborCost(Math.max(0, Math.round(v)))}
                     className="w-full px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right"
                   />
                 </div>

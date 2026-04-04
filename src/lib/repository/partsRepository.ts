@@ -174,6 +174,7 @@ export async function createPart(
       stock: input.stock || { CN1: 0 },
       retailPrice: input.retailPrice || { CN1: 0 },
       wholesalePrice: input.wholesalePrice || { CN1: 0 },
+      laborCost: (input as any).laborCost,
       category: input.category,
       description: input.description,
       warrantyPeriod: input.warrantyPeriod,

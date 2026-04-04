@@ -218,19 +218,29 @@ const InventoryHistorySection: React.FC<{
     groupedReceipts.forEach((receipt) => {
       if (selectedReceipts.has(receipt.receiptCode)) {
         receipt.items.forEach((item) => {
-          if (item.partId) {
+          const partId = String((item as any).partId || (item as any).part_id || "").trim();
+          if (partId) {
             // Aggregate quantities
-            if (!quantities[item.partId]) {
-              quantities[item.partId] = 0;
+            if (!quantities[partId]) {
+              quantities[partId] = 0;
             }
-            quantities[item.partId] += item.quantity;
+            quantities[partId] += Math.max(0, Number(item.quantity || 0));
 
             // Add to parts list if not already added
-            if (!selectedPartIds.has(item.partId)) {
-              selectedPartIds.add(item.partId);
-              const part = parts.find((p) => p.id === item.partId);
+            if (!selectedPartIds.has(partId)) {
+              selectedPartIds.add(partId);
+              const part = parts.find((p) => p.id === partId);
               if (part) {
                 partsList.push(part);
+              } else {
+                partsList.push({
+                  id: partId,
+                  name: item.partName || "Sản phẩm không xác định",
+                  sku: partId,
+                  stock: {},
+                  retailPrice: {},
+                  category: "Khác",
+                } as Part);
               }
             }
           }

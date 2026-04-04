@@ -97,6 +97,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
         sku: tempSku,
         quantity: productData.quantity,
         importPrice: productData.importPrice,
+        laborCost: productData.laborCost || 0,
         sellingPrice: productData.retailPrice,
         wholesalePrice: productData.wholesalePrice || 0,
         // Store product data for later creation when receipt is finalized
@@ -108,6 +109,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
           category: productData.category,
           description: productData.description || "",
           importPrice: productData.importPrice,
+          laborCost: productData.laborCost || 0,
           retailPrice: productData.retailPrice,
           wholesalePrice:
             productData.wholesalePrice ||
@@ -133,7 +135,8 @@ const GoodsReceiptMobileWrapper: React.FC<{
     }
 
     const subtotal = receiptItems.reduce(
-      (sum, item) => sum + item.quantity * item.importPrice,
+      (sum, item) =>
+        sum + item.quantity * item.importPrice + ((item as any).laborCost || 0),
       0
     );
     const discountAmount =

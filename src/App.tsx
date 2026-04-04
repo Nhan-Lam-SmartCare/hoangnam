@@ -55,6 +55,7 @@ const CategoriesManager = lazyImport(
 const LookupManager = lazyImport(() => import("./components/lookup/LookupManager"));
 const MigrationTool = lazyImport(() => import("./components/admin/MigrationTool"));
 const ReportsOverview = lazyImport(() => import("./components/reports/ReportsOverview"));
+const CashBookPage = lazyImport(() => import("./components/finance/CashBookPage"));
 const SettingsManager = lazyImport(() =>
   import("./components/settings/SettingsManager").then((m) => ({
     default: m.SettingsManager,
@@ -142,6 +143,11 @@ const ReportsPage = () => (
     <ReportsOverview />
   </Suspense>
 );
+const CashBook = () => (
+  <Suspense fallback={<PageLoader />}>
+    <CashBookPage />
+  </Suspense>
+);
 const EmployeesPage = () => (
   <Suspense fallback={<PageLoader />}>
     <EmployeesManager />
@@ -172,6 +178,7 @@ const MainLayout: React.FC = () => {
     "/warranty",
     "/categories",
     "/lookup",
+    "/cash-book",
   ].some((path) => location.pathname.startsWith(path));
 
   return (
@@ -199,6 +206,14 @@ const MainLayout: React.FC = () => {
             element={
               <ProtectedRoute>
                 <ReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cash-book"
+            element={
+              <ProtectedRoute>
+                <CashBook />
               </ProtectedRoute>
             }
           />

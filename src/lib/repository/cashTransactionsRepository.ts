@@ -11,7 +11,7 @@ export interface CreateCashTxInput {
   type: CashTransaction["type"]; // "income" | "expense"
   amount: number;
   branchId: string;
-  paymentSourceId: string; // maps to paymentSource column in DB
+  paymentSourceId?: string; // maps to paymentSource column in DB
   date?: string;
   notes?: string;
   category?: string; // e.g. sale_income, debt_collection
@@ -105,8 +105,6 @@ export async function createCashTransaction(
       return failure({ code: "validation", message: "Số tiền phải > 0" });
     if (!input.branchId)
       return failure({ code: "validation", message: "Thiếu chi nhánh" });
-    if (!input.paymentSourceId)
-      return failure({ code: "validation", message: "Thiếu nguồn tiền" });
     if (!input.type)
       return failure({ code: "validation", message: "Thiếu loại thu/chi" });
 
@@ -157,74 +155,122 @@ export async function createCashTransaction(
       (input.type === "income" ? "general_income" : "general_expense");
     const txDate = input.date || new Date().toISOString();
 
-    const payloadAttempts: Array<{ table: string; payload: Record<string, any> }> = [
-      {
-        table: "cash_transactions",
-        payload: {
-          id: txId,
-          type: input.type,
-          amount: input.amount,
-          branchid: input.branchId,
-          paymentsource: input.paymentSourceId,
-          category: canonicalCategory,
-          date: txDate,
-          description: input.notes || "",
-          recipient: input.recipient || null,
-          saleid: input.saleId,
-          workorderid: input.workOrderId,
-          supplierid: input.supplierId,
-          customerid: input.customerId,
-        },
-      },
-      {
-        table: "cash_transactions",
-        payload: {
-          id: txId,
-          type: input.type,
-          amount: input.amount,
-          branchId: input.branchId,
-          paymentSource: input.paymentSourceId,
-          category: canonicalCategory,
-          date: txDate,
-          notes: input.notes || "",
-          recipient: input.recipient || null,
-          saleId: input.saleId,
-          workOrderId: input.workOrderId,
-          supplierId: input.supplierId,
-          customerId: input.customerId,
-        },
-      },
-      {
-        table: "cashtransactions",
-        payload: {
-          id: txId,
-          type: input.type,
-          amount: input.amount,
-          branchid: input.branchId,
-          paymentsource: input.paymentSourceId,
-          category: canonicalCategory,
-          date: txDate,
-          description: input.notes || "",
-          recipient: input.recipient || null,
-        },
-      },
-    ];
+    const sourceCandidates: Array<string | null> = [];
+    const pushCandidate = (value: unknown) => {
+      if (value == null) return;
+      const normalized = String(value).trim();
+      if (!normalized) return;
+      if (!sourceCandidates.includes(normalized)) {
+        sourceCandidates.push(normalized);
+      }
+    };
+
+    // Priority: requested source -> common ids -> known ids from source tables -> seen ids from cash table.
+    pushCandidate(input.paymentSourceId);
+    pushCandidate("cash");
+    pushCandidate("bank");
+
+    for (const sourceTable of ["payment_sources", "paymentsources"]) {
+      const { data, error } = await supabase.from(sourceTable).select("*").limit(100);
+      if (error || !data) continue;
+      for (const row of data as any[]) {
+        pushCandidate(row?.id);
+        pushCandidate(row?.paymentSourceId);
+        pushCandidate(row?.paymentsourceid);
+        pushCandidate(row?.payment_source_id);
+      }
+    }
+
+    {
+      const { data, error } = await supabase
+        .from("cash_transactions")
+        .select("paymentsource,paymentSource,paymentSourceId")
+        .limit(100);
+      if (!error && data) {
+        for (const row of data as any[]) {
+          pushCandidate(row?.paymentsource);
+          pushCandidate(row?.paymentSource);
+          pushCandidate(row?.paymentSourceId);
+        }
+      }
+    }
+
+    // Last fallback: try insert without payment source columns (some schemas may allow nullable).
+    sourceCandidates.push(null);
 
     let inserted = false;
     let lastError: any = null;
     let usedPayload: Record<string, any> | undefined;
 
-    for (const attempt of payloadAttempts) {
-      const res = await insertWithSchemaFallback(attempt.table, attempt.payload);
-      if (res.ok) {
-        inserted = true;
-        usedPayload = res.usedPayload;
-        break;
+    for (const sourceCandidate of sourceCandidates) {
+      const withSnakeSource: Record<string, any> = {
+        id: txId,
+        type: input.type,
+        amount: input.amount,
+        branchid: input.branchId,
+        category: canonicalCategory,
+        date: txDate,
+        description: input.notes || "",
+        recipient: input.recipient || null,
+        saleid: input.saleId,
+        workorderid: input.workOrderId,
+        supplierid: input.supplierId,
+        customerid: input.customerId,
+      };
+
+      const withCamelSource: Record<string, any> = {
+        id: txId,
+        type: input.type,
+        amount: input.amount,
+        branchId: input.branchId,
+        category: canonicalCategory,
+        date: txDate,
+        notes: input.notes || "",
+        recipient: input.recipient || null,
+        saleId: input.saleId,
+        workOrderId: input.workOrderId,
+        supplierId: input.supplierId,
+        customerId: input.customerId,
+      };
+
+      const withLegacySource: Record<string, any> = {
+        id: txId,
+        type: input.type,
+        amount: input.amount,
+        branchid: input.branchId,
+        category: canonicalCategory,
+        date: txDate,
+        description: input.notes || "",
+        recipient: input.recipient || null,
+      };
+
+      if (sourceCandidate) {
+        withSnakeSource.paymentsource = sourceCandidate;
+        withCamelSource.paymentSource = sourceCandidate;
+        withLegacySource.paymentsource = sourceCandidate;
       }
-      lastError = res.error;
-      console.warn("[CashTx] Insert attempt failed", {
-        table: attempt.table,
-        error: res.error,
+
+      const payloadAttempts: Array<{ table: string; payload: Record<string, any> }> = [
+        { table: "cash_transactions", payload: withSnakeSource },
+        { table: "cash_transactions", payload: withCamelSource },
+        { table: "cashtransactions", payload: withLegacySource },
+      ];
+
+      for (const attempt of payloadAttempts) {
+        const res = await insertWithSchemaFallback(attempt.table, attempt.payload);
+        if (res.ok) {
+          inserted = true;
+          usedPayload = res.usedPayload;
+          break;
+        }
+        lastError = res.error;
+      }
+
+      if (inserted) break;
+
+      console.warn("[CashTx] Insert attempt failed for source candidate", {
+        sourceCandidate,
+        error: lastError,
       });
     }
 
@@ -242,7 +288,13 @@ export async function createCashTransaction(
       date: txDate,
       amount: input.amount,
       notes: input.notes || "",
-      paymentSourceId: input.paymentSourceId,
+      paymentSourceId: String(
+        (usedPayload as any)?.paymentsource ||
+        (usedPayload as any)?.paymentSource ||
+        (usedPayload as any)?.paymentSourceId ||
+        input.paymentSourceId ||
+        "cash"
+      ),
       branchId: input.branchId,
       category: canonicalCategory as any,
       saleId: input.saleId,

@@ -356,6 +356,12 @@ export function Nav() {
                 label="Báo cáo"
               />
             )}
+            <NavLink
+              to="/cash-book"
+              colorKey="teal"
+              icon={<Landmark className="w-4 h-4" />}
+              label="Sổ quỹ"
+            />
             {/* Removed unrelated links: Finance, Debt, Analytics, Promotions */}
           </div>
 

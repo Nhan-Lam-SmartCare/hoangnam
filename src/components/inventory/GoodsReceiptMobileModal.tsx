@@ -25,6 +25,7 @@ interface ReceiptItem {
   sku: string;
   quantity: number;
   importPrice: number;
+  laborCost?: number;
   sellingPrice: number;
   wholesalePrice: number;
 }
@@ -261,7 +262,8 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
   };
 
   const subtotal = receiptItems.reduce(
-    (sum, item) => sum + item.quantity * item.importPrice,
+    (sum, item) =>
+      sum + item.quantity * item.importPrice + (item.laborCost || 0),
     0
   );
 
@@ -740,7 +742,10 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                             />
                           </div>
                           <div className="font-bold text-orange-600 dark:text-orange-400">
-                            {formatCurrency(item.quantity * item.importPrice)}
+                            {formatCurrency(
+                              item.quantity * item.importPrice +
+                                (item.laborCost || 0)
+                            )}
                           </div>
                         </div>
                       </div>

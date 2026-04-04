@@ -2,7 +2,6 @@
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
-import { validatePriceAndQty } from "../../../utils/validation";
 import type { Part } from "../../../types";
 
 interface EditPartModalProps {
@@ -22,7 +21,10 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
     name: part.name,
     category: part.category || "",
     retailPrice: part.retailPrice?.[currentBranchId] || 0,
-    wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
+    laborCost:
+      (part as any).laborCost?.[currentBranchId] ||
+      part.wholesalePrice?.[currentBranchId] ||
+      0,
     costPrice: part.costPrice?.[currentBranchId] || 0,
     stock: part.stock?.[currentBranchId] || 0,
   });
@@ -55,9 +57,14 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
         ...(part.retailPrice || {}),
         [currentBranchId]: formData.retailPrice,
       },
+      laborCost: {
+        ...((part as any).laborCost || {}),
+        [currentBranchId]: formData.laborCost,
+      } as any,
+      // Keep a compatibility mirror for old schemas/screens still reading wholesalePrice.
       wholesalePrice: {
         ...(part.wholesalePrice || {}),
-        [currentBranchId]: formData.wholesalePrice,
+        [currentBranchId]: formData.laborCost,
       },
     });
   };
@@ -190,17 +197,15 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Giá nhập
               </label>
-              <input
-                type="number"
+              <FormattedNumberInput
                 value={formData.costPrice || 0}
-                onChange={(e) =>
+                onValue={(v) =>
                   setFormData({
                     ...formData,
-                    costPrice: Number(e.target.value),
+                    costPrice: Math.max(0, Math.round(v)),
                   })
                 }
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                min="0"
               />
             </div>
 
@@ -208,35 +213,31 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 Giá bán lẻ
               </label>
-              <input
-                type="number"
+              <FormattedNumberInput
                 value={formData.retailPrice}
-                onChange={(e) =>
+                onValue={(v) =>
                   setFormData({
                     ...formData,
-                    retailPrice: Number(e.target.value),
+                    retailPrice: Math.max(0, Math.round(v)),
                   })
                 }
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                min="0"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Giá bán sỉ
+                Tiền công
               </label>
-              <input
-                type="number"
-                value={formData.wholesalePrice}
-                onChange={(e) =>
+              <FormattedNumberInput
+                value={formData.laborCost}
+                onValue={(v) =>
                   setFormData({
                     ...formData,
-                    wholesalePrice: Number(e.target.value),
+                    laborCost: Math.max(0, Math.round(v)),
                   })
                 }
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                min="0"
               />
             </div>
           </div>
@@ -269,7 +270,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
               <div className="font-medium mb-1">Lưu ý:</div>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Bạn có thể chỉnh sửa trực tiếp giá nhập, giá bán và tồn kho
+                  Bạn có thể chỉnh sửa trực tiếp giá nhập, giá bán, tiền công và tồn kho
                 </li>
                 <li>
                   Hoặc sử dụng "Tạo phiếu nhập" để ghi nhận lịch sử nhập kho chi

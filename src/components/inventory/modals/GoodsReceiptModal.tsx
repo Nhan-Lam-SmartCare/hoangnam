@@ -53,6 +53,7 @@ const GoodsReceiptModal: React.FC<{
       partName: string;
       quantity: number;
       importPrice: number;
+      laborCost?: number;
       sellingPrice: number;
     }>,
     supplierId: string,
@@ -84,6 +85,7 @@ const GoodsReceiptModal: React.FC<{
       sku: string;
       quantity: number;
       importPrice: number;
+      laborCost?: number;
       sellingPrice: number;
       wholesalePrice: number;
     }>
@@ -220,6 +222,10 @@ const GoodsReceiptModal: React.FC<{
           sku: part.sku,
           quantity: 1,
           importPrice: part.costPrice?.[currentBranchId] || 0,
+          laborCost:
+            (part as any).laborCost?.[currentBranchId] ||
+            part.wholesalePrice?.[currentBranchId] ||
+            0,
           sellingPrice: part.retailPrice[currentBranchId] || 0,
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
         },
@@ -306,6 +312,10 @@ const GoodsReceiptModal: React.FC<{
             sku: foundPart.sku,
             quantity: 1,
             importPrice: foundPart.costPrice?.[currentBranchId] || 0,
+            laborCost:
+              (foundPart as any).laborCost?.[currentBranchId] ||
+              foundPart.wholesalePrice?.[currentBranchId] ||
+              0,
             sellingPrice: foundPart.retailPrice[currentBranchId] || 0,
             wholesalePrice: foundPart.wholesalePrice?.[currentBranchId] || 0,
           },
@@ -343,7 +353,7 @@ const GoodsReceiptModal: React.FC<{
 
   const subtotal = useMemo(() => {
     return receiptItems.reduce(
-      (sum, item) => sum + item.importPrice * item.quantity,
+      (sum, item) => sum + item.importPrice * item.quantity + (item.laborCost || 0),
       0
     );
   }, [receiptItems]);
@@ -405,6 +415,7 @@ const GoodsReceiptModal: React.FC<{
           description: productData.description,
           stock: { [currentBranchId]: 0 }, // Stock = 0, sẽ cập nhật khi hoàn tất phiếu nhập
           costPrice: { [currentBranchId]: productData.importPrice },
+          laborCost: { [currentBranchId]: Number(productData.laborCost || 0) } as any,
           retailPrice: { [currentBranchId]: productData.retailPrice },
           wholesalePrice: {
             [currentBranchId]: Math.round(productData.retailPrice * 0.9),
@@ -427,6 +438,7 @@ const GoodsReceiptModal: React.FC<{
             sku: partSku,
             quantity: productData.quantity,
             importPrice: productData.importPrice,
+            laborCost: productData.laborCost || 0,
             sellingPrice: productData.retailPrice,
             wholesalePrice: productData.wholesalePrice || 0,
           },
@@ -723,19 +735,40 @@ const GoodsReceiptModal: React.FC<{
                           </div>
                           {/* Price Information */}
                           <div className="flex items-center gap-2 mt-1.5">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Nhập:</span>
-                              <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
-                                {formatCurrency(part.costPrice?.[currentBranchId] || 0)}
-                              </span>
-                            </div>
-                            <span className="text-slate-300 dark:text-slate-600">•</span>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Bán:</span>
-                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                {formatCurrency(part.retailPrice?.[currentBranchId] || 0)}
-                              </span>
-                            </div>
+                            {(() => {
+                              const inCart = receiptItems.find((item) => item.partId === part.id);
+                              const displayImportPrice =
+                                inCart?.importPrice ?? part.costPrice?.[currentBranchId] ?? 0;
+                              const displayRetailPrice =
+                                inCart?.sellingPrice ?? part.retailPrice?.[currentBranchId] ?? 0;
+                              const displayLaborCost =
+                                inCart?.laborCost ?? (part as any).laborCost?.[currentBranchId] ?? 0;
+
+                              return (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Nhập:</span>
+                                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
+                                      {formatCurrency(displayImportPrice)}
+                                    </span>
+                                  </div>
+                                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Bán:</span>
+                                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                      {formatCurrency(displayRetailPrice)}
+                                    </span>
+                                  </div>
+                                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Công:</span>
+                                    <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                      {formatCurrency(displayLaborCost)}
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                         <svg
@@ -1022,8 +1055,14 @@ const GoodsReceiptModal: React.FC<{
 
                           {/* Total amount */}
                           <div className="min-w-[70px] text-right flex-shrink-0">
+                            <div className="text-[10px] text-cyan-600 dark:text-cyan-400 whitespace-nowrap mb-0.5">
+                              Công: {formatCurrency(item.laborCost || 0)}
+                            </div>
                             <div className="text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                              {formatCurrency(item.importPrice * item.quantity)}
+                              {formatCurrency(
+                                item.importPrice * item.quantity +
+                                (item.laborCost || 0)
+                              )}
                             </div>
                           </div>
                         </div>

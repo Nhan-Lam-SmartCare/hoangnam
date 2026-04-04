@@ -67,6 +67,7 @@ export interface Part {
   reservedStock?: { [branchId: string]: number }; // Số lượng đặt trước cho phiếu sửa chữa chưa thanh toán
   retailPrice: { [branchId: string]: number };
   wholesalePrice?: { [branchId: string]: number };
+  laborCost?: { [branchId: string]: number };
   category?: string;
   description?: string;
   warrantyPeriod?: string;

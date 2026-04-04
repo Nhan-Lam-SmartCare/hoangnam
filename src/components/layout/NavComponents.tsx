@@ -8,6 +8,7 @@ import {
   Users,
   Shield,
   FileText,
+  Landmark,
   Menu,
   X,
   LogOut,
@@ -384,6 +385,13 @@ export const BottomNav: React.FC = () => {
                     icon={<FileText className="w-5 h-5" />}
                     label="Báo cáo tổng quan"
                     color="fuchsia"
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <MobileDrawerLink
+                    to="/cash-book"
+                    icon={<Landmark className="w-5 h-5" />}
+                    label="Sổ quỹ"
+                    color="teal"
                     onClick={() => setShowMenu(false)}
                   />
                 </div>
