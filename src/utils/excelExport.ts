@@ -705,6 +705,7 @@ export const exportDetailedInventoryReport = (
   const summaryData = [
     ["BÁO CÁO TỒN KHO CHI TIẾT"],
     [`Ngày: ${formatDate(new Date().toISOString())}`],
+    [`Khoảng thời gian: ${formatDate(startDate)} - ${formatDate(endDate)}`],
     [`Chi nhánh: ${branchId}`],
     [],
     ["Chỉ tiêu", "Giá trị"],
@@ -795,8 +796,6 @@ export const exportDetailedInventoryReport = (
     XLSX.utils.book_append_sheet(wb, wsOutOfStock, "Hết hàng");
   }
 
-  const fileName = `TonKhoChiTiet_${branchId}_${formatDate(
-    new Date().toISOString()
-  )}.xlsx`;
+  const fileName = `TonKhoChiTiet_${branchId}_${startDate}_${endDate}.xlsx`;
   XLSX.writeFile(wb, fileName);
 };

@@ -359,6 +359,90 @@ export function useDeletePurchaseOrder() {
   });
 }
 
+function isMissingColumn(err: any, columnName: string) {
+  return (
+    err?.code === "PGRST204" &&
+    typeof err?.message === "string" &&
+    err.message.includes(`'${columnName}'`)
+  );
+}
+
+async function insertInventoryTransactionsWithFallback(txRecords: any[]) {
+  const attempt1 = await supabase
+    .from("inventory_transactions")
+    .insert(txRecords)
+    .select();
+
+  if (!attempt1.error) {
+    return { receipts: attempt1.data as any[] | null, error: null as any };
+  }
+
+  if (isMissingColumn(attempt1.error, "supplierId")) {
+    const txRecordsWithoutSupplier = txRecords.map(
+      ({ supplierId: _supplierId, ...rest }: any) => rest
+    );
+    const attempt2 = await supabase
+      .from("inventory_transactions")
+      .insert(txRecordsWithoutSupplier)
+      .select();
+    return { receipts: attempt2.data as any[] | null, error: attempt2.error };
+  }
+
+  return { receipts: null as any[] | null, error: attempt1.error };
+}
+
+async function createCashTxWithFallback(options: {
+  cashTxBaseLower: any;
+  cashTxBaseCamel: any;
+  supplierId: string | null;
+}) {
+  const attempts = [
+    {
+      payload: {
+        ...options.cashTxBaseLower,
+        type: "expense",
+        supplierId: options.supplierId,
+      },
+      shouldRetry: (err: any) =>
+        isMissingColumn(err, "type") || isMissingColumn(err, "supplierId"),
+    },
+    {
+      payload: options.cashTxBaseLower,
+      shouldRetry: (err: any) =>
+        isMissingColumn(err, "branchId") ||
+        isMissingColumn(err, "paymentSource"),
+    },
+    {
+      payload: options.cashTxBaseCamel,
+      shouldRetry: (err: any) =>
+        isMissingColumn(err, "branchId") ||
+        isMissingColumn(err, "paymentSource"),
+    },
+    {
+      payload: {
+        ...options.cashTxBaseCamel,
+        type: "expense",
+        supplierId: options.supplierId,
+      },
+      shouldRetry: () => false,
+    },
+  ];
+
+  let lastError: any = null;
+  for (const attempt of attempts) {
+    const result = await supabase.from("cash_transactions").insert(attempt.payload);
+    if (!result.error) {
+      return { cashTxCreated: true, cashTxError: null as any };
+    }
+    lastError = result.error;
+    if (!attempt.shouldRetry(result.error)) {
+      break;
+    }
+  }
+
+  return { cashTxCreated: false, cashTxError: lastError };
+}
+
 // =====================================================
 // Convert PO to Receipt (Inventory Transaction)
 // This creates an inventory_transactions entry and updates PO status
@@ -390,14 +474,6 @@ export async function convertPOToReceipt(
     throw new Error("Đơn đặt hàng này đã được nhập kho rồi");
   }
 
-  const isMissingColumn = (err: any, columnName: string) => {
-    return (
-      err?.code === "PGRST204" &&
-      typeof err?.message === "string" &&
-      err.message.includes(`'${columnName}'`)
-    );
-  };
-
   // 2. Create inventory transactions (one per item in old schema)
   const currentDate = new Date().toISOString();
   const supplierName = po.supplier?.name || "Không xác định";
@@ -418,26 +494,8 @@ export async function convertPOToReceipt(
   }));
 
   // Try insert with supplierId; if column missing, retry without it
-  let receipts: any[] | null = null;
-  let receiptError: any = null;
-  {
-    const attempt1 = await supabase
-      .from("inventory_transactions")
-      .insert(txRecords)
-      .select();
-    receipts = attempt1.data as any;
-    receiptError = attempt1.error;
-  }
-
-  if (receiptError && isMissingColumn(receiptError, "supplierId")) {
-    const txRecordsWithoutSupplier = txRecords.map(({ supplierId, ...rest }: any) => rest);
-    const attempt2 = await supabase
-      .from("inventory_transactions")
-      .insert(txRecordsWithoutSupplier)
-      .select();
-    receipts = attempt2.data as any;
-    receiptError = attempt2.error;
-  }
+  const { receipts, error: receiptError } =
+    await insertInventoryTransactionsWithFallback(txRecords);
 
   if (receiptError) throw receiptError;
 
@@ -469,54 +527,14 @@ export async function convertPOToReceipt(
   };
 
   // Try richer schema first; if columns don't exist, fall back to base
-  let cashTxError: any = null;
-  let cashTxCreated = false;
-  {
-    // Attempt 1: lower-case physical columns + new columns
-    const a1 = await supabase.from("cash_transactions").insert({
-      ...cashTxBaseLower,
-      type: "expense",
-      supplierId: po.supplier_id,
-    });
-    cashTxError = a1.error;
-    cashTxCreated = !a1.error;
-  }
-
-  if (
-    cashTxError &&
-    (isMissingColumn(cashTxError, "type") ||
-      isMissingColumn(cashTxError, "supplierId"))
-  ) {
-    // Attempt 2: lower-case physical columns only
-    const a2 = await supabase.from("cash_transactions").insert(cashTxBaseLower);
-    cashTxError = a2.error;
-    cashTxCreated = !a2.error;
-  }
-
-  if (
-    cashTxError &&
-    (isMissingColumn(cashTxError, "branchId") ||
-      isMissingColumn(cashTxError, "paymentSource"))
-  ) {
-    // Attempt 3: camelCase columns only
-    const a3 = await supabase.from("cash_transactions").insert(cashTxBaseCamel);
-    cashTxError = a3.error;
-    cashTxCreated = !a3.error;
-  }
-
-  if (
-    cashTxError &&
-    (isMissingColumn(cashTxError, "branchId") || isMissingColumn(cashTxError, "paymentSource"))
-  ) {
-    // Attempt 4: camelCase columns + new columns
-    const a4 = await supabase.from("cash_transactions").insert({
-      ...cashTxBaseCamel,
-      type: "expense",
-      supplierId: po.supplier_id,
-    });
-    cashTxError = a4.error;
-    cashTxCreated = !a4.error;
-  }
+  const {
+    cashTxCreated,
+    cashTxError,
+  } = await createCashTxWithFallback({
+    cashTxBaseLower,
+    cashTxBaseCamel,
+    supplierId: po.supplier_id || null,
+  });
 
   if (cashTxError) {
     console.error("Error creating cash transaction:", cashTxError);

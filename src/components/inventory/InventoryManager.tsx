@@ -1,9 +1,11 @@
+/* eslint-disable max-lines */
+/* eslint-disable max-lines-per-function */
+/* eslint-disable complexity */
 import React, {
   useState,
   useMemo,
   useCallback,
   useEffect,
-  useRef,
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -30,18 +32,16 @@ import { useAppContext } from "../../contexts/AppContext";
 import { supabase } from "../../supabaseClient";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
-  usePartsRepo,
   usePartsRepoPaged,
   useCreatePartRepo,
   useUpdatePartRepo,
   useDeletePartRepo,
 } from "../../hooks/usePartsRepository";
-import { formatCurrency, formatDate } from "../../utils/format";
+import { formatCurrency } from "../../utils/format";
 import { getCategoryColor } from "../../utils/categoryColors";
 import {
   exportPartsToExcel,
   exportInventoryTemplate,
-  importPartsFromExcel,
   importPartsFromExcelDetailed,
 } from "../../utils/excel";
 import { showToast } from "../../utils/toast";
@@ -53,18 +53,13 @@ import {
   useCreateInventoryTxRepo,
   useCreateReceiptAtomicRepo,
 } from "../../hooks/useInventoryTransactionsRepository";
-import { useWorkOrdersRepo, useUpdateWorkOrderRepo, useUpdateWorkOrderAtomicRepo } from "../../hooks/useWorkOrdersRepository";
-import { useCategories, useCreateCategory } from "../../hooks/useCategories";
-import { useSuppliers } from "../../hooks/useSuppliers";
+import { useWorkOrdersRepo, useUpdateWorkOrderAtomicRepo } from "../../hooks/useWorkOrdersRepository";
+import { useCategories } from "../../hooks/useCategories";
 import type { Part, InventoryTransaction, WorkOrder } from "../../types";
-import { fetchPartBySku, createPart, updatePart } from "../../lib/repository/partsRepository";
+import { createPart, updatePart } from "../../lib/repository/partsRepository";
 import { useSupplierDebtsRepo } from "../../hooks/useDebtsRepository";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
-import FormattedNumberInput from "../common/FormattedNumberInput";
-import { validatePriceAndQty } from "../../utils/validation";
-import { GoodsReceiptMobileModal } from "../inventory/GoodsReceiptMobileModal";
 import InventoryHistorySectionMobile from "../inventory/InventoryHistorySectionMobile";
-import PrintBarcodeModal from "../inventory/PrintBarcodeModal";
 import BatchPrintBarcodeModal from "../inventory/BatchPrintBarcodeModal";
 import BarcodeScannerModal from "../common/BarcodeScannerModal";
 import { PurchaseOrdersList } from "../purchase-orders/PurchaseOrdersList";
@@ -73,75 +68,21 @@ import { PODetailView } from "../purchase-orders/PODetailView";
 import { ExternalDataImport } from "../inventory/ExternalDataImport";
 import type { PurchaseOrder } from "../../types";
 import EditReceiptModal from "../inventory/components/EditReceiptModal";
-import SupplierModal from "../inventory/components/SupplierModal";
-import AddProductToReceiptModal from "../inventory/components/AddProductToReceiptModal";
 // Extracted modals
-import AddProductModal from "./modals/AddProductModal";
 import GoodsReceiptMobileWrapper from "./modals/GoodsReceiptMobileWrapper";
 import GoodsReceiptModal from "./modals/GoodsReceiptModal";
-import InventoryHistoryModal from "./modals/InventoryHistoryModal";
 import InventoryHistorySection from "./InventoryHistorySection";
 import ImportInventoryModal from "./components/ImportInventoryModal";
 import EditPartModal from "./modals/EditPartModal";
 
 const LOW_STOCK_THRESHOLD = 5;
-const FILTER_THEME_STYLES: Record<
-  "neutral" | "success" | "warning" | "danger",
-  {
-    buttonActive: string;
-    buttonInactive: string;
-    badgeActive: string;
-    badgeInactive: string;
-  }
-> = {
-  neutral: {
-    buttonActive:
-      "border-blue-500 bg-blue-500/10 shadow-[0_5px_25px_rgba(59,130,246,0.15)] text-slate-900 dark:text-slate-100",
-    buttonInactive:
-      "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-300/70",
-    badgeActive:
-      "border-blue-500 text-blue-600 bg-white/60 dark:bg-slate-900/40 dark:text-blue-400",
-    badgeInactive:
-      "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300",
-  },
-  success: {
-    buttonActive:
-      "border-emerald-500 bg-emerald-50 shadow-[0_5px_25px_rgba(16,185,129,0.2)] text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200",
-    buttonInactive:
-      "border-emerald-200 bg-emerald-50/40 hover:border-emerald-400/70 dark:border-emerald-800 dark:bg-emerald-950/20",
-    badgeActive:
-      "border-emerald-500 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-600",
-    badgeInactive:
-      "border-emerald-200 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400",
-  },
-  warning: {
-    buttonActive:
-      "border-amber-500 bg-amber-50 shadow-[0_5px_25px_rgba(245,158,11,0.25)] text-amber-900 dark:bg-amber-950/50 dark:text-amber-200",
-    buttonInactive:
-      "border-amber-200 bg-amber-50/40 hover:border-amber-400/70 dark:border-amber-800 dark:bg-amber-950/20",
-    badgeActive:
-      "border-amber-500 text-amber-700 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-600",
-    badgeInactive:
-      "border-amber-200 text-amber-600 dark:border-amber-700 dark:text-amber-400",
-  },
-  danger: {
-    buttonActive:
-      "border-red-500 bg-red-50 shadow-[0_5px_25px_rgba(239,68,68,0.25)] text-red-900 dark:bg-red-950/50 dark:text-red-200",
-    buttonInactive:
-      "border-red-200 bg-red-50/40 hover:border-red-400/70 dark:border-red-800 dark:bg-red-950/20",
-    badgeActive:
-      "border-red-500 text-red-700 bg-red-50 dark:bg-red-950/50 dark:text-red-300 dark:border-red-700",
-    badgeInactive:
-      "border-red-200 text-red-600 dark:border-red-700 dark:text-red-400",
-  },
-};
 
 // Main Inventory Manager Component (New)
 const InventoryManagerNew: React.FC = () => {
   const { currentBranchId } = useAppContext();
   const [searchParams, setSearchParams] = useSearchParams();
   // Supabase repository mutation for inventory transactions
-  const { mutateAsync: createInventoryTxAsync } = useCreateInventoryTxRepo();
+  useCreateInventoryTxRepo();
   const createReceiptAtomicMutation = useCreateReceiptAtomicRepo();
   const { mutate: updateWorkOrderAtomic } = useUpdateWorkOrderAtomicRepo();
   const { data: invTx = [] } = useInventoryTxRepo({
@@ -176,12 +117,6 @@ const InventoryManagerNew: React.FC = () => {
   const [editingPart, setEditingPart] = useState<Part | null>(null);
   const [editingReceipt, setEditingReceipt] = useState<any | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [showAddProductToReceiptModal, setShowAddProductToReceiptModal] =
-    useState(false);
-  const [showImportInventoryModal, setShowImportInventoryModal] =
-    useState(false);
-  const [showEditPartModal, setShowEditPartModal] = useState(false);
   const [reservedInfoPartId, setReservedInfoPartId] = useState<string | null>(null);
   const [showExternalImport, setShowExternalImport] = useState(false);
   const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
@@ -250,7 +185,6 @@ const InventoryManagerNew: React.FC = () => {
   const {
     data: pagedResult,
     isLoading: partsLoading,
-    isError: partsError,
     refetch: refetchInventory,
   } = usePartsRepoPaged({
     page,
@@ -262,7 +196,7 @@ const InventoryManagerNew: React.FC = () => {
   // Fetch work orders for "Reserved" stock details
   const { data: workOrders = [] } = useWorkOrdersRepo();
 
-  const repoParts = pagedResult?.data || [];
+  const repoParts = useMemo(() => pagedResult?.data ?? [], [pagedResult?.data]);
   const totalParts = pagedResult?.meta?.total || 0;
   const totalPages = Math.max(1, Math.ceil(totalParts / pageSize));
 
@@ -601,7 +535,7 @@ const InventoryManagerNew: React.FC = () => {
 
   const queryClient = useQueryClient();
   const updatePartMutation = useUpdatePartRepo();
-  const createPartMutation = useCreatePartRepo();
+  useCreatePartRepo();
   const deletePartMutation = useDeletePartRepo();
   const { data: allCategories = [] } = useCategories();
 
@@ -915,10 +849,8 @@ const InventoryManagerNew: React.FC = () => {
                 paymentInfo.paymentMethod
               );
               let cashTxResult: any = null;
-              let usedPaymentSourceId = "";
 
               for (const candidateId of paymentSourceCandidates) {
-                usedPaymentSourceId = candidateId;
                 cashTxResult = await createCashTransaction({
                   type: "expense",
                   amount: paidAmount,
@@ -935,9 +867,7 @@ const InventoryManagerNew: React.FC = () => {
                 if (!isLikelyPaymentSourceError(cashTxResult.error)) break;
               }
 
-              if (cashTxResult.ok) {
-
-              } else {
+              if (!cashTxResult.ok) {
                 console.error("❌ Lỗi ghi sổ quỹ:", cashTxResult.error);
                 paymentFailed = true;
                 paymentErrorDetail = String(
@@ -1032,11 +962,11 @@ const InventoryManagerNew: React.FC = () => {
     [
       allPartsData,
       currentBranchId,
-      updatePartMutation,
-      createPartMutation,
-      createInventoryTxAsync,
       createReceiptAtomicMutation,
       profile?.id,
+      profile?.name,
+      profile?.full_name,
+      queryClient,
     ]
   );
 
@@ -1122,7 +1052,7 @@ const InventoryManagerNew: React.FC = () => {
     const totalCount = selectedItems.length;
 
     // Delete all selected items
-    selectedItems.forEach((id, index) => {
+    selectedItems.forEach((id) => {
       deletePartMutation.mutate(
         { id },
         {
@@ -1164,7 +1094,7 @@ const InventoryManagerNew: React.FC = () => {
 
   // Handle save edited receipt
   const handleSaveEditedReceipt = async (
-    updatedData: {
+    _updatedData: {
       date: string;
       supplierId: string;
       items: any[];
@@ -1286,8 +1216,6 @@ const InventoryManagerNew: React.FC = () => {
 
           if (updateError) {
             console.warn(`Could not update stock for ${tx.part_id}:`, updateError);
-          } else {
-
           }
         }
       }
@@ -1376,11 +1304,6 @@ const InventoryManagerNew: React.FC = () => {
 
   const shouldShowLowStockBanner =
     stockHealth.lowStock > 0 && stockFilter !== "low-stock";
-
-  const lowStockPercent =
-    stockHealth.totalProducts > 0
-      ? Math.round((stockHealth.lowStock / stockHealth.totalProducts) * 100)
-      : 0;
 
   // Handle export to Excel
   const handleExportExcel = () => {
@@ -2892,7 +2815,7 @@ const InventoryManagerNew: React.FC = () => {
 
               // BATCH: Execute all creates
               if (partsToCreate.length > 0) {
-                const { data: createdParts, error: createError } =
+                const { error: createError } =
                   await supabase.from("parts").insert(partsToCreate).select();
 
                 if (createError) {
@@ -2903,9 +2826,6 @@ const InventoryManagerNew: React.FC = () => {
 
               // BATCH: Execute all updates
               if (partsToUpdate.length > 0) {
-                let updateSuccess = 0;
-                let updateFailed = 0;
-
                 for (const update of partsToUpdate) {
                   const { error } = await supabase
                     .from("parts")
@@ -2922,9 +2842,6 @@ const InventoryManagerNew: React.FC = () => {
                       `❌ Update error for part ${update.id}:`,
                       error
                     );
-                    updateFailed++;
-                  } else {
-                    updateSuccess++;
                   }
                 }
               }
@@ -2947,7 +2864,7 @@ const InventoryManagerNew: React.FC = () => {
 
               // Audit summary for import (best-effort)
               try {
-                const { data: userData } = await supabase.auth.getUser();
+                await supabase.auth.getUser();
                 // await safeAudit(userData?.user?.id || null, {
                 //   action: "inventory.import",
                 //   tableName: "inventory_transactions",

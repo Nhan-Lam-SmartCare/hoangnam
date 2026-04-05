@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Shield, Plus, Search, Filter, Calendar, X } from "lucide-react";
+import { Shield, Plus, Search, Calendar } from "lucide-react";
 import { useWarrantyCards } from "../../hooks/useWarrantyRepository";
 import { WarrantyCardModal } from "../warranty/WarrantyCardModal";
 import { formatDate } from "../../utils/format";
 
+// eslint-disable-next-line max-lines-per-function
 export const WarrantyManager: React.FC = () => {
     const { data: warrantyCards, isLoading } = useWarrantyCards();
     const [showCreateModal, setShowCreateModal] = useState(false);

@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from "../../utils/format";
 import { useSupplierDebtsRepo } from "../../hooks/useDebtsRepository";
 import { usePartsRepo } from "../../hooks/usePartsRepository";
 import { useSuppliers } from "../../hooks/useSuppliers";
+import { useCashTxRepo } from "../../hooks/useCashTransactionsRepository";
 import type { InventoryTransaction } from "../../types";
 
 interface InventoryHistorySectionMobileProps {
@@ -27,6 +28,11 @@ const InventoryHistorySectionMobile: React.FC<
 }) => {
   const { currentBranchId } = useAppContext();
   const { data: supplierDebts = [] } = useSupplierDebtsRepo();
+  const { data: cashTransactions = [] } = useCashTxRepo({
+    branchId: currentBranchId,
+    type: "expense",
+    limit: 1000,
+  });
   const { data: parts = [] } = usePartsRepo();
   const { data: suppliers = [] } = useSuppliers();
 
@@ -113,10 +119,6 @@ const InventoryHistorySectionMobile: React.FC<
     searchTerm,
   ]);
 
-  const totalAmount = useMemo(() => {
-    return filteredTransactions.reduce((sum, t) => sum + t.totalPrice, 0);
-  }, [filteredTransactions]);
-
   const groupedReceipts = useMemo(() => {
     const groups = new Map<string, InventoryTransaction[]>();
 
@@ -140,7 +142,7 @@ const InventoryHistorySectionMobile: React.FC<
     });
 
     return Array.from(groups.entries())
-      .map(([key, items], index) => {
+      .map(([_key, items], index) => {
         const firstItem = items[0];
         const date = new Date(firstItem.date);
 
@@ -175,7 +177,54 @@ const InventoryHistorySectionMobile: React.FC<
         };
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [filteredTransactions]);
+  }, [filteredTransactions, suppliers]);
+
+  const receiptDebtMap = useMemo(() => {
+    const map = new Map<string, any>();
+    const receiptCodeRegex = /NH-\d{8}-\d{3}/i;
+
+    for (const debt of supplierDebts || []) {
+      const description = String((debt as any)?.description || "");
+      const match = description.match(receiptCodeRegex);
+      if (!match) continue;
+      map.set(match[0].toUpperCase(), debt);
+    }
+
+    return map;
+  }, [supplierDebts]);
+
+  const receiptPaidFromCashMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const receiptCodeRegex = /NH-\d{8}-\d{3}/gi;
+
+    for (const tx of cashTransactions || []) {
+      const text = `${(tx as any)?.notes || ""} ${(tx as any)?.description || ""}`;
+      const matches = text.match(receiptCodeRegex);
+      if (!matches || matches.length === 0) continue;
+
+      const amount = Math.abs(Number((tx as any)?.amount || 0));
+      if (amount <= 0) continue;
+
+      for (const code of matches) {
+        const normalized = code.toUpperCase();
+        map.set(normalized, Number(map.get(normalized) || 0) + amount);
+      }
+    }
+
+    return map;
+  }, [cashTransactions]);
+
+  const totalAmount = useMemo(() => {
+    return groupedReceipts.reduce((sum, receipt) => {
+      const rawTotal = Number(receipt.total || 0);
+      const receiptDebt = receiptDebtMap.get(receipt.receiptCode);
+      const debtTotal = Number(receiptDebt?.totalAmount || 0);
+      const paidFromCash = Number(receiptPaidFromCashMap.get(receipt.receiptCode) || 0);
+      const effectiveTotal =
+        rawTotal > 0 ? rawTotal : debtTotal > 0 ? debtTotal : paidFromCash;
+      return sum + effectiveTotal;
+    }, 0);
+  }, [groupedReceipts, receiptDebtMap, receiptPaidFromCashMap]);
 
   return (
     <>
@@ -250,9 +299,12 @@ const InventoryHistorySectionMobile: React.FC<
                   minute: "2-digit",
                 });
 
-                const receiptDebt = supplierDebts.find((debt: any) =>
-                  debt.description?.includes(receipt.receiptCode)
-                );
+                const receiptDebt = receiptDebtMap.get(receipt.receiptCode);
+                const paidFromCash = Number(receiptPaidFromCashMap.get(receipt.receiptCode) || 0);
+                const rawTotal = Number(receipt.total || 0);
+                const debtTotal = Number(receiptDebt?.totalAmount || 0);
+                const effectiveTotal =
+                  rawTotal > 0 ? rawTotal : debtTotal > 0 ? debtTotal : paidFromCash;
                 const remainingDebt = receiptDebt?.remainingAmount || 0;
                 const hasDebt = remainingDebt > 0;
 
@@ -262,6 +314,7 @@ const InventoryHistorySectionMobile: React.FC<
                     onClick={() =>
                       setSelectedReceipt({
                         ...receipt,
+                        total: effectiveTotal,
                         date: new Date(receipt.date),
                       })
                     }
@@ -281,7 +334,7 @@ const InventoryHistorySectionMobile: React.FC<
                           Tổng tiền
                         </div>
                         <div className="text-base font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(receipt.total)}
+                          {formatCurrency(effectiveTotal)}
                         </div>
                       </div>
                     </div>

@@ -202,7 +202,7 @@ export const exportSalesReport = (
   });
 
   const topProducts = Array.from(productSales.entries())
-    .map(([id, data]) => ({
+    .map(([_id, data]) => ({
       name: data.name,
       quantity: data.quantity,
       revenue: data.revenue,

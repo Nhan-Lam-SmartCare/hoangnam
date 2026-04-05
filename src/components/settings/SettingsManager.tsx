@@ -92,6 +92,34 @@ interface Branch {
   name: string;
 }
 
+const BRANCH_TABLE_DISABLED_KEY = "motocare-schema-missing-branches";
+
+function readLocalFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeLocalFlag(key: string): void {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // Ignore localStorage write errors
+  }
+}
+
+function isMissingTableError(error: any): boolean {
+  const details = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return (
+    error?.status === 404 ||
+    error?.code === "PGRST205" ||
+    details.includes("does not exist") ||
+    details.includes("could not find")
+  );
+}
+
 type StaffOverridesMap = Record<
   string,
   {
@@ -267,12 +295,28 @@ export const SettingsManager = ({
   }
 
   const loadBranches = async () => {
+    if (readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
+      const mergedBranches = mergeBranches(
+        [{ id: "CN1", name: "Chi nhánh 1" }],
+        branchOverrides
+      );
+      setBranches(mergedBranches);
+      if (!newStaffBranch) {
+        setNewStaffBranch((mergedBranches[0] || { id: "CN1" }).id);
+      }
+      return;
+    }
+
     try {
       // Try to get branches from database first
       const { data, error } = await supabase
         .from("branches")
         .select("id, name")
         .order("name");
+
+      if (isMissingTableError(error)) {
+        writeLocalFlag(BRANCH_TABLE_DISABLED_KEY);
+      }
 
       if (!error && data && data.length > 0) {
         const mergedBranches = mergeBranches(data as Branch[], branchOverrides);
@@ -347,7 +391,14 @@ export const SettingsManager = ({
     const newBranch: Branch = { id: branchId, name: branchName };
     setSavingBranch(true);
     try {
-      const { error } = await supabase.from("branches").insert(newBranch);
+      let error: any = null;
+      if (!readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
+        const insertRes = await supabase.from("branches").insert(newBranch);
+        error = insertRes.error;
+        if (isMissingTableError(error)) {
+          writeLocalFlag(BRANCH_TABLE_DISABLED_KEY);
+        }
+      }
 
       if (error) {
         console.warn("Insert branch failed, using local fallback:", error.message);

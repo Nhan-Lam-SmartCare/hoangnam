@@ -398,8 +398,9 @@ const GoodsReceiptModal: React.FC<{
   };
 
   const subtotal = useMemo(() => {
+    // Payment amount for goods receipt must follow import value only.
     return receiptItems.reduce(
-      (sum, item) => sum + item.importPrice * item.quantity + (item.laborCost || 0),
+      (sum, item) => sum + item.importPrice * item.quantity,
       0
     );
   }, [receiptItems]);

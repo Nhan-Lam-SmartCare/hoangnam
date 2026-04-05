@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Wrench,
-  ShoppingCart as Cart,
   Boxes,
   Users,
   Shield,
@@ -14,14 +13,12 @@ import {
   LogOut,
   User,
   Crown,
-  UserCog,
-  Bell,
   Settings,
   CircleUser
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from "../../contexts/useTheme";
 import { canAccessInventorySection } from "../../utils/inventoryAccess";
 import { canDo } from "../../utils/permissions";
 
@@ -39,6 +36,7 @@ export type ColorKey =
   | "fuchsia"
   | "slate";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const NAV_COLORS: Record<
   ColorKey,
   { text: string; bg: string; hoverBg: string }
@@ -158,7 +156,7 @@ export const NavLink: React.FC<{
   icon: React.ReactNode;
   label: string;
   colorKey: ColorKey;
-}> = ({ to, icon, label, colorKey }) => {
+}> = ({ to, icon, label, colorKey: _colorKey }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
@@ -177,6 +175,7 @@ export const NavLink: React.FC<{
 };
 
 // Bottom Navigation Bar for Mobile
+// eslint-disable-next-line max-lines-per-function, complexity
 export const BottomNav: React.FC = () => {
   const location = useLocation();
   const { profile, user, signOut } = useAuth();

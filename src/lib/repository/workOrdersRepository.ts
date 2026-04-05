@@ -154,6 +154,7 @@ async function syncTechnicianAndLaborFallback(
 function normalizeWorkOrder(row: any): WorkOrder {
   // DEBUG LOG
   if (row.id && (row.notes || row.issuedescription || row.partsused)) {
+    // noop: retained as a lightweight debug checkpoint for suspicious row shapes
   }
   return {
     id: row.id,
@@ -637,11 +638,13 @@ export async function updateWorkOrder(
       });
 
     // Audit
-    let userId: string | null = null;
+    let _userId: string | null = null;
     try {
       const { data: userData } = await supabase.auth.getUser();
-      userId = userData?.user?.id || null;
-    } catch { }
+      _userId = userData?.user?.id || null;
+    } catch {
+      // noop: audit path is optional
+    }
     // Audit removed
 
     return success(data as WorkOrder);
@@ -669,11 +672,13 @@ export async function deleteWorkOrder(id: string): Promise<RepoResult<void>> {
       });
 
     // Audit
-    let userId: string | null = null;
+    let _userId: string | null = null;
     try {
       const { data: userData } = await supabase.auth.getUser();
-      userId = userData?.user?.id || null;
-    } catch { }
+      _userId = userData?.user?.id || null;
+    } catch {
+      // noop: audit path is optional
+    }
     // Audit removed
 
     return success(undefined);
@@ -995,7 +1000,9 @@ export async function refundWorkOrder(
     try {
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
-    } catch { }
+    } catch {
+      // noop: fallback still works without user id
+    }
 
     const rpcAttempts: Array<Record<string, any>> = [
       {
@@ -1202,7 +1209,9 @@ export async function completeWorkOrderPayment(
     try {
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
-    } catch { }
+    } catch {
+      // noop: payment can continue without user id in fallback mode
+    }
 
     const { data, error } = await supabase.rpc("work_order_complete_payment", {
       p_order_id: orderId,
@@ -1228,7 +1237,9 @@ export async function completeWorkOrderPayment(
           const jsonStr = rawDetails.slice(colon + 1).trim();
           try {
             items = JSON.parse(jsonStr);
-          } catch { }
+          } catch {
+            // noop: keep generic stock error message when payload is not JSON
+          }
         }
         const list = Array.isArray(items)
           ? items

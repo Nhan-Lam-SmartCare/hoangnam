@@ -5,24 +5,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useSupplierDebtsRepo } from '../../hooks/useDebtsRepository';
 import { usePartsRepo } from '../../hooks/usePartsRepository';
-import { useInventoryTxRepo } from '../../hooks/useInventoryTransactionsRepository';
+import { useCashTxRepo } from '../../hooks/useCashTransactionsRepository';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { showToast } from '../../utils/toast';
 import { supabase } from '../../supabaseClient';
 import {
-  Boxes, Package, Search, FileText, Filter, Edit, Trash2,
-  Plus, Repeat, UploadCloud, DownloadCloud, MoreHorizontal, ShoppingCart,
-  Calendar, ArrowUpRight, ArrowDownLeft, X, Check, AlertTriangle, Printer,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight
+  Trash2,
+  Printer,
 } from 'lucide-react';
 import ConfirmModal from '../common/ConfirmModal';
-import InventoryHistoryModal from './modals/InventoryHistoryModal';
 import EditReceiptModal from './components/EditReceiptModal';
 import BatchPrintBarcodeModal from './BatchPrintBarcodeModal';
 import { InventoryTransaction, Part } from '../../types';
-import { canDo } from '../../utils/permissions';
-import { getCategoryColor } from '../../utils/categoryColors';
 
 const InventoryHistorySection: React.FC<{
   transactions: InventoryTransaction[];
@@ -42,6 +37,11 @@ const InventoryHistorySection: React.FC<{
   const queryClient = useQueryClient();
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
   const { data: supplierDebts = [] } = useSupplierDebtsRepo();
+  const { data: cashTransactions = [] } = useCashTxRepo({
+    branchId,
+    type: "expense",
+    limit: 1000,
+  });
   const { data: parts = [] } = usePartsRepo();
   const { data: suppliers = [] } = useSuppliers();
   const [activeTimeFilter, setActiveTimeFilter] = useState("7days");
@@ -59,7 +59,7 @@ const InventoryHistorySection: React.FC<{
     items: InventoryTransaction[];
     total: number;
   } | null>(null);
-  const { currentBranchId } = useAppContext();
+  const currentBranchId = branchId;
 
   const filteredTransactions = useMemo(() => {
     // CHỈ LẤY GIAO DỊCH NHẬP KHO
@@ -132,10 +132,6 @@ const InventoryHistorySection: React.FC<{
     searchTerm,
   ]);
 
-  const totalAmount = useMemo(() => {
-    return filteredTransactions.reduce((sum, t) => sum + t.totalPrice, 0);
-  }, [filteredTransactions]);
-
   // Group transactions by receipt (same date, same supplier/notes)
   const groupedReceipts = useMemo(() => {
     const groups = new Map<string, InventoryTransaction[]>();
@@ -162,7 +158,7 @@ const InventoryHistorySection: React.FC<{
 
     // Convert to array and generate receipt codes
     return Array.from(groups.entries())
-      .map(([key, items], index) => {
+      .map(([_key, items], index) => {
         const firstItem = items[0];
         const date = new Date(firstItem.date);
 
@@ -199,7 +195,56 @@ const InventoryHistorySection: React.FC<{
         };
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [filteredTransactions]);
+  }, [filteredTransactions, suppliers]);
+
+  const receiptDebtMap = useMemo(() => {
+    const map = new Map<string, any>();
+    const receiptCodeRegex = /NH-\d{8}-\d{3}/i;
+
+    for (const debt of supplierDebts || []) {
+      const description = String((debt as any)?.description || "");
+      const match = description.match(receiptCodeRegex);
+      if (!match) continue;
+      map.set(match[0].toUpperCase(), debt);
+    }
+
+    return map;
+  }, [supplierDebts]);
+
+  const receiptPaidFromCashMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const receiptCodeRegex = /NH-\d{8}-\d{3}/gi;
+
+    for (const tx of cashTransactions || []) {
+      const text = `${(tx as any)?.notes || ""} ${(tx as any)?.description || ""}`;
+      const matches = text.match(receiptCodeRegex);
+      if (!matches || matches.length === 0) continue;
+
+      const amount = Math.abs(Number((tx as any)?.amount || 0));
+      if (amount <= 0) continue;
+
+      for (const code of matches) {
+        const normalized = code.toUpperCase();
+        map.set(normalized, Number(map.get(normalized) || 0) + amount);
+      }
+    }
+
+    return map;
+  }, [cashTransactions]);
+
+  const totalAmount = useMemo(() => {
+    return groupedReceipts.reduce((sum, receipt) => {
+      const rawTotal = Number(receipt.total || 0);
+      const receiptDebt = receiptDebtMap.get(receipt.receiptCode);
+      const debtTotal = Number(receiptDebt?.totalAmount || 0);
+      const paidFromCash = Number(receiptPaidFromCashMap.get(receipt.receiptCode) || 0);
+
+      const effectiveTotal =
+        rawTotal > 0 ? rawTotal : debtTotal > 0 ? debtTotal : paidFromCash;
+
+      return sum + effectiveTotal;
+    }, 0);
+  }, [groupedReceipts, receiptDebtMap, receiptPaidFromCashMap]);
 
   const [selectedReceipts, setSelectedReceipts] = useState<Set<string>>(
     new Set()
@@ -344,8 +389,6 @@ const InventoryHistorySection: React.FC<{
 
           if (updateError) {
             console.warn(`Could not update stock for ${tx.part_id}:`, updateError);
-          } else {
-
           }
         }
       }
@@ -376,7 +419,6 @@ const InventoryHistorySection: React.FC<{
 
         if (cashError) {
           console.warn(`Could not delete cash transaction for ${receiptCode}:`, cashError);
-        } else {
         }
       }
 
@@ -552,13 +594,18 @@ const InventoryHistorySection: React.FC<{
             });
 
             // Check if this receipt has debt
-            const receiptDebt = supplierDebts.find((debt) =>
-              debt.description?.includes(receipt.receiptCode)
-            );
+            const receiptDebt = receiptDebtMap.get(receipt.receiptCode);
+            const paidFromCash = Number(receiptPaidFromCashMap.get(receipt.receiptCode) || 0);
+            const rawTotal = Number(receipt.total || 0);
+            const debtTotal = Number(receiptDebt?.totalAmount || 0);
+            const effectiveTotal =
+              rawTotal > 0 ? rawTotal : debtTotal > 0 ? debtTotal : paidFromCash;
 
             const paidAmount = receiptDebt
               ? receiptDebt.totalAmount - receiptDebt.remainingAmount
-              : receipt.total;
+              : paidFromCash > 0
+                ? paidFromCash
+                : effectiveTotal;
             const remainingDebt = receiptDebt?.remainingAmount || 0;
             const hasDebt = remainingDebt > 0;
 
@@ -589,7 +636,7 @@ const InventoryHistorySection: React.FC<{
                         Tổng tiền
                       </div>
                       <div className="text-lg font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(receipt.total)}
+                        {formatCurrency(effectiveTotal)}
                       </div>
                     </div>
                   </div>
@@ -623,7 +670,7 @@ const InventoryHistorySection: React.FC<{
 
                       return (
                         <>
-                          {displayItems.map((item, idx) => (
+                          {displayItems.map((item) => (
                             <div
                               key={item.id}
                               className="flex items-start justify-between text-sm text-slate-700 dark:text-slate-200"
@@ -795,7 +842,7 @@ const InventoryHistorySection: React.FC<{
 
                         return (
                           <>
-                            {displayItems.map((item, idx) => {
+                            {displayItems.map((item) => {
                               const part = parts.find(
                                 (p) => p.id === item.partId
                               );
@@ -882,7 +929,7 @@ const InventoryHistorySection: React.FC<{
                         Tổng tiền:
                       </div>
                       <div className="text-base font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(receipt.total)}
+                        {formatCurrency(effectiveTotal)}
                       </div>
 
                       {/* Payment details */}

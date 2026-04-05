@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 // Use a single Supabase client app-wide to avoid multiple GoTrue instances
 import { supabase } from "../supabaseClient";
 import type {
@@ -8,7 +8,6 @@ import type {
   AuthenticatorAssuranceLevels,
 } from "@supabase/supabase-js";
 // import { safeAudit } from "../lib/repository/auditLogsRepository";
-import { showToast } from "../utils/toast";
 
 export type UserRole = "owner" | "manager" | "staff";
 
@@ -78,6 +77,120 @@ const getPermissionMetadata = (rawUser: any): Record<string, boolean> => {
   }, {});
 };
 
+async function fetchProfileFromSupabase(userId: string) {
+  let { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error && (error as any).code !== "PGRST116") {
+    throw error;
+  }
+
+  if (!data) {
+    const alt = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    data = alt.data as any;
+    error = alt.error as any;
+    if (error && (error as any).code !== "PGRST116") throw error;
+  }
+
+  return { data, error };
+}
+
+// eslint-disable-next-line complexity
+async function loadUserProfileInternal(params: {
+  userId: string;
+  userEmail?: string;
+  setProfile: (profile: UserProfile | null) => void;
+  setLoading: (loading: boolean) => void;
+}) {
+  const { userId, userEmail, setProfile, setLoading } = params;
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+    const authUser = authData?.user;
+    const { data, error } = await fetchProfileFromSupabase(userId);
+
+    if (error) throw error;
+
+    const resolvedEmail = normalizeEmail(
+      userEmail || authUser?.email || (data as any)?.email
+    );
+    const metadataPermissions = getPermissionMetadata(authUser);
+
+    if (!data) {
+      console.warn("No profile found for user, creating default profile");
+      const defaultProfile: UserProfile = {
+        id: userId,
+        email: userEmail || authUser?.email || "unknown",
+        role: isForcedOwnerEmail(resolvedEmail) ? "owner" : "staff",
+        permissions: metadataPermissions,
+        custom_permissions: metadataPermissions,
+        permission_overrides: metadataPermissions,
+        created_at: new Date().toISOString(),
+      };
+      setProfile(defaultProfile);
+      return;
+    }
+
+    const profilePermissions =
+      ((data as any)?.custom_permissions as Record<string, boolean> | undefined) ||
+      ((data as any)?.permission_overrides as Record<string, boolean> | undefined) ||
+      ((data as any)?.permissions as Record<string, boolean> | undefined) ||
+      {};
+    const normalizedProfile = {
+      ...(data as any),
+      role: isForcedOwnerEmail(resolvedEmail)
+        ? ("owner" as const)
+        : (data as any).role,
+      permissions: {
+        ...profilePermissions,
+        ...metadataPermissions,
+      },
+      custom_permissions: {
+        ...profilePermissions,
+        ...metadataPermissions,
+      },
+      permission_overrides: {
+        ...profilePermissions,
+        ...metadataPermissions,
+      },
+    };
+    setProfile(normalizedProfile as UserProfile);
+  } catch (error: any) {
+    console.error("Error loading user profile:", error);
+    const resolvedEmail = normalizeEmail(userEmail);
+    const { data: authData } = await supabase.auth.getUser();
+    const authUser = authData?.user;
+    const metadataPermissions = getPermissionMetadata(authUser);
+    const defaultProfile: UserProfile = {
+      id: userId,
+      email: userEmail || authUser?.email || "unknown",
+      role: isForcedOwnerEmail(resolvedEmail)
+        ? "owner"
+        : ((authUser?.user_metadata?.role as UserRole) || "staff"),
+      permissions: metadataPermissions,
+      custom_permissions: metadataPermissions,
+      permission_overrides: metadataPermissions,
+      name: authUser?.user_metadata?.name || authUser?.email?.split("@")?.[0],
+      created_at: new Date().toISOString(),
+      branch_id: "CN1",
+    };
+    setProfile(defaultProfile);
+
+    if (error?.code !== "PGRST205" && error?.code !== "PGRST116") {
+      console.warn("Suppressed profile loading error to prevent toast loop");
+    }
+  } finally {
+    setLoading(false);
+  }
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -96,6 +209,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [mfaRequired, setMfaRequired] = useState(false);
   const [currentAAL, setCurrentAAL] =
     useState<AuthenticatorAssuranceLevels | null>(null);
+
+  const loadUserProfile = useCallback(
+    async (userId: string, userEmail?: string) => {
+      await loadUserProfileInternal({
+        userId,
+        userEmail,
+        setProfile,
+        setLoading,
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | undefined;
@@ -142,110 +267,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       subscription.unsubscribe();
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []);
-
-  const loadUserProfile = async (userId: string, userEmail?: string) => {
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const authUser = authData?.user || user;
-
-      // Ưu tiên bảng profiles trước, sau đó fallback sang user_profiles nếu không có hoặc bảng không tồn tại
-      let { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error && (error as any).code !== "PGRST116") {
-        // Lỗi khác PGRST116 (table not found) => ném lỗi để hiển thị
-        throw error;
-      }
-
-      if (!data) {
-        const alt = await supabase
-          .from("user_profiles")
-          .select("*")
-          .eq("id", userId)
-          .maybeSingle();
-        data = alt.data as any;
-        error = alt.error as any;
-        if (error && (error as any).code !== "PGRST116") throw error;
-      }
-
-      if (error) throw error;
-      const resolvedEmail = normalizeEmail(userEmail || user?.email || (data as any)?.email);
-      const metadataPermissions = getPermissionMetadata(authUser);
-
-      if (!data) {
-        // Nếu không có profile, tạo một profile mặc định để tránh stuck
-        console.warn('No profile found for user, creating default profile');
-        const defaultProfile: UserProfile = {
-          id: userId,
-          email: userEmail || authUser?.email || user?.email || 'unknown',
-          role: isForcedOwnerEmail(resolvedEmail) ? 'owner' : 'staff', // default role
-          permissions: metadataPermissions,
-          custom_permissions: metadataPermissions,
-          permission_overrides: metadataPermissions,
-          created_at: new Date().toISOString(),
-        };
-        setProfile(defaultProfile);
-      } else {
-        const profilePermissions =
-          ((data as any)?.custom_permissions as Record<string, boolean> | undefined) ||
-          ((data as any)?.permission_overrides as Record<string, boolean> | undefined) ||
-          ((data as any)?.permissions as Record<string, boolean> | undefined) ||
-          {};
-        const normalizedProfile = {
-          ...(data as any),
-          role: isForcedOwnerEmail(resolvedEmail)
-            ? ("owner" as const)
-            : (data as any).role,
-          permissions: {
-            ...profilePermissions,
-            ...metadataPermissions,
-          },
-          custom_permissions: {
-            ...profilePermissions,
-            ...metadataPermissions,
-          },
-          permission_overrides: {
-            ...profilePermissions,
-            ...metadataPermissions,
-          },
-        };
-        setProfile(normalizedProfile as UserProfile);
-      }
-    } catch (error: any) {
-      console.error("Error loading user profile:", error);
-      // Suppress toast for missing table/row, just use default profile
-      const resolvedEmail = normalizeEmail(userEmail || user?.email);
-      const { data: authData } = await supabase.auth.getUser();
-      const authUser = authData?.user || user;
-      const metadataPermissions = getPermissionMetadata(authUser);
-      const defaultProfile: UserProfile = {
-        id: userId,
-        email: userEmail || authUser?.email || user?.email || 'unknown',
-        role: isForcedOwnerEmail(resolvedEmail)
-          ? 'owner'
-          : ((authUser?.user_metadata?.role as UserRole) || (user?.user_metadata?.role as UserRole) || 'staff'),
-        permissions: metadataPermissions,
-        custom_permissions: metadataPermissions,
-        permission_overrides: metadataPermissions,
-        name: authUser?.user_metadata?.name || authUser?.email?.split("@")?.[0] || user?.email?.split("@")[0],
-        created_at: new Date().toISOString(),
-        branch_id: "CN1"
-      };
-      setProfile(defaultProfile);
-
-      // Only set error if it's NOT a missing table/data issue
-      if (error?.code !== 'PGRST205' && error?.code !== 'PGRST116') {
-        // setError("Không thể tải hồ sơ người dùng"); // Commented out to be safe against spam
-        console.warn("Suppressed profile loading error to prevent toast loop");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadUserProfile]);
 
   const signIn = async (
     email: string,
@@ -269,14 +291,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (aalData.nextLevel === "aal2" && aalData.currentLevel === "aal1") {
         setMfaRequired(true);
         // Audit login attempt (best-effort)
-        const userId = data?.user?.id || null;
+        const _userId = data?.user?.id || null;
         // safeAudit(userId, { action: "auth.login_mfa_pending" });
         return { mfaRequired: true };
       }
     }
 
     // No MFA required, complete login
-    const userId = data?.user?.id || null;
+    const _userId = data?.user?.id || null;
     // safeAudit(userId, { action: "auth.login" });
     return { mfaRequired: false };
   };
@@ -315,7 +337,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    const currentUserId = user?.id || null;
+    const _currentUserId = user?.id || null;
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setError(null);

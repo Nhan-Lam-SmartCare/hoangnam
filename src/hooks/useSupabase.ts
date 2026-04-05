@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabaseHelpers } from "../lib/supabase";
 // Note: supabaseHelpers internally used its own supabase client. To avoid multiple GoTrue instances,
 // we refactor supabaseHelpers to consume the unified client from supabaseClient.
-import type { Customer, Part, WorkOrder, Sale, PaymentSource } from "../types";
+import type { Customer, Part, WorkOrder, PaymentSource } from "../types";
 
 // Customers hooks
 export const useCustomers = () => {

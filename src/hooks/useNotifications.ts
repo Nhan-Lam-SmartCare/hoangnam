@@ -204,12 +204,12 @@ export function useNotifications() {
 
     if (Notification.permission === "granted") {
       try {
-        new Notification(title, {
+        const notificationOptions: NotificationOptions & { vibrate?: number[] } = {
           body,
           icon: "/logo-smartcare.png",
-          // @ts-ignore
           vibrate: [200, 100, 200]
-        });
+        };
+        new Notification(title, notificationOptions);
       } catch (e) {
         console.error("Error showing system notification:", e);
       }

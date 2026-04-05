@@ -25,7 +25,7 @@ export async function fetchCustomerDebts(): Promise<
       .filter((row: any) => row.sale_id)
       .map((row: any) => row.sale_id);
 
-    let salesMap = new Map<string, string>();
+    const salesMap = new Map<string, string>();
     if (saleIds.length > 0) {
       const { data: salesData } = await supabase
         .from("sales")

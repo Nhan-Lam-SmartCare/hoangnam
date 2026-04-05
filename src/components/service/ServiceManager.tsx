@@ -3,7 +3,6 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   FileText,
-  Bike,
   Wrench,
   Check,
   Settings,
@@ -16,7 +15,6 @@ import {
   Printer,
   History,
   ChevronDown,
-  Share2,
   Edit2,
   Clock,
   AlertTriangle,
@@ -29,9 +27,7 @@ import { useAppContext } from "../../contexts/AppContext";
 import { canDo } from "../../utils/permissions";
 import type {
   WorkOrder,
-  Part,
   WorkOrderPart,
-  Vehicle,
   Customer,
 } from "../../types";
 import {
@@ -42,13 +38,11 @@ import {
 } from "../../utils/format";
 import { completeWorkOrderPayment } from "../../lib/repository/workOrdersRepository";
 import { syncRepairOrderServices } from "../../lib/repository/repairLaborRepository";
-import { getCategoryColor } from "../../utils/categoryColors";
 import {
   useCreateWorkOrderAtomicRepo,
   useUpdateWorkOrderAtomicRepo,
   useRefundWorkOrderRepo,
   useDeleteWorkOrderRepo,
-  useWorkOrdersRepo,
   useWorkOrdersFilteredRepo,
 } from "../../hooks/useWorkOrdersRepository";
 import type { RepairTemplate } from "../../hooks/useRepairTemplatesRepository";
@@ -69,11 +63,6 @@ import StatusBadge from "../service/components/StatusBadge";
 import { getQuickStatusFilters } from "../service/components/QuickStatusFilters";
 import { getStatusSnapshotCards } from "../service/components/StatusSnapshotCards";
 import {
-  validatePhoneNumber,
-  validateDepositAmount,
-} from "../../utils/validation";
-import { NumberInput } from "../common/NumberInput";
-import {
   detectMaintenancesFromWorkOrder,
   updateVehicleMaintenances,
 } from "../../utils/maintenanceReminder";
@@ -86,17 +75,12 @@ import {
   StoreSettings,
   WorkOrderStatus,
   ServiceTabKey,
-  FilterColor,
   FILTER_BADGE_CLASSES,
   getDateFilterLabel,
 } from "../service/types/service.types";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import {
-  POPULAR_MOTORCYCLES,
   PAGE_SIZE,
-  DEFAULT_FETCH_LIMIT,
-  DEFAULT_DATE_RANGE_DAYS,
-  FILTER_INPUT_CLASS,
 } from "../service/constants/service.constants";
 import {
   downloadImage,
@@ -108,7 +92,7 @@ import {
 
 // Local types removed - now imported from ./types/service.types
 
-const serviceTemplates = [
+const _serviceTemplates = [
   {
     name: "Cài đặt Windows",
     description: "Cài đặt Windows 11, cập nhật driver, phần mềm cơ bản",
@@ -178,7 +162,7 @@ export default function ServiceManager() {
   const { data: fetchedParts, isLoading: partsLoading } = usePartsRepo();
 
   // Fetch employees from Supabase
-  const { data: fetchedEmployees, isLoading: employeesLoading } =
+  const { data: fetchedEmployees, isLoading: _employeesLoading } =
     useEmployeesRepo();
 
   // State for date range filter
@@ -230,12 +214,12 @@ export default function ServiceManager() {
           schema: "public",
           table: "work_orders",
         },
-        (payload) => {
+        (_payload) => {
           // Refetch work orders to get latest data
           refetchWorkOrders();
         }
       )
-      .subscribe((status) => {
+      .subscribe((_status) => {
       });
 
     // Cleanup on unmount
@@ -253,7 +237,7 @@ export default function ServiceManager() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // Debounce search for better performance
-  const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderStatus>(
+  const [_statusFilter, _setStatusFilter] = useState<"all" | WorkOrderStatus>(
     "all"
   );
   const [activeTab, setActiveTab] = useState<ServiceTabKey>("all");
@@ -375,7 +359,7 @@ export default function ServiceManager() {
     null
   );
   const invoicePreviewRef = useRef<HTMLDivElement>(null);
-  const [isSharing, setIsSharing] = useState(false);
+  const [_isSharing, setIsSharing] = useState(false);
   const printableIssueDescription = sanitizeIssueDescriptionForPrint(
     printOrder?.issueDescription
   );
@@ -419,7 +403,7 @@ export default function ServiceManager() {
   );
 
   // Share invoice as image function
-  const handleShareInvoice = async () => {
+  const _handleShareInvoice = async () => {
     if (!invoicePreviewRef.current || !printOrder) return;
 
     setIsSharing(true);
@@ -589,6 +573,15 @@ export default function ServiceManager() {
   const showTableError =
     workOrdersIsError && (displayWorkOrders?.length ?? 0) === 0;
 
+  const handleLoadMore = useCallback(() => {
+    setVisibleCount((c) => c + PAGE_SIZE);
+    const loadedCount =
+      fetchedWorkOrders?.length ?? displayWorkOrders?.length ?? 0;
+    if (!workOrdersFetching && loadedCount >= fetchLimit) {
+      setFetchLimit((l) => l + 100);
+    }
+  }, [displayWorkOrders?.length, fetchLimit, fetchedWorkOrders?.length, workOrdersFetching]);
+
   // Scroll-to-load: auto load more when sentinel becomes visible
   useEffect(() => {
     const sentinel = document.getElementById("service-table-scroll-sentinel");
@@ -605,7 +598,7 @@ export default function ServiceManager() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMoreOrders, workOrdersFetching]);
+  }, [handleLoadMore, hasMoreOrders, workOrdersFetching]);
 
   // ========================================
   // USE CUSTOM HOOK FOR STATS (Refactored!)
@@ -625,10 +618,6 @@ export default function ServiceManager() {
     parts: parts, // Pass parts for cost lookup
     currentBranchId: currentBranchId,
   });
-
-  // Filter input class (kept inline for now)
-  const filterInputClass =
-    "px-4 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-200";
 
   // quickStatusFilters and statusSnapshotCards moved to components
   const quickStatusFilters = getQuickStatusFilters(
@@ -675,7 +664,7 @@ export default function ServiceManager() {
     setShowModal(true);
   };
 
-  const handleApplyTemplate = (template: (typeof serviceTemplates)[0]) => {
+  const _handleApplyTemplate = (template: (typeof _serviceTemplates)[0]) => {
     const newOrder: Partial<WorkOrder> = {
       id: "",
       customerName: "",
@@ -742,7 +731,7 @@ export default function ServiceManager() {
 
   // 🔹 Handle create/update customer debts
   const createCustomerDebt = useCreateCustomerDebtRepo();
-  const updateCustomerDebt = useUpdateCustomerDebtRepo();
+  const _updateCustomerDebt = useUpdateCustomerDebtRepo();
 
   // 🔔 Helper: Create notification when work order is created
   const createWorkOrderNotification = async (
@@ -777,7 +766,6 @@ export default function ServiceManager() {
 
       if (error) {
         console.error("❌ Error creating notification:", error);
-      } else {
       }
     } catch (err) {
       console.error("❌ Error in createWorkOrderNotification:", err);
@@ -975,7 +963,7 @@ export default function ServiceManager() {
         total = 0,
         depositAmount = 0,
         paymentMethod,
-        paymentType,
+        paymentType: _paymentType,
         totalPaid = 0,
         remainingAmount = 0,
       } = workOrderData;
@@ -1486,7 +1474,7 @@ export default function ServiceManager() {
   };
 
   // handleCallCustomer moved to ./utils/service.utils.ts
-  const handleCallCustomerWrapper = (phone: string) => callCustomer(phone);
+  const _handleCallCustomerWrapper = (phone: string) => callCustomer(phone);
 
   // formatMaskedPhone moved to ./utils/service.utils.ts
 
@@ -1496,15 +1484,6 @@ export default function ServiceManager() {
     setTechnicianFilter("all");
     setPaymentFilter("all");
     setDateFilter("week");
-  };
-
-  const handleLoadMore = () => {
-    setVisibleCount((c) => c + PAGE_SIZE);
-    const loadedCount =
-      fetchedWorkOrders?.length ?? displayWorkOrders?.length ?? 0;
-    if (!workOrdersFetching && loadedCount >= fetchLimit) {
-      setFetchLimit((l) => l + 100);
-    }
   };
 
   // Handle delete work order - using hook for proper query invalidation
@@ -2102,14 +2081,14 @@ export default function ServiceManager() {
                 paginatedOrders.map((order) => {
                   // Calculate costs based on actual form data structure
                   // Tiền phụ tùng = Tổng giá phụ tùng
-                  const partsCost =
+                  const _partsCost =
                     order.partsUsed?.reduce(
                       (sum, p) => sum + p.quantity * p.price,
                       0
                     ) || 0;
 
                   // Gia công/Đặt hàng = additionalServices total (price * qty)
-                  const servicesTotal =
+                  const _servicesTotal =
                     order.additionalServices?.reduce(
                       (sum: number, s: any) =>
                         sum + (s.price || 0) * (s.quantity || 1),
@@ -2120,7 +2099,7 @@ export default function ServiceManager() {
                   const services = order.additionalServices || [];
 
                   // Phí dịch vụ = laborCost
-                  const laborCost = order.laborCost || 0;
+                  const _laborCost = order.laborCost || 0;
                   const totalAmount = order.total || 0;
                   const paidAmount = totalAmount - (order.remainingAmount || 0);
                   const paymentProgress = totalAmount

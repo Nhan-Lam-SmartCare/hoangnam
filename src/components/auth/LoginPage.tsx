@@ -124,7 +124,6 @@ export const LoginPage = () => {
     setPassword("");
     // Sign out the partial session
     try {
-      const { supabase } = await import("../../supabaseClient");
       await supabase.auth.signOut();
     } catch (err) {
       console.error("Error signing out:", err);

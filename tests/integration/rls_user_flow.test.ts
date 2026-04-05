@@ -35,9 +35,19 @@ async function upsertProfile(id: string, role: string, branch: string) {
   }
 }
 
+async function assertSalesSchemaReady() {
+  const { error } = await admin!.from("sales").select("id").limit(1);
+  if (error) {
+    throw new Error(
+      `[rls_user_flow.test] Thiếu schema/policy cho public.sales. Hãy chạy migration sql/2026-04-05_add_sales_table_and_rls.sql. Chi tiết: ${error.message}`
+    );
+  }
+}
+
 describe("rls_user_flow (integration)", () => {
   beforeAll(async () => {
     if (!admin || !anonClient) return;
+    await assertSalesSchemaReady();
     // Tạo user xác thực và xác nhận email
     const { data: created, error: createErr } =
       await admin.auth.admin.createUser({
@@ -100,22 +110,9 @@ describe("rls_user_flow (integration)", () => {
       .from("sales")
       .select("id")
       .in("id", ["RLS-SEED-A", "RLS-SEED-B"]);
-    if (error) {
-      console.warn(
-        "[rls_user_flow.test] Bỏ qua assert do lỗi select (có thể thiếu migration RLS branch):",
-        error
-      );
-      expect(true).toBe(true);
-      return;
-    }
+    expect(error).toBeNull();
     const ids = (data || []).map((r) => r.id);
-    if (!ids.length) {
-      console.warn(
-        "[rls_user_flow.test] Không thấy bản ghi nào cho staff – có thể policy đang ở chế độ manager/owner-only do thiếu cột branchId/branchid. Bỏ qua assert."
-      );
-      expect(true).toBe(true);
-      return;
-    }
+    expect(ids.length).toBeGreaterThan(0);
     // Phải thấy A
     expect(ids).toEqual(expect.arrayContaining(["RLS-SEED-A"]));
     // Không thấy B

@@ -41,10 +41,12 @@ export const getDateRange = (filter: string): { startDate: Date; endDate: Date; 
                 label = "7 ngày qua";
                 break;
             case "week":
-                const dayOfWeek = now.getDay();
-                const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
-                label = "Tuần này";
+                {
+                    const dayOfWeek = now.getDay();
+                    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+                    label = "Tuần này";
+                }
                 break;
             case "month":
                 startDate = new Date(now.getFullYear(), now.getMonth(), 1);

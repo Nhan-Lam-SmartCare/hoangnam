@@ -150,7 +150,7 @@ const WorkOrderModal: React.FC<{
   upsertCustomer,
   setCashTransactions,
   setPaymentSources,
-  paymentSources,
+  paymentSources: _paymentSources,
   currentBranchId,
   storeSettings,
   canUpdateWorkOrderStatus = true,
@@ -329,7 +329,7 @@ const WorkOrderModal: React.FC<{
       vehicleModel: "",
       licensePlate: "",
     });
-    const [expandedSections, setExpandedSections] = useState({
+    const [_expandedSections, _setExpandedSections] = useState({
       customer: true,
       vehicle: true,
       issue: true,
@@ -339,11 +339,11 @@ const WorkOrderModal: React.FC<{
     });
 
     // Manual parts entry state
-    const [showAddManualPart, setShowAddManualPart] = useState(false);
-    const [newManualPartName, setNewManualPartName] = useState("");
-    const [newManualPartCost, setNewManualPartCost] = useState(0);
-    const [newManualPartPrice, setNewManualPartPrice] = useState(0);
-    const [newManualPartQuantity, setNewManualPartQuantity] = useState(1);
+    const [_showAddManualPart, _setShowAddManualPart] = useState(false);
+    const [_newManualPartName, _setNewManualPartName] = useState("");
+    const [_newManualPartCost, _setNewManualPartCost] = useState(0);
+    const [_newManualPartPrice, _setNewManualPartPrice] = useState(0);
+    const [_newManualPartQuantity, _setNewManualPartQuantity] = useState(1);
     const [customerSearch, setCustomerSearch] = useState("");
 
     // Server-side search state
@@ -1137,7 +1137,7 @@ const WorkOrderModal: React.FC<{
     };
 
     // 🔹 Function to handle deposit (Đặt cọc để đặt hàng)
-    const handleDeposit = async () => {
+    const _handleDeposit = async () => {
       // Validation
       if (!formData.customerName?.trim()) {
         showToast.error("Vui lòng nhập tên khách hàng");
@@ -1603,7 +1603,7 @@ const WorkOrderModal: React.FC<{
         // Save to Supabase database
         if (order?.id) {
           // Update existing
-          const { data, error } = await updateWorkOrderWithSchemaFallback(
+          const { error } = await updateWorkOrderWithSchemaFallback(
             order.id,
             workOrderData
           );
@@ -1664,11 +1664,10 @@ const WorkOrderModal: React.FC<{
                 `[WorkOrderModal UPDATE] ⚠️ Customer not found: ${formData.customerPhone}`
               );
             }
-          } else {
           }
         } else {
           // Insert new
-          const { data, error } = await insertWorkOrderWithSchemaFallback(
+          const { error } = await insertWorkOrderWithSchemaFallback(
             workOrderData
           );
 
@@ -1738,7 +1737,6 @@ const WorkOrderModal: React.FC<{
                 `[WorkOrderModal CREATE] ⚠️ Customer not found: ${formData.customerPhone}`
               );
             }
-          } else {
           }
         }
 
@@ -2176,8 +2174,7 @@ const WorkOrderModal: React.FC<{
                     .eq("category", "outsourcing")
                     .maybeSingle();
 
-                  if (existingTx) {
-                  } else {
+                  if (!existingTx) {
                     const { error: expenseError } = await supabase
                       .from("cash_transactions")
                       .insert({
@@ -2270,8 +2267,7 @@ const WorkOrderModal: React.FC<{
                     .eq("category", "refund")
                     .maybeSingle();
 
-                  if (existingNegTx) {
-                  } else {
+                  if (!existingNegTx) {
                     const { error: negExpenseError } = await supabase
                       .from("cash_transactions")
                       .insert({
@@ -4187,7 +4183,6 @@ const WorkOrderModal: React.FC<{
                         <tr key={idx} className="bg-white dark:bg-slate-800">
                           <td className="px-4 py-2">
                             {(() => {
-                              const partRef = parts.find((p) => p.id === part.partId);
                               const laborPerUnit = getPartLaborBase(part.partId);
                               const integratedLaborLine = getIntegratedLaborByQuantity(
                                 laborPerUnit,
@@ -4594,7 +4589,7 @@ const WorkOrderModal: React.FC<{
                             name="paymentMethod"
                             value="cash"
                             checked={formData.paymentMethod === "cash"}
-                            onChange={(e) =>
+                            onChange={(_e) =>
                               setFormData({ ...formData, paymentMethod: "cash" })
                             }
                             className="w-4 h-4"
@@ -4627,7 +4622,7 @@ const WorkOrderModal: React.FC<{
                             name="paymentMethod"
                             value="bank"
                             checked={formData.paymentMethod === "bank"}
-                            onChange={(e) =>
+                            onChange={(_e) =>
                               setFormData({ ...formData, paymentMethod: "bank" })
                             }
                             className="w-4 h-4"

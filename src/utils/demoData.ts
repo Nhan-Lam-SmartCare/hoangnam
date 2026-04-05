@@ -5,13 +5,12 @@ import {
   Employee,
   PayrollRecord,
   Loan,
-  LoanPayment,
   CashTransaction,
   Supplier,
   WorkOrder,
-  CustomerDebt,
-  SupplierDebt,
 } from "../types";
+
+/* eslint-disable max-lines */
 
 // Hàm generate ID ngẫu nhiên
 const generateId = () => Math.random().toString(36).substr(2, 9);

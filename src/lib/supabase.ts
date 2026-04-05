@@ -66,7 +66,10 @@ export const supabaseHelpers = {
     // Filter out fields that don't exist in the customers table
     // The actual DB columns are: id, name, phone, email, address, vehicles (jsonb),
     // segment, status, loyaltyPoints, totalSpent, visitCount, notes, lastVisit, created_at
-    const { licensePlate, vehicleModel, vehicleId, ...validUpdates } = updates;
+    const validUpdates = { ...updates };
+    delete validUpdates.licensePlate;
+    delete validUpdates.vehicleModel;
+    delete validUpdates.vehicleId;
 
     const { data, error } = await supabase
       .from("customers")
@@ -228,9 +231,6 @@ export const supabaseHelpers = {
       .order("date", { ascending: false });
 
     if (error) throw error;
-
-    if (data?.length) {
-    }
 
     // Map DB columns to TypeScript interface (handle both lowercase and camelCase)
     const mapped = (data || []).map((row: any) => ({

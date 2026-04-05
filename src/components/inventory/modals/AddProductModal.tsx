@@ -1,16 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { useCreatePartRepo } from '../../../hooks/usePartsRepository';
 import { showToast } from '../../../utils/toast';
-import { formatCurrency } from '../../../utils/format';
 import { validatePriceAndQty } from '../../../utils/validation';
-import { getCategoryColor } from '../../../utils/categoryColors';
 import FormattedNumberInput from '../../common/FormattedNumberInput';
-import SupplierModal from '../../inventory/components/SupplierModal';
-import { X, Plus, Save, Scan, Printer, ShoppingCart, Trash2, Search, Package, AlertCircle, CheckCircle } from 'lucide-react';
 import { useCategories, useCreateCategory } from '../../../hooks/useCategories';
-import { useSuppliers } from '../../../hooks/useSuppliers';
-import { canDo } from '../../../utils/permissions';
-import { useAuth } from '../../../contexts/AuthContext';
 import { calcSellingFromRule, getCategoryPricingRule } from '../../../utils/categoryPricingRules';
 // Add New Product Modal Component
 const AddProductModal: React.FC<{

@@ -35,14 +35,18 @@ export const useConfirm = () => {
   }, []);
 
   const handleConfirm = useCallback(() => {
-    state.resolve?.(true);
-    setState((prev) => ({ ...prev, isOpen: false, resolve: null }));
-  }, [state.resolve]);
+    setState((prev) => {
+      prev.resolve?.(true);
+      return { ...prev, isOpen: false, resolve: null };
+    });
+  }, []);
 
   const handleCancel = useCallback(() => {
-    state.resolve?.(false);
-    setState((prev) => ({ ...prev, isOpen: false, resolve: null }));
-  }, [state.resolve]);
+    setState((prev) => {
+      prev.resolve?.(false);
+      return { ...prev, isOpen: false, resolve: null };
+    });
+  }, []);
 
   return {
     confirm,

@@ -1,26 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../contexts/ThemeContext";
+import { useTheme } from "../../contexts/useTheme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppContext } from "../../contexts/AppContext";
 import { supabase } from "../../supabaseClient";
 import NotificationDropdown from "../common/NotificationDropdown";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
-import { NavLink, MobileDrawerLink } from "./index";
+import { NavLink } from "./index";
 import { canAccessInventorySection } from "../../utils/inventoryAccess";
 import { canDo } from "../../utils/permissions";
 import {
   LayoutDashboard,
   Wrench,
   Shield,
-  ShoppingCart as Cart,
   Boxes,
   Users,
   UserRoundPlus,
-  BriefcaseBusiness,
   Landmark,
-  HandCoins,
-  BarChart3,
   FileText,
   Settings as Cog,
   LogOut,
@@ -32,11 +28,37 @@ import {
   X,
   Menu,
   Home,
-  DollarSign,
-  Truck,
-  Tag,
 } from "lucide-react";
 
+const BRANCH_TABLE_DISABLED_KEY = "motocare-schema-missing-branches";
+
+function readLocalFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeLocalFlag(key: string): void {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // Ignore localStorage write errors
+  }
+}
+
+function isMissingTableError(error: any): boolean {
+  const details = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return (
+    error?.status === 404 ||
+    error?.code === "PGRST205" ||
+    details.includes("does not exist") ||
+    details.includes("could not find")
+  );
+}
+
+// eslint-disable-next-line max-lines-per-function, complexity
 export function Nav() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -125,6 +147,11 @@ export function Nav() {
         localOverrides = [];
       }
 
+      if (readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
+        setBranchOptions(mergeBranches(localOverrides));
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from("branches")
@@ -134,6 +161,10 @@ export function Nav() {
         if (!error && data) {
           setBranchOptions(mergeBranches(data as Array<{ id: string; name: string }>, localOverrides));
           return;
+        }
+
+        if (isMissingTableError(error)) {
+          writeLocalFlag(BRANCH_TABLE_DISABLED_KEY);
         }
       } catch {
         // Fallback below

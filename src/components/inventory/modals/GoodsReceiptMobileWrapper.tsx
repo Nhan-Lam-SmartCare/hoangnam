@@ -157,8 +157,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
     }
 
     const subtotal = receiptItems.reduce(
-      (sum, item) =>
-        sum + item.quantity * item.importPrice + ((item as any).laborCost || 0),
+      (sum, item) => sum + item.quantity * item.importPrice,
       0
     );
     const discountAmount =

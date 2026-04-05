@@ -24,7 +24,7 @@ export async function syncMotocareToPin(
     };
 
     // Insert vào Pin Factory database
-    const { data, error } = await pinSupabase
+    const { error } = await pinSupabase
       .from("cashtransactions")
       .upsert(pinTx, { onConflict: "id" }); // Upsert để tránh duplicate
 
@@ -67,7 +67,7 @@ export async function syncPinToMotocare(
     };
 
     // Insert vào Motocare database
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("cash_transactions")
       .upsert(motocareTx, { onConflict: "id" }); // Upsert để tránh duplicate
 

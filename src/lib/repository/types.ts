@@ -105,7 +105,9 @@ export const failure = (detail: RepoErrorDetail): RepoError => {
       // Fire an event so listeners (Dev Error Panel) can update immediately
       window.dispatchEvent(new CustomEvent("repo-error", { detail }));
     }
-  } catch {}
+  } catch {
+    // noop: error tracking should never break the caller path
+  }
   return {
     ok: false,
     error: detail,
