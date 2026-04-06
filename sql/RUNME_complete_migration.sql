@@ -349,6 +349,7 @@ DECLARE
   v_row_json JSONB;
   v_current_total NUMERIC := 0;
   v_current_paid NUMERIC := 0;
+  v_deposit NUMERIC := 0;
   v_add_paid NUMERIC := 0;
   v_new_paid NUMERIC := 0;
   v_remaining NUMERIC := 0;
@@ -371,6 +372,7 @@ BEGIN
 
   v_current_total := COALESCE((v_row_json->>'total')::numeric, 0);
   v_current_paid := COALESCE((v_row_json->>'totalPaid')::numeric, (v_row_json->>'totalpaid')::numeric, 0);
+  v_deposit := COALESCE((v_row_json->>'depositAmount')::numeric, (v_row_json->>'depositamount')::numeric, 0);
   v_add_paid := GREATEST(0, COALESCE(p_payment_amount, 0));
   v_new_paid := v_current_paid + v_add_paid;
   v_remaining := GREATEST(0, v_current_total - v_new_paid);
@@ -399,6 +401,13 @@ BEGIN
   ELSE
     SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='work_orders' AND column_name='totalpaid') INTO v_col_exists;
     IF v_col_exists THEN v_set_clause := v_set_clause || 'totalpaid = ' || v_new_paid || ', '; END IF;
+  END IF;
+
+  SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='work_orders' AND column_name='additionalPayment') INTO v_col_exists;
+  IF v_col_exists THEN v_set_clause := v_set_clause || '"additionalPayment" = ' || GREATEST(0, v_new_paid - v_deposit) || ', ';
+  ELSE
+    SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='work_orders' AND column_name='additionalpayment') INTO v_col_exists;
+    IF v_col_exists THEN v_set_clause := v_set_clause || 'additionalpayment = ' || GREATEST(0, v_new_paid - v_deposit) || ', '; END IF;
   END IF;
 
   SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='work_orders' AND column_name='remainingAmount') INTO v_col_exists;

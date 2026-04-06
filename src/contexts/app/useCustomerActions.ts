@@ -156,25 +156,35 @@ export function useCustomerActions(
 
       try {
         if (existingCustomer) {
-          const { error } = await supabase
-            .from("customers")
-            .update({
-              name: customer.name || existingCustomer.name,
-              phone: customer.phone || existingCustomer.phone || null,
-              vehiclemodel:
-                customer.vehicleModel || existingCustomer.vehicleModel || null,
-              licenseplate:
-                customer.licensePlate || existingCustomer.licensePlate || null,
-              vehicles: customer.vehicles || existingCustomer.vehicles || [],
-              status: customer.status || existingCustomer.status || "active",
-              segment: customer.segment || existingCustomer.segment || "New",
-              loyaltypoints:
-                customer.loyaltyPoints ?? existingCustomer.loyaltyPoints ?? 0,
-              totalspent: customer.totalSpent ?? existingCustomer.totalSpent ?? 0,
-              visitcount: customer.visitCount ?? existingCustomer.visitCount ?? 0,
+          const basePayload = {
+            name: customer.name || existingCustomer.name,
+            phone: customer.phone || existingCustomer.phone || null,
+            vehiclemodel:
+              customer.vehicleModel || existingCustomer.vehicleModel || null,
+            licenseplate:
+              customer.licensePlate || existingCustomer.licensePlate || null,
+            vehicles: customer.vehicles || existingCustomer.vehicles || [],
+            status: customer.status || existingCustomer.status || "active",
+            segment: customer.segment || existingCustomer.segment || "New",
+            loyaltypoints:
+              customer.loyaltyPoints ?? existingCustomer.loyaltyPoints ?? 0,
+            totalspent: customer.totalSpent ?? existingCustomer.totalSpent ?? 0,
+            visitcount: customer.visitCount ?? existingCustomer.visitCount ?? 0,
+          };
+
+          const error = await updateCustomerWithFallback(customer.id, [
+            {
+              ...basePayload,
               lastvisit: customer.lastVisit || existingCustomer.lastVisit || null,
-            })
-            .eq("id", customer.id);
+            },
+            {
+              ...basePayload,
+              latestvisit: customer.lastVisit || existingCustomer.lastVisit || null,
+            },
+            {
+              ...basePayload,
+            },
+          ]);
 
           if (error) {
             console.error("Error updating customer in Supabase:", error);

@@ -6,6 +6,36 @@ import { formatWorkOrderId } from "../../utils/format";
 
 const WORK_ORDERS_TABLE = "work_orders";
 
+function getMissingColumnNameFromError(error: any): string | null {
+  const code = String(error?.code || "").toUpperCase();
+  const message = String(error?.message || "");
+  if (code !== "PGRST204" && !message.toLowerCase().includes("column")) {
+    return null;
+  }
+
+  const singleQuoteMatch = message.match(/'([^']+)'\s+column/i);
+  if (singleQuoteMatch?.[1]) return singleQuoteMatch[1];
+
+  const doubleQuoteMatch = message.match(/"([^"]+)"\s+column/i);
+  if (doubleQuoteMatch?.[1]) return doubleQuoteMatch[1];
+
+  return null;
+}
+
+function removeMissingColumnKeys(payload: Record<string, any>, missingColumn: string): number {
+  const normalizedMissing = String(missingColumn || "").replace(/['"]/g, "").toLowerCase();
+  if (!normalizedMissing) return 0;
+
+  let removed = 0;
+  Object.keys(payload).forEach((key) => {
+    if (String(key).toLowerCase() === normalizedMissing) {
+      delete payload[key];
+      removed += 1;
+    }
+  });
+  return removed;
+}
+
 async function resolveRefundTargetWorkOrder(
   orderId: string
 ): Promise<{ id: string; row: any } | null> {
@@ -444,6 +474,16 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     // 🔹 FALLBACK: Use direct insert since RPC function is missing/broken on user's DB
     // Map input to DB columns (based on supabase_complete_setup.sql)
     const creatorId = (input as any).created_by || (input as any).createdBy || null;
+    const depositAmount = Math.max(0, Number(input.depositAmount || 0));
+    const additionalPayment = Math.max(0, Number(input.additionalPayment || 0));
+    const providedTotalPaid = Number(input.totalPaid);
+    const totalPaid = Number.isFinite(providedTotalPaid)
+      ? Math.max(0, providedTotalPaid)
+      : depositAmount + additionalPayment;
+    const providedRemaining = Number(input.remainingAmount);
+    const remainingAmount = Number.isFinite(providedRemaining)
+      ? Math.max(0, providedRemaining)
+      : Math.max(0, Number(input.total || 0) - totalPaid);
 
     const newOrder = {
       id: input.id,
@@ -466,11 +506,11 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
       "paymentStatus": input.paymentStatus || "unpaid",
       "paymentMethod": input.paymentMethod || null,
-      "totalPaid": input.additionalPayment || 0, // Initial payment?
-      "remainingAmount": (input.total || 0) - (input.additionalPayment || 0) - (input.depositAmount || 0),
-
-      // Store deposit info in notes or separate logic if needed?
-      // For now, simpler insert to ensure SAVE works.
+      "depositAmount": depositAmount,
+      "additionalPayment": additionalPayment,
+      "totalPaid": totalPaid,
+      "remainingAmount": remainingAmount,
+      "paymentDate": input.paymentStatus === "paid" ? new Date().toISOString() : null,
     };
 
     const insertPayloads: Array<Record<string, any>> = creatorId
@@ -488,15 +528,36 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     for (const payload of insertPayloads) {
       const sanitizedPayload = Object.fromEntries(
         Object.entries(payload).filter(([, value]) => value !== undefined)
-      );
-      const res = await supabase
-        .from(WORK_ORDERS_TABLE)
-        .insert(sanitizedPayload)
-        .select()
-        .single();
+      ) as Record<string, any>;
 
-      data = res.data;
-      error = res.error;
+      while (true) {
+        const res = await supabase
+          .from(WORK_ORDERS_TABLE)
+          .insert(sanitizedPayload)
+          .select()
+          .single();
+
+        data = res.data;
+        error = res.error;
+
+        if (!error) {
+          break;
+        }
+
+        const missingColumn = getMissingColumnNameFromError(error);
+        if (!missingColumn) {
+          break;
+        }
+
+        const removedCount = removeMissingColumnKeys(sanitizedPayload, missingColumn);
+        if (removedCount === 0) {
+          break;
+        }
+
+        console.warn("[createWorkOrderAtomic] Retry insert without missing column", {
+          missingColumn,
+        });
+      }
 
       if (!error) {
         break;
@@ -553,6 +614,26 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     // 🔹 FALLBACK: Use direct update since RPC function is missing/broken on user's DB
     // Map input to DB columns (based on supabase_complete_setup.sql)
     const partsToSave = input.partsUsed || (input as any).parts || [];
+    const normalizedDepositAmount =
+      input.depositAmount !== undefined
+        ? Math.max(0, Number(input.depositAmount || 0))
+        : undefined;
+    const normalizedAdditionalPayment =
+      input.additionalPayment !== undefined
+        ? Math.max(0, Number(input.additionalPayment || 0))
+        : undefined;
+    const normalizedTotalPaid =
+      input.totalPaid !== undefined
+        ? Math.max(0, Number(input.totalPaid || 0))
+        : normalizedDepositAmount !== undefined || normalizedAdditionalPayment !== undefined
+          ? Math.max(0, Number(normalizedDepositAmount || 0) + Number(normalizedAdditionalPayment || 0))
+          : undefined;
+    const normalizedRemainingAmount =
+      input.remainingAmount !== undefined
+        ? Math.max(0, Number(input.remainingAmount || 0))
+        : normalizedTotalPaid !== undefined && input.total !== undefined
+          ? Math.max(0, Number(input.total || 0) - normalizedTotalPaid)
+          : undefined;
 
     // Ensure parts have valid structure (though JSONB accepts generic, we want consistency)
     // NOTE: WorkOrderMobileModal already cleans custom partIds.
@@ -574,18 +655,50 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
       "paymentStatus": input.paymentStatus,
       "paymentMethod": input.paymentMethod,
-      // For updates, simpler payment handling (ignoring deposits for fallback)
+      "depositAmount": normalizedDepositAmount,
+      "additionalPayment": normalizedAdditionalPayment,
+      "totalPaid": normalizedTotalPaid,
+      "remainingAmount": normalizedRemainingAmount,
+      "paymentDate": input.paymentStatus === "paid" ? new Date().toISOString() : undefined,
     };
 
     // Remove undefined keys so we don't overwrite with null unless intended
     Object.keys(updates).forEach(key => (updates as any)[key] === undefined && delete (updates as any)[key]);
 
-    const { data, error } = await supabase
-      .from(WORK_ORDERS_TABLE)
-      .update(updates)
-      .eq("id", input.id)
-      .select()
-      .single();
+    const sanitizedUpdates = { ...(updates as Record<string, any>) };
+
+    let data: any = null;
+    let error: any = null;
+
+    while (true) {
+      const res = await supabase
+        .from(WORK_ORDERS_TABLE)
+        .update(sanitizedUpdates)
+        .eq("id", input.id)
+        .select()
+        .single();
+
+      data = res.data;
+      error = res.error;
+
+      if (!error) {
+        break;
+      }
+
+      const missingColumn = getMissingColumnNameFromError(error);
+      if (!missingColumn) {
+        break;
+      }
+
+      const removedCount = removeMissingColumnKeys(sanitizedUpdates, missingColumn);
+      if (removedCount === 0) {
+        break;
+      }
+
+      console.warn("[updateWorkOrderAtomic] Retry update without missing column", {
+        missingColumn,
+      });
+    }
 
     if (error) {
       console.error("[updateWorkOrderAtomic] Update Error:", error);
@@ -748,67 +861,77 @@ export async function refundWorkOrder(
         });
       }
 
+      const inventoryWasDeducted =
+        Boolean((existingRow as any).inventory_deducted) ||
+        Boolean((existingRow as any).inventoryDeducted);
+
       const branchId = currentOrder.branchId || "CN1";
       const refundAmount = Math.max(0, Number(currentOrder.totalPaid || 0));
       const nowIso = new Date().toISOString();
 
-      // 1) Restore stock for used parts (best effort each item)
-      const partsUsed = (currentOrder.partsUsed || []) as any[];
-      for (const part of partsUsed) {
-        const partId = String(part?.partId || "").trim();
-        const qty = Math.max(0, Number(part?.quantity || 0));
-        if (!partId || qty <= 0) continue;
+      // 1) Restore stock for used parts only when this order was previously deducted.
+      if (inventoryWasDeducted) {
+        const partsUsed = (currentOrder.partsUsed || []) as any[];
+        for (const part of partsUsed) {
+          const partId = String(part?.partId || "").trim();
+          const qty = Math.max(0, Number(part?.quantity || 0));
+          if (!partId || qty <= 0) continue;
 
-        const { data: partRow, error: partFetchError } = await supabase
-          .from("parts")
-          .select("id,name,stock")
-          .eq("id", partId)
-          .single();
+          const { data: partRow, error: partFetchError } = await supabase
+            .from("parts")
+            .select("id,name,stock")
+            .eq("id", partId)
+            .single();
 
-        if (partFetchError || !partRow) {
-          console.warn("[refundWorkOrder:fallback] Skip restore stock: part not found", {
-            partId,
-            partFetchError,
-          });
-          continue;
+          if (partFetchError || !partRow) {
+            console.warn("[refundWorkOrder:fallback] Skip restore stock: part not found", {
+              partId,
+              partFetchError,
+            });
+            continue;
+          }
+
+          const currentStock = (partRow as any).stock || {};
+          const nextStock = {
+            ...currentStock,
+            [branchId]: Number(currentStock?.[branchId] || 0) + qty,
+          };
+
+          const { error: partUpdateError } = await supabase
+            .from("parts")
+            .update({ stock: nextStock })
+            .eq("id", partId);
+
+          if (partUpdateError) {
+            console.warn("[refundWorkOrder:fallback] Failed restoring part stock", {
+              partId,
+              partUpdateError,
+            });
+            continue;
+          }
+
+          // Best-effort inventory history line
+          await supabase.from("inventory_transactions").insert([
+            {
+              id:
+                typeof crypto !== "undefined" && (crypto as any).randomUUID
+                  ? (crypto as any).randomUUID()
+                  : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+              type: "Nhập kho",
+              partId,
+              partName: String(part?.partName || (partRow as any).name || "Phụ tùng"),
+              quantity: qty,
+              date: nowIso,
+              branchId,
+              notes: `Hoàn kho do hủy phiếu ${refundTargetOrderId}`,
+              workOrderId: refundTargetOrderId,
+            },
+          ]);
         }
-
-        const currentStock = (partRow as any).stock || {};
-        const nextStock = {
-          ...currentStock,
-          [branchId]: Number(currentStock?.[branchId] || 0) + qty,
-        };
-
-        const { error: partUpdateError } = await supabase
-          .from("parts")
-          .update({ stock: nextStock })
-          .eq("id", partId);
-
-        if (partUpdateError) {
-          console.warn("[refundWorkOrder:fallback] Failed restoring part stock", {
-            partId,
-            partUpdateError,
-          });
-          continue;
-        }
-
-        // Best-effort inventory history line
-        await supabase.from("inventory_transactions").insert([
-          {
-            id:
-              typeof crypto !== "undefined" && (crypto as any).randomUUID
-                ? (crypto as any).randomUUID()
-                : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
-            type: "Nhập kho",
-            partId,
-            partName: String(part?.partName || (partRow as any).name || "Phụ tùng"),
-            quantity: qty,
-            date: nowIso,
-            branchId,
-            notes: `Hoàn kho do hủy phiếu ${refundTargetOrderId}`,
-            workOrderId: refundTargetOrderId,
-          },
-        ]);
+      } else {
+        console.warn("[refundWorkOrder:fallback] Skip stock restore because inventory_deducted is false", {
+          refundTargetOrderId,
+        });
       }
 
       // 2) Create refund cash transaction + adjust payment source balance (if any)
@@ -933,6 +1056,7 @@ export async function refundWorkOrder(
           refund_reason: refundReason,
           refunded_at: nowIso,
           refund_transaction_id: refundTransactionId,
+          inventory_deducted: false,
         },
         {
           refunded: true,
@@ -940,13 +1064,16 @@ export async function refundWorkOrder(
           refundReason: refundReason,
           refundedAt: nowIso,
           refundTransactionId: refundTransactionId,
+          inventoryDeducted: false,
         },
         {
           refunded: true,
           status: "Đã hủy",
+          inventory_deducted: false,
         },
         {
           status: "Đã hủy",
+          inventory_deducted: false,
         },
       ];
 
@@ -1160,16 +1287,18 @@ export async function completeWorkOrderPayment(
       const currentOrder = normalizeWorkOrder(existingRow);
       const currentTotal = Number(currentOrder.total || 0);
       const currentPaid = Number(currentOrder.totalPaid || 0);
+      const currentDeposit = Math.max(0, Number(currentOrder.depositAmount || 0));
       const addPaid = Math.max(0, Number(paymentAmount || 0));
       const nextPaid = currentPaid + addPaid;
       const remainingAmount = Math.max(0, currentTotal - nextPaid);
+      const nextAdditionalPayment = Math.max(0, nextPaid - currentDeposit);
       const nextStatus =
         remainingAmount <= 0 ? "paid" : nextPaid > 0 ? "partial" : "unpaid";
 
       const updates: any = {
         paymentStatus: nextStatus,
         paymentMethod: paymentMethod || currentOrder.paymentMethod || null,
-        additionalPayment: addPaid,
+        additionalPayment: nextAdditionalPayment,
         totalPaid: nextPaid,
         remainingAmount,
       };

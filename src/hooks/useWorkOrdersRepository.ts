@@ -95,13 +95,17 @@ export const useUpdateWorkOrderAtomicRepo = () => {
 export const useUpdateWorkOrderRepo = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       id,
       updates,
     }: {
       id: string;
       updates: Partial<WorkOrder>;
-    }) => updateWorkOrder(id, updates),
+    }) => {
+      const res = await updateWorkOrder(id, updates);
+      if (!res.ok) throw res.error;
+      return res.data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workOrdersRepo"] });
       qc.invalidateQueries({ queryKey: ["workOrdersFiltered"] }); // Invalidate filtered queries
@@ -116,7 +120,11 @@ export const useUpdateWorkOrderRepo = () => {
 export const useDeleteWorkOrderRepo = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id }: { id: string }) => deleteWorkOrder(id),
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await deleteWorkOrder(id);
+      if (!res.ok) throw res.error;
+      return res.data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workOrdersRepo"] });
       qc.invalidateQueries({ queryKey: ["workOrdersFiltered"] }); // Invalidate filtered queries
