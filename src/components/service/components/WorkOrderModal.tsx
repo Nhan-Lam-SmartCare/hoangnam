@@ -285,6 +285,10 @@ const WorkOrderModal: React.FC<{
       );
       return matchedByName?.name || "";
     }, [employees, profile?.email, profile?.name, profile?.full_name]);
+    const isStaffRole =
+      String(profile?.role || "").trim().toLowerCase() === "staff";
+    const isTechnicianLockedForStaff =
+      isStaffRole && !!defaultTechnicianName;
 
     const [formData, setFormData] = useState<Partial<WorkOrder>>(() => {
       if (order?.id) return order;
@@ -308,6 +312,10 @@ const WorkOrderModal: React.FC<{
         creationDate: order?.creationDate || new Date().toISOString(),
       };
     });
+    const resolvedTechnicianName =
+      isTechnicianLockedForStaff
+        ? defaultTechnicianName
+        : formData.technicianName || "";
 
     const [searchPart, setSearchPart] = useState("");
     const [devicePassword, setDevicePassword] = useState("");
@@ -487,6 +495,20 @@ const WorkOrderModal: React.FC<{
         };
       });
     }, [order?.id, defaultTechnicianName]);
+
+    useEffect(() => {
+      if (!isTechnicianLockedForStaff) return;
+
+      setFormData((prev) => {
+        if (String(prev.technicianName || "").trim() === defaultTechnicianName) {
+          return prev;
+        }
+        return {
+          ...prev,
+          technicianName: defaultTechnicianName,
+        };
+      });
+    }, [isTechnicianLockedForStaff, defaultTechnicianName]);
 
     // Search customers from Supabase when search term changes
     useEffect(() => {
@@ -770,7 +792,7 @@ const WorkOrderModal: React.FC<{
       if (service.workers.length > 0) return service.workers;
       return buildDefaultWorkerSplit(
         employeeOptions,
-        formData.technicianName,
+        resolvedTechnicianName,
         service.defaultWorkerSharePercent
       );
     };
@@ -1187,7 +1209,7 @@ const WorkOrderModal: React.FC<{
           licensePlate: formData.licensePlate || "",
           currentKm: formData.currentKm,
           issueDescription: formData.issueDescription || "",
-          technicianName: formData.technicianName || "",
+          technicianName: resolvedTechnicianName,
           status: formData.status || "Tiếp nhận",
           laborCost: effectiveLaborCost,
           laborTotal: effectiveLaborCost,
@@ -1571,8 +1593,8 @@ const WorkOrderModal: React.FC<{
           currentkm: formData.currentKm,
           issueDescription: formData.issueDescription || "",
           issuedescription: formData.issueDescription || "",
-          technicianName: formData.technicianName || "",
-          technicianname: formData.technicianName || "",
+          technicianName: resolvedTechnicianName,
+          technicianname: resolvedTechnicianName,
           status: formData.status || "Tiếp nhận",
           laborCost: effectiveLaborCost,
           laborcost: effectiveLaborCost,
@@ -1917,7 +1939,7 @@ const WorkOrderModal: React.FC<{
               licensePlate: formData.licensePlate || "",
               currentKm: formData.currentKm,
               issueDescription: finalIssueDescription, // Use modified description
-              technicianName: formData.technicianName || "",
+              technicianName: resolvedTechnicianName,
               status: formData.status || "Tiếp nhận",
               laborCost: effectiveLaborCost,
               discount: discount,
@@ -1951,7 +1973,7 @@ const WorkOrderModal: React.FC<{
               licensePlate: formData.licensePlate || "",
               currentKm: formData.currentKm,
               issueDescription: formData.issueDescription || "",
-              technicianName: formData.technicianName || "",
+              technicianName: resolvedTechnicianName,
               status: formData.status || "Tiếp nhận",
               laborCost: effectiveLaborCost,
               laborTotal: syncedRepairServices.reduce(
@@ -2413,7 +2435,7 @@ const WorkOrderModal: React.FC<{
               vehicleModel: formData.vehicleModel || "",
               licensePlate: formData.licensePlate || "",
               issueDescription: finalIssueDescription, // Use modified description
-              technicianName: formData.technicianName || "",
+              technicianName: resolvedTechnicianName,
               status: formData.status || "Tiếp nhận",
               laborCost: effectiveLaborCost,
               discount: discount,
@@ -2558,7 +2580,7 @@ const WorkOrderModal: React.FC<{
                 licensePlate: formData.licensePlate || order.licensePlate,
                 issueDescription:
                   formData.issueDescription || order.issueDescription,
-                technicianName: formData.technicianName || order.technicianName,
+                technicianName: resolvedTechnicianName || order.technicianName,
                 status: formData.status || order.status,
                 laborCost: effectiveLaborCost,
                 laborTotal: syncedRepairServices.reduce(
@@ -3584,15 +3606,21 @@ const WorkOrderModal: React.FC<{
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Kỹ thuật viên
                     </label>
+                    {isTechnicianLockedForStaff && (
+                      <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+                        Tài khoản nhân viên: kỹ thuật viên được cố định theo đăng nhập.
+                      </p>
+                    )}
                     <select
-                      value={formData.technicianName || ""}
+                      value={resolvedTechnicianName}
+                      disabled={isTechnicianLockedForStaff}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
                           technicianName: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">-- Chọn kỹ thuật viên --</option>
                       {employees
@@ -3664,7 +3692,7 @@ const WorkOrderModal: React.FC<{
                                 : 0,
                             workers: buildDefaultWorkerSplit(
                               employeeOptions,
-                              formData.technicianName,
+                              resolvedTechnicianName,
                               selectedService.defaultWorkerSharePercent
                             ),
                           });

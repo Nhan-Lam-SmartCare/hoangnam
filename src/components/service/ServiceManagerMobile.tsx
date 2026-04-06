@@ -81,6 +81,7 @@ const WorkOrderCard = React.memo(({
   canEdit,
   canPrint,
   canDelete,
+  showOwnerModeBadge,
 }: {
   workOrder: WorkOrder;
   onEdit: (wo: WorkOrder) => void;
@@ -90,6 +91,7 @@ const WorkOrderCard = React.memo(({
   canEdit: boolean;
   canPrint: boolean;
   canDelete: boolean;
+  showOwnerModeBadge: boolean;
 }) => {
   const getStatusMeta = (status: string) => {
     switch (status) {
@@ -204,6 +206,14 @@ const WorkOrderCard = React.memo(({
           </div>
         </div>
       </div>
+
+      {showOwnerModeBadge && (
+        <div className="px-2.5 py-1 border-t border-[#273348]">
+          <span className="inline-flex items-center rounded-full border border-amber-300/50 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+            Owner mode: Toan quyen phieu
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-4 border-t border-[#273348]">
         <button
@@ -363,6 +373,7 @@ export function ServiceManagerMobile({
   onRefresh,
 }: ServiceManagerMobileProps) {
   const { profile } = useAuth();
+  const canManageAllWorkOrders = profile?.role === "owner";
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showFilterPopup, setShowFilterPopup] = useState(false);
@@ -427,7 +438,9 @@ export function ServiceManagerMobile({
     const NOW = new Date();
     const startOfToday = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate());
 
-    return workOrders.filter(w => {
+    return workOrders
+      .filter((w) => !w.refunded && w.status !== "Đã hủy")
+      .filter(w => {
       if (!w.creationDate) return false;
       const date = new Date(w.creationDate);
 
@@ -805,9 +818,16 @@ export function ServiceManagerMobile({
                         onCall={onCallCustomer}
                         onPrint={onPrintWorkOrder}
                         onDelete={onDeleteWorkOrder}
-                        canEdit={canUpdateWorkOrder && isOwnWorkOrder(workOrder)}
+                        showOwnerModeBadge={canManageAllWorkOrders}
+                        canEdit={
+                          canUpdateWorkOrder &&
+                          (canManageAllWorkOrders || isOwnWorkOrder(workOrder))
+                        }
                         canPrint={canPrintWorkOrder}
-                        canDelete={canDeleteWorkOrder && isOwnWorkOrder(workOrder)}
+                        canDelete={
+                          canDeleteWorkOrder &&
+                          (canManageAllWorkOrders || isOwnWorkOrder(workOrder))
+                        }
                       />
                     ))
                   )}

@@ -58,6 +58,7 @@ import { WORK_ORDER_STATUS, type WorkOrderStatus } from "../../constants";
 import { NumberInput } from "../common/NumberInput";
 import { showToast } from "../../utils/toast";
 import { supabase } from "../../supabaseClient";
+import { useAuth } from "../../contexts/AuthContext";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useServiceConfigs } from "../../hooks/useRepairLabor";
 import {
@@ -151,6 +152,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   canUpdateWorkOrderVehicle = true,
   canUpdateWorkOrderOutsourceService = true,
 }) => {
+  const { profile } = useAuth();
   const { data: serviceConfigs = [] } = useServiceConfigs();
   // Popular electronic devices for repair
   const POPULAR_DEVICES = [
@@ -311,9 +313,48 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const [status, setStatus] = useState<WorkOrderStatus>(
     (workOrder?.status as WorkOrderStatus) || WORK_ORDER_STATUS.RECEIVED
   );
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState(
-    employees.find((e) => e.name === workOrder?.technicianName)?.id || ""
+  const isStaffRole =
+    String(profile?.role || "").trim().toLowerCase() === "staff";
+  const defaultTechnicianId = useMemo(() => {
+    const normalizedProfileEmail = String(profile?.email || "")
+      .trim()
+      .toLowerCase();
+    const normalizedProfileName = String(profile?.name || profile?.full_name || "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedProfileEmail && !normalizedProfileName) return "";
+
+    const activeEmployees = (employees || []).filter(
+      (emp) => emp?.status === "active"
+    );
+
+    const matchedByEmail = activeEmployees.find(
+      (emp) =>
+        String(emp?.email || "")
+          .trim()
+          .toLowerCase() === normalizedProfileEmail
+    );
+    if (matchedByEmail?.id) return matchedByEmail.id;
+
+    const matchedByName = activeEmployees.find(
+      (emp) =>
+        String(emp?.name || "")
+          .trim()
+          .toLowerCase() === normalizedProfileName
+    );
+    return matchedByName?.id || "";
+  }, [employees, profile?.email, profile?.name, profile?.full_name]);
+  const technicianIdFromWorkOrder = useMemo(
+    () => employees.find((e) => e.name === workOrder?.technicianName)?.id || "",
+    [employees, workOrder?.technicianName]
   );
+  const isTechnicianLockedForStaff = isStaffRole && !!defaultTechnicianId;
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState(
+    technicianIdFromWorkOrder || defaultTechnicianId || ""
+  );
+  const effectiveSelectedTechnicianId =
+    (isTechnicianLockedForStaff ? defaultTechnicianId : selectedTechnicianId) || "";
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
@@ -325,6 +366,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     if (workOrder) {
       setSelectedCustomer(initialCustomer);
       setSelectedVehicle(initialVehicle);
+      setSelectedTechnicianId(technicianIdFromWorkOrder || defaultTechnicianId || "");
 
       // Load Password/Pattern from issueDescription/notes
       let password = "";
@@ -375,6 +417,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     } else {
       setSelectedCustomer(null);
       setSelectedVehicle(null);
+      setSelectedTechnicianId(defaultTechnicianId || "");
       setCurrentKm("");
       setShowCustomerSearch(true);
       setDepositAmount(0);
@@ -383,7 +426,23 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       setShowPaymentInput(false);
       setIncludeIntegratedLabor(true);
     }
-  }, [workOrder, initialCustomer, initialVehicle]);
+  }, [
+    workOrder,
+    initialCustomer,
+    initialVehicle,
+    technicianIdFromWorkOrder,
+    defaultTechnicianId,
+  ]);
+
+  useEffect(() => {
+    if (!isTechnicianLockedForStaff) return;
+    if (selectedTechnicianId === defaultTechnicianId) return;
+    setSelectedTechnicianId(defaultTechnicianId);
+  }, [
+    isTechnicianLockedForStaff,
+    selectedTechnicianId,
+    defaultTechnicianId,
+  ]);
 
   const [currentKm, setCurrentKm] = useState(
     workOrder?.currentKm?.toString() || ""
@@ -581,7 +640,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
   const getRepairServiceWorkers = (service: RepairServiceDraft) => {
     if (service.workers.length > 0) return service.workers;
-    const mainTechnician = employees.find((employee) => employee.id === selectedTechnicianId)?.name;
+    const mainTechnician = employees.find(
+      (employee) => employee.id === effectiveSelectedTechnicianId
+    )?.name;
     return buildDefaultWorkerSplit(
       employees,
       mainTechnician,
@@ -1277,7 +1338,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
     const workOrderData = {
       status,
-      technicianId: selectedTechnicianId,
+      technicianId: effectiveSelectedTechnicianId,
       customer: selectedCustomer,
       vehicle: selectedVehicle,
       // FIX: 'currentKm' stores Password/Pattern (string), but DB expects Integer for Odometer.
@@ -1891,15 +1952,25 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
                       Kỹ thuật viên phụ trách
                     </label>
+                    {isTechnicianLockedForStaff && (
+                      <p className="text-[10px] font-semibold text-blue-500 ml-1">
+                        Tài khoản nhân viên: kỹ thuật viên được cố định theo đăng nhập.
+                      </p>
+                    )}
                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
                       {employees
                         .filter(emp => !["Nguyễn Xuân Nhạn", "Võ Thanh Lâm"].includes(emp.name))
                         .map((emp) => {
-                          const isActive = selectedTechnicianId === emp.id;
+                          const isActive = effectiveSelectedTechnicianId === emp.id;
                           return (
                             <button
                               key={emp.id}
-                              onClick={() => setSelectedTechnicianId(emp.id)}
+                              type="button"
+                              disabled={isTechnicianLockedForStaff}
+                              onClick={() => {
+                                if (isTechnicianLockedForStaff) return;
+                                setSelectedTechnicianId(emp.id);
+                              }}
                               className={`flex-shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${isActive
                                 ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20 scale-[1.02]"
                                 : "bg-white dark:bg-[#1e1e2d] border-slate-200 dark:border-slate-700/50 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-600"
@@ -2210,7 +2281,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                   return;
                                 }
                                 const technicianName =
-                                  employees.find((employee) => employee.id === selectedTechnicianId)?.name;
+                                  employees.find((employee) => employee.id === effectiveSelectedTechnicianId)?.name;
                                 setNewRepairServiceDraft({
                                   ...createEmptyRepairServiceDraft(),
                                   serviceId: selectedService.id,

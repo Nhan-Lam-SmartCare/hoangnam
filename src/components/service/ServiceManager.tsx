@@ -142,6 +142,7 @@ export default function ServiceManager() {
     profile,
     "work_order.outsource_service.update"
   );
+  const canManageAllWorkOrders = profile?.role === USER_ROLES.OWNER;
 
   const {
     parts: contextParts,
@@ -333,7 +334,7 @@ export default function ServiceManager() {
         ? !!currentUserId && creatorId === currentUserId
         : !!profileName && !!technicianName && profileName === technicianName;
 
-      if (!(canUpdateWorkOrder && isOwnerOrder)) {
+      if (!(canUpdateWorkOrder && (canManageAllWorkOrders || isOwnerOrder))) {
         showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
         window.history.replaceState({}, document.title);
         return;
@@ -347,6 +348,7 @@ export default function ServiceManager() {
   }, [
     location.state,
     canUpdateWorkOrder,
+    canManageAllWorkOrders,
     profile?.id,
     profile?.name,
     profile?.full_name,
@@ -393,13 +395,15 @@ export default function ServiceManager() {
   );
 
   const canModifyOrder = useCallback(
-    (order?: Partial<WorkOrder>) => canUpdateWorkOrder && isOwnWorkOrder(order),
-    [canUpdateWorkOrder, isOwnWorkOrder]
+    (order?: Partial<WorkOrder>) =>
+      canUpdateWorkOrder && (canManageAllWorkOrders || isOwnWorkOrder(order)),
+    [canUpdateWorkOrder, canManageAllWorkOrders, isOwnWorkOrder]
   );
 
   const canDeleteOrder = useCallback(
-    (order?: Partial<WorkOrder>) => canDeleteWorkOrder && isOwnWorkOrder(order),
-    [canDeleteWorkOrder, isOwnWorkOrder]
+    (order?: Partial<WorkOrder>) =>
+      canDeleteWorkOrder && (canManageAllWorkOrders || isOwnWorkOrder(order)),
+    [canDeleteWorkOrder, canManageAllWorkOrders, isOwnWorkOrder]
   );
 
   // Share invoice as image function
@@ -932,7 +936,7 @@ export default function ServiceManager() {
   // 🔹 Handle Mobile Save - Similar to desktop handleSave
   const handleMobileSave = async (workOrderData: any) => {
     try {
-      if (editingOrder?.id && !isOwnWorkOrder(editingOrder)) {
+      if (editingOrder?.id && !canModifyOrder(editingOrder)) {
         showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
         throw new Error("UNAUTHORIZED_WORK_ORDER_OWNER");
       }
@@ -2511,6 +2515,13 @@ export default function ServiceManager() {
                                 }}
                               >
                                 <div className="py-1">
+                                  {canManageAllWorkOrders && (
+                                    <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700">
+                                      <span className="inline-flex items-center rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
+                                        Owner mode: Toan quyen phieu
+                                      </span>
+                                    </div>
+                                  )}
                                   {canModifyOrder(order) && (
                                     <button
                                       onClick={() => {
