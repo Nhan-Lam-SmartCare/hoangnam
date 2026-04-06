@@ -11,6 +11,27 @@ try {
   // Ignore session storage access errors
 }
 
+// Hard-disable legacy PWA caching to prevent stale mixed JS chunks in production.
+if (typeof window !== "undefined") {
+  window.addEventListener("load", () => {
+    (async () => {
+      try {
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((reg) => reg.unregister()));
+        }
+
+        if ("caches" in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        }
+      } catch (err) {
+        console.warn("Legacy service worker cleanup failed:", err);
+      }
+    })();
+  });
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
@@ -28,12 +49,3 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     />
   </React.StrictMode>
 );
-// Register Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .catch(registrationError => {
-        console.error("Service Worker registration failed:", registrationError);
-      });
-  });
-}
