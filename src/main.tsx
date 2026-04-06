@@ -5,6 +5,12 @@ import "./index.css";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+try {
+  window.sessionStorage.removeItem("motocare-react-activity-recovery-v1");
+} catch {
+  // Ignore session storage access errors
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

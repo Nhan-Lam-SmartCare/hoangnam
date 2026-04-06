@@ -38,6 +38,68 @@
     class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200"
   >
     <div id="root"></div>
+    <script>
+      (function () {
+        var RECOVERY_KEY = "motocare-react-activity-recovery-v1";
+
+        function hasActivityInitError(message) {
+          var msg = String(message || "").toLowerCase();
+          return (
+            msg.indexOf("cannot set properties of undefined") !== -1 &&
+            msg.indexOf("activity") !== -1
+          );
+        }
+
+        async function recoverFromStaleBundle() {
+          try {
+            if (sessionStorage.getItem(RECOVERY_KEY) === "1") {
+              return;
+            }
+            sessionStorage.setItem(RECOVERY_KEY, "1");
+
+            if ("serviceWorker" in navigator) {
+              var registrations = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(registrations.map(function (reg) {
+                return reg.unregister();
+              }));
+            }
+
+            if ("caches" in window) {
+              var names = await caches.keys();
+              await Promise.all(names.map(function (name) {
+                return caches.delete(name);
+              }));
+            }
+          } catch (err) {
+            console.warn("[Recovery] Bundle recovery failed:", err);
+          }
+
+          var url = new URL(window.location.href);
+          url.searchParams.set("bundle_recover", String(Date.now()));
+          window.location.replace(url.toString());
+        }
+
+        window.addEventListener("error", function (event) {
+          if (hasActivityInitError(event && event.message)) {
+            recoverFromStaleBundle();
+          }
+        });
+
+        window.addEventListener("unhandledrejection", function (event) {
+          var reason = event && event.reason;
+          var message =
+            typeof reason === "string"
+              ? reason
+              : reason && reason.message
+              ? reason.message
+              : "";
+
+          if (hasActivityInitError(message)) {
+            recoverFromStaleBundle();
+          }
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
