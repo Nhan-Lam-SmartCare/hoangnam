@@ -1364,8 +1364,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     // Execute save callback with offline fallback
     try {
       await onSave(workOrderData);
-      // Note: Not resetting isSubmitting here because modal will close on success
-      // Parent component is responsible for closing the modal
     } catch (error: any) {
       console.error("Error saving work order:", error);
       console.error("Error details:", {
@@ -1374,7 +1372,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         details: error?.details,
         hint: error?.hint,
       });
-      setIsSubmitting(false); // Reset on error so user can retry
 
       // Fallback: Save to Local Storage as draft
       const drafts = JSON.parse(localStorage.getItem("offline_drafts") || "[]");
@@ -1406,6 +1403,8 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
       alert(errorMessage + "\n\nDữ liệu đã được lưu tạm. Bạn có thể thử lại hoặc chụp màn hình.");
       // onClose(); // Don't close so user can retry
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1442,6 +1441,15 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       document.body.classList.remove("hide-bottom-nav");
     };
   }, [isOpen]);
+
+  // Reset submit lock when modal is reopened/closed so next create flow is never stuck.
+  useEffect(() => {
+    if (!isOpen) {
+      setIsSubmitting(false);
+      return;
+    }
+    setIsSubmitting(false);
+  }, [isOpen, workOrder?.id]);
 
   if (!isOpen) return null;
 
