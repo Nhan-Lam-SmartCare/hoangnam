@@ -3,7 +3,7 @@
 
 // IMPORTANT: Change this version when deploying new code
 // Format: YYYYMMDD-HHMM (e.g., 20251222-0743)
-const CACHE_VERSION = '20251222-0743';
+const CACHE_VERSION = '20260406-1635';
 const CACHE_NAME = `motocare-v${CACHE_VERSION}`;
 
 // Static assets to cache (images, fonts, etc.)
@@ -11,6 +11,15 @@ const STATIC_CACHE_URLS = [
     '/logo-smartcare.png',
     '/clear-cache.html'
 ];
+
+const OFFLINE_FALLBACK_RESPONSE = new Response('Offline', {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store'
+    }
+});
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
@@ -72,9 +81,18 @@ self.addEventListener('fetch', event => {
                     // Don't cache HTML responses
                     return response;
                 })
-                .catch(() => {
+                .catch(async () => {
                     // If network fails, try cache as fallback
-                    return caches.match(request);
+                    const directMatch = await caches.match(request);
+                    if (directMatch) return directMatch;
+
+                    // For navigation requests, fallback to app shell root if cached
+                    if (request.mode === 'navigate' || url.pathname === '/') {
+                        const rootMatch = await caches.match('/');
+                        if (rootMatch) return rootMatch;
+                    }
+
+                    return OFFLINE_FALLBACK_RESPONSE;
                 })
         );
         return;
@@ -89,24 +107,26 @@ self.addEventListener('fetch', event => {
                 }
 
                 // Not in cache, fetch from network
-                return fetch(request).then(response => {
-                    // Don't cache if not a successful response
-                    if (!response || response.status !== 200 || response.type === 'error') {
+                return fetch(request)
+                    .then(response => {
+                        // Don't cache if not a successful response
+                        if (!response || response.status !== 200 || response.type === 'error') {
+                            return response;
+                        }
+
+                        // Cache static assets only
+                        if (
+                            url.pathname.match(/\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico)$/)
+                        ) {
+                            const responseToCache = response.clone();
+                            caches.open(CACHE_NAME).then(cache => {
+                                cache.put(request, responseToCache);
+                            });
+                        }
+
                         return response;
-                    }
-
-                    // Cache static assets only
-                    if (
-                        url.pathname.match(/\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico)$/)
-                    ) {
-                        const responseToCache = response.clone();
-                        caches.open(CACHE_NAME).then(cache => {
-                            cache.put(request, responseToCache);
-                        });
-                    }
-
-                    return response;
-                });
+                    })
+                    .catch(() => OFFLINE_FALLBACK_RESPONSE);
             })
     );
 });
