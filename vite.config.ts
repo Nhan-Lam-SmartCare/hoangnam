@@ -57,30 +57,6 @@ export default defineConfig(({ mode }) => {
           entryFileNames: "assets/[name]-[hash].js",
           chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash].[ext]",
-          manualChunks(id) {
-            if (!id.includes("node_modules")) return;
-
-            if (id.includes("@supabase/supabase-js")) return "supabase";
-            if (id.includes("react") || id.includes("react-dom") || id.includes("react-router")) {
-              return "react-vendor";
-            }
-            if (id.includes("xlsx")) return "xlsx-vendor";
-            if (id.includes("html2canvas")) return "html2canvas-vendor";
-            if (id.includes("jspdf")) return "pdf-vendor";
-            if (id.includes("recharts")) return "charts-vendor";
-
-            const parts = id.split("node_modules/")[1]?.split("/") || [];
-            if (!parts.length) return;
-            const pkg = parts[0].startsWith("@")
-              ? `${parts[0]}-${parts[1] || "pkg"}`
-              : parts[0];
-
-            if (["cookie", "set-cookie-parser", "tiny-invariant"].includes(pkg)) {
-              return;
-            }
-
-            return `npm-${pkg}`;
-          },
         },
       },
     },
