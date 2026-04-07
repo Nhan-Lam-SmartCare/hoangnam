@@ -96,6 +96,10 @@ const queryClient = new QueryClient({
 // Attach global error handlers using built-in callbacks by extending QueryCache/MutationCache
 // Simplified: we rely on per-query onError via a wrapper helper if needed; fallback here is noop.
 
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  window.localStorage.removeItem("TanstackQueryDevtools.pip_open");
+}
+
 // MainLayout components
 const Inventory = () => (
   <Suspense fallback={<PageLoader />}>

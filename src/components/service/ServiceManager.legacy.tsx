@@ -1334,15 +1334,27 @@ export default function ServiceManager() {
                 // Short delay to ensure RPC triggered DB updates/triggers have settled if any
                 await new Promise((resolve) => setTimeout(resolve, 500));
 
-                const { data: currentCustomer } = await supabase
+                const { data: camelCustomer, error: camelError } = await supabase
                   .from("customers")
                   .select("id, totalSpent, visitCount")
                   .eq("phone", customer.phone)
-                  .single();
+                  .maybeSingle();
+
+                const { data: lowerCustomer } = camelError
+                  ? await supabase
+                      .from("customers")
+                      .select("id, totalspent, visitcount")
+                      .eq("phone", customer.phone)
+                      .maybeSingle()
+                  : { data: null as any };
+
+                const currentCustomer = camelCustomer || lowerCustomer;
 
                 if (currentCustomer) {
-                  const currentTotal = currentCustomer?.totalSpent || 0;
-                  const currentVisits = currentCustomer?.visitCount || 0;
+                  const currentTotal =
+                    currentCustomer?.totalSpent ?? currentCustomer?.totalspent ?? 0;
+                  const currentVisits =
+                    currentCustomer?.visitCount ?? currentCustomer?.visitcount ?? 0;
 
                   let newTotalSpent = currentTotal;
                   let newVisits = currentVisits;
@@ -1359,7 +1371,7 @@ export default function ServiceManager() {
                   }
 
                   if (newTotalSpent !== currentTotal || newVisits !== currentVisits) {
-                    await supabase
+                    const { error: updateCamelError } = await supabase
                       .from("customers")
                       .update({
                         totalSpent: newTotalSpent,
@@ -1367,6 +1379,17 @@ export default function ServiceManager() {
                         lastVisit: new Date().toISOString(),
                       })
                       .eq("id", currentCustomer.id);
+
+                    if (updateCamelError) {
+                      await supabase
+                        .from("customers")
+                        .update({
+                          totalspent: newTotalSpent,
+                          visitcount: newVisits,
+                          lastvisit: new Date().toISOString(),
+                        })
+                        .eq("id", currentCustomer.id);
+                    }
 
                   }
                 }

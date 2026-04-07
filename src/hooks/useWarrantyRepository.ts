@@ -57,6 +57,126 @@ export interface CreateWarrantyCardInput {
     notes?: string;
 }
 
+const parseWarrantyMonths = (raw: unknown): number => {
+    const text = String(raw || "").trim().toLowerCase();
+    if (!text) return 0;
+    const numMatch = text.match(/\d+/);
+    if (!numMatch) return 0;
+    const value = Number(numMatch[0]);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    if (text.includes("năm") || text.includes("nam") || text.includes("year")) {
+        return value * 12;
+    }
+    return value;
+};
+
+const normalizeStatusKey = (raw: unknown): string =>
+    String(raw || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+
+const shouldGenerateWarrantyLike = (statusRaw: unknown, paymentStatusRaw: unknown): boolean => {
+    const statusKey = normalizeStatusKey(statusRaw);
+    const paymentStatusKey = normalizeStatusKey(paymentStatusRaw);
+    const isPaid =
+        paymentStatusKey === "paid" ||
+        paymentStatusKey === "da thanh toan" ||
+        paymentStatusKey === "thanh toan" ||
+        paymentStatusKey === "completed";
+    const isCompletedStatus =
+        statusKey === "da sua xong" ||
+        statusKey === "tra may" ||
+        statusKey === "hoan tat" ||
+        statusKey === "completed";
+    const isCanceled =
+        statusKey === "da huy" ||
+        statusKey === "huy" ||
+        statusKey === "cancelled" ||
+        statusKey === "canceled";
+    return !isCanceled && (isPaid || isCompletedStatus);
+};
+
+const deriveWarrantyCardsFromWorkOrders = async (
+    profileBranchId: string | null
+): Promise<WarrantyCard[]> => {
+    const { data: orders, error } = await supabase
+        .from("work_orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+    if (error || !orders) return [];
+
+    const today = new Date();
+    const fallbackRows: WarrantyCard[] = [];
+
+    for (const row of orders as any[]) {
+        const rowBranch =
+            row?.branch_id ?? row?.branchid ?? row?.branchId ?? "CN1";
+
+        if (profileBranchId && String(rowBranch) !== String(profileBranchId)) {
+            continue;
+        }
+
+        const status = row?.status;
+        const paymentStatus = row?.paymentStatus ?? row?.paymentstatus;
+        if (!shouldGenerateWarrantyLike(status, paymentStatus)) continue;
+
+        const parts = Array.isArray(row?.partsUsed)
+            ? row.partsUsed
+            : Array.isArray(row?.partsused)
+                ? row.partsused
+                : [];
+        if (parts.length === 0) continue;
+
+        const startBase = row?.creationDate || row?.creationdate || row?.created_at || new Date().toISOString();
+        const startDate = new Date(startBase);
+
+        parts.forEach((part: any, idx: number) => {
+            const months = parseWarrantyMonths(
+                part?.warrantyPeriod ??
+                part?.warrantyperiod ??
+                part?.warranty_period ??
+                part?.warranty ??
+                ""
+            );
+            if (months <= 0) return;
+
+            const qty = Math.max(1, Number(part?.quantity || 1));
+            for (let i = 0; i < qty; i += 1) {
+                const endDate = new Date(startDate);
+                endDate.setMonth(endDate.getMonth() + months);
+                const isExpired = endDate < today;
+
+                fallbackRows.push({
+                    id: `WO-${row.id}-${String(part?.partId || part?.partid || idx)}-${i}`,
+                    customer_name: row?.customerName || row?.customername || "Khách lẻ",
+                    customer_phone: row?.customerPhone || row?.customerphone || null,
+                    device_model: part?.partName || part?.part_name || "Sản phẩm",
+                    imei_serial: part?.sku || row?.licensePlate || row?.licenseplate || null,
+                    warranty_start_date: startDate.toISOString().slice(0, 10),
+                    warranty_end_date: endDate.toISOString().slice(0, 10),
+                    warranty_period_months: months,
+                    warranty_type: "standard",
+                    covered_parts: ["Lỗi kỹ thuật do nhà sản xuất"],
+                    coverage_terms: "Dữ liệu tạm dựng từ phiếu sửa chữa",
+                    work_order_id: row?.id,
+                    issued_by: "Hệ thống",
+                    branch_id: String(rowBranch || "CN1"),
+                    status: isExpired ? "expired" : "active",
+                    notes: "AUTO-FALLBACK-WO",
+                    created_at: String(startBase),
+                    updated_at: new Date().toISOString(),
+                });
+            }
+        });
+    }
+
+    return fallbackRows;
+};
+
 // Hook to fetch warranty cards
 export const useWarrantyCards = () => {
     const { profile } = useAuth();
@@ -72,7 +192,11 @@ export const useWarrantyCards = () => {
                 .order("created_at", { ascending: false });
             const { data, error } = await query;
 
-            if (error) throw error;
+            if (error) {
+                const fallbackRows = await deriveWarrantyCardsFromWorkOrders(profileBranchId ? String(profileBranchId) : null);
+                if (fallbackRows.length > 0) return fallbackRows;
+                throw error;
+            }
 
             const rows = (data || []) as WarrantyCard[];
             if (!profileBranchId) {
@@ -87,6 +211,9 @@ export const useWarrantyCards = () => {
                             return retry.data as WarrantyCard[];
                         }
                     }
+
+                    const fallbackRows = await deriveWarrantyCardsFromWorkOrders(null);
+                    if (fallbackRows.length > 0) return fallbackRows;
                 }
                 return rows;
             }
@@ -102,9 +229,12 @@ export const useWarrantyCards = () => {
             });
 
             if (filtered.length === 0) {
-                const refill = await backfillWarrantyCardsForExistingWorkOrders(
+                let refill = await backfillWarrantyCardsForExistingWorkOrders(
                     String(profileBranchId)
                 );
+                if (refill.ok && refill.data.created === 0) {
+                    refill = await backfillWarrantyCardsForExistingWorkOrders();
+                }
                 if (refill.ok && refill.data.created > 0) {
                     const retry = await supabase
                         .from("warranty_cards")
@@ -118,6 +248,15 @@ export const useWarrantyCards = () => {
                             return String(rowBranchId) === String(profileBranchId);
                         });
                     }
+                }
+
+                const fallbackRows = await deriveWarrantyCardsFromWorkOrders(String(profileBranchId));
+                if (fallbackRows.length > 0) return fallbackRows;
+
+                // Fallback for legacy branch id formats (e.g. CN1 vs UUID):
+                // if rows exist but none match exactly, show available rows instead of empty state.
+                if (rows.length > 0) {
+                    return rows;
                 }
             }
 

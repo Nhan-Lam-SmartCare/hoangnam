@@ -19,15 +19,61 @@ const parseWarrantyMonths = (raw: unknown): number => {
   return value;
 };
 
+const normalizeStatusKey = (raw: unknown): string =>
+  String(raw || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
 const shouldGenerateWarrantyForWorkOrder = (order: WorkOrder): boolean => {
-  const status = String(order.status || "");
-  const paymentStatus = String(order.paymentStatus || "");
-  return (
-    paymentStatus === "paid" ||
-    status === "Đã sửa xong" ||
-    status === "Trả máy"
-  );
+  const statusKey = normalizeStatusKey(order.status);
+  const paymentStatusKey = normalizeStatusKey(order.paymentStatus);
+
+  const isPaid =
+    paymentStatusKey === "paid" ||
+    paymentStatusKey === "da thanh toan" ||
+    paymentStatusKey === "thanh toan" ||
+    paymentStatusKey === "completed";
+
+  const isCompletedStatus =
+    statusKey === "da sua xong" ||
+    statusKey === "tra may" ||
+    statusKey === "hoan tat" ||
+    statusKey === "completed";
+
+  const isCanceledStatus =
+    statusKey === "da huy" ||
+    statusKey === "huy" ||
+    statusKey === "cancelled" ||
+    statusKey === "canceled";
+
+  const isRefunded = order.refunded === true;
+
+  return !isCanceledStatus && !isRefunded && (isPaid || isCompletedStatus);
 };
+
+const getPartIdFromOrderItem = (item: any): string =>
+  String(item?.partId ?? item?.partid ?? item?.part_id ?? "").trim();
+
+const withWarrantyFallbackContext = (
+  order: WorkOrder,
+  fallback: Partial<WorkOrder>
+): WorkOrder => ({
+  ...order,
+  partsUsed:
+    Array.isArray(order.partsUsed) && order.partsUsed.length > 0
+      ? order.partsUsed
+      : Array.isArray(fallback.partsUsed)
+        ? (fallback.partsUsed as any)
+        : order.partsUsed,
+  branchId: order.branchId || fallback.branchId || "CN1",
+  paymentStatus: order.paymentStatus || fallback.paymentStatus,
+  status: order.status || fallback.status,
+  customerName: order.customerName || fallback.customerName || "",
+  customerPhone: order.customerPhone || fallback.customerPhone || "",
+  licensePlate: order.licensePlate || fallback.licensePlate || "",
+});
 
 async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<number> {
   if (!shouldGenerateWarrantyForWorkOrder(order)) return 0;
@@ -38,7 +84,7 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<nu
   const partIds = Array.from(
     new Set(
       orderParts
-        .map((p: any) => String(p?.partId || "").trim())
+        .map((p: any) => getPartIdFromOrderItem(p))
         .filter(Boolean)
     )
   );
@@ -118,21 +164,25 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<nu
   const today = new Date();
 
   for (const item of orderParts as any[]) {
-    const partId = String(item?.partId || "").trim();
+    const partId = getPartIdFromOrderItem(item);
     if (!partId) continue;
 
     const partRow = partsById.get(partId);
     if (!partRow) continue;
 
     const months = parseWarrantyMonths(
-      partRow.warrantyPeriod ||
+      item?.warrantyPeriod ||
+        item?.warrantyperiod ||
+        item?.warranty_period ||
+        item?.warranty ||
+        partRow.warrantyPeriod ||
         partRow.warrantyperiod ||
         partRow.warranty_period ||
         partRow.warranty
     );
     if (months <= 0) continue;
 
-    const qty = Math.max(1, Number(item?.quantity || 1));
+    const qty = Math.max(1, Number(item?.quantity ?? item?.qty ?? 1));
     const existingCount = existingCountByPartId.get(partId) || 0;
     const missingCount = Math.max(0, qty - existingCount);
     if (missingCount <= 0) continue;
@@ -144,8 +194,9 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<nu
       rowsToInsert.push({
         customer_name: order.customerName || "Khách lẻ",
         customer_phone: order.customerPhone || null,
-        device_model: item.partName || partRow.name || "Sản phẩm",
-        imei_serial: item.sku || partRow.sku || order.licensePlate || null,
+        device_model: item.partName || item.part_name || partRow.name || "Sản phẩm",
+        imei_serial:
+          item.sku || item.partSku || item.part_sku || partRow.sku || order.licensePlate || null,
         warranty_start_date: today.toISOString().slice(0, 10),
         warranty_end_date: endDate.toISOString().slice(0, 10),
         warranty_period_months: months,
@@ -885,7 +936,17 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     );
 
     const normalizedOrder = normalizeWorkOrder(data);
-    await autoCreateWarrantyCardsForWorkOrder(normalizedOrder);
+    await autoCreateWarrantyCardsForWorkOrder(
+      withWarrantyFallbackContext(normalizedOrder, {
+        partsUsed,
+        branchId,
+        status: input.status,
+        paymentStatus,
+        customerName,
+        customerPhone,
+        licensePlate,
+      })
+    );
 
     return success({
       ...normalizedOrder,
@@ -1022,7 +1083,17 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     );
 
     const normalizedOrder = normalizeWorkOrder(data);
-    await autoCreateWarrantyCardsForWorkOrder(normalizedOrder);
+    await autoCreateWarrantyCardsForWorkOrder(
+      withWarrantyFallbackContext(normalizedOrder, {
+        partsUsed: partsToSave as any,
+        branchId: input.branchId,
+        status: input.status,
+        paymentStatus: input.paymentStatus,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        licensePlate: input.licensePlate,
+      })
+    );
 
     return success({
       ...normalizedOrder,

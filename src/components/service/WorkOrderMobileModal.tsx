@@ -470,6 +470,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       costPrice?: number;
       sku?: string;
       category?: string;
+      warrantyPeriod?: string;
     }>
   >(
     workOrder?.partsUsed?.map((p) => ({
@@ -480,6 +481,13 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       costPrice: p.costPrice || 0,
       sku: p.sku || "",
       category: p.category || "",
+      warrantyPeriod: String(
+        (p as any).warrantyPeriod ??
+          (p as any).warrantyperiod ??
+          (p as any).warranty_period ??
+          (p as any).warranty ??
+          ""
+      ).trim(),
     })) || []
   );
   const [additionalServices, setAdditionalServices] = useState<
@@ -696,6 +704,44 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const getPartWarranty = (partId: string) => {
     const partRef = parts.find((p) => p.id === partId);
     return getWarrantyText(partRef);
+  };
+
+  const getWarrantyForWorkOrderPart = (part: any): string => {
+    const ownWarranty = String(
+      part?.warrantyPeriod ??
+        part?.warrantyperiod ??
+        part?.warranty_period ??
+        part?.warranty ??
+        ""
+    ).trim();
+    if (ownWarranty) return ownWarranty;
+
+    const rawPartId = String(part?.partId ?? part?.partid ?? "").trim();
+    if (rawPartId) {
+      const partById = parts.find((item) => String(item.id) === rawPartId);
+      const byIdWarranty = getWarrantyText(partById);
+      if (byIdWarranty) return byIdWarranty;
+    }
+
+    const rawSku = String(part?.sku || "").trim();
+    if (rawSku) {
+      const partBySku = parts.find(
+        (item) => String(item.sku || "").trim() === rawSku
+      );
+      const bySkuWarranty = getWarrantyText(partBySku);
+      if (bySkuWarranty) return bySkuWarranty;
+    }
+
+    const rawName = String(part?.partName || "").trim().toLowerCase();
+    if (rawName) {
+      const partByName = parts.find(
+        (item) => String(item.name || "").trim().toLowerCase() === rawName
+      );
+      const byNameWarranty = getWarrantyText(partByName);
+      if (byNameWarranty) return byNameWarranty;
+    }
+
+    return "";
   };
 
   // Keep rule same as desktop: qty1=100%, qty2=150%, qty3=200%...
@@ -1018,6 +1064,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
           costPrice: part.costPrice?.[currentBranchId] || 0,
           sku: part.sku || "",
           category: part.category || "",
+          warrantyPeriod: getWarrantyText(part),
         },
       ]);
     }
@@ -1219,6 +1266,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       costPrice: p.costPrice || 0, // Cost price for profit calculation
       sku: p.sku || "",
       category: p.category || "",
+      warrantyPeriod: p.warrantyPeriod || getPartWarranty(p.partId) || undefined,
     }));
 
     // Transform additional services to use 'price' field
@@ -1702,7 +1750,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                   LINH KIỆN ({workOrder.partsUsed.length})
                 </h3>
                 <div className="space-y-2">
-                  {workOrder.partsUsed.map((part, idx) => (
+                  {workOrder.partsUsed.map((part, idx) => {
+                    const warrantyText = getWarrantyForWorkOrderPart(part);
+                    return (
                     <div key={idx} className="bg-white dark:bg-[#1e1e2d] rounded-xl p-3 border border-slate-200 dark:border-transparent">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0 pr-2">
@@ -1712,6 +1762,11 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                           <div className="text-xs text-slate-500 dark:text-slate-400">
                             SL: {part.quantity} {part.sku && `• ${part.sku}`}
                           </div>
+                          {warrantyText && (
+                            <div className="text-[11px] text-emerald-500 dark:text-emerald-400 font-semibold mt-0.5">
+                              Bảo hành: {warrantyText}
+                            </div>
+                          )}
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
@@ -1735,7 +1790,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                         </span>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               </div>
             )}
