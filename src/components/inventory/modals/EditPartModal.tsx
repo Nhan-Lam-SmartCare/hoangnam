@@ -20,6 +20,12 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
   const [formData, setFormData] = useState({
     name: part.name,
     category: part.category || "",
+    warrantyPeriod:
+      part.warrantyPeriod ||
+      (part as any).warrantyperiod ||
+      (part as any).warranty_period ||
+      (part as any).warranty ||
+      "",
     retailPrice: part.retailPrice?.[currentBranchId] || 0,
     laborCost:
       (part as any).laborCost?.[currentBranchId] ||
@@ -45,6 +51,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
       id: part.id,
       name: formData.name.trim(),
       category: formData.category.trim() || undefined,
+      warrantyPeriod: formData.warrantyPeriod.trim() || undefined,
       stock: {
         ...(part.stock || {}),
         [currentBranchId]: formData.stock,
@@ -242,26 +249,42 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
             </div>
           </div>
 
-          {/* Stock adjustment */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Tồn kho hiện tại
-            </label>
-            <input
-              type="number"
-              value={formData.stock}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  stock: Number(e.target.value),
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-              min="0"
-            />
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Số lượng tồn kho tại chi nhánh hiện tại
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Bảo hành
+              </label>
+              <input
+                type="text"
+                value={formData.warrantyPeriod}
+                onChange={(e) =>
+                  setFormData({ ...formData, warrantyPeriod: e.target.value })
+                }
+                placeholder="Ví dụ: 12 tháng, 1 năm"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Tồn kho hiện tại
+              </label>
+              <input
+                type="number"
+                value={formData.stock}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    stock: Number(e.target.value),
+                  })
+                }
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                min="0"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Số lượng tồn kho tại chi nhánh hiện tại
+              </p>
+            </div>
           </div>
 
           {/* Info */}

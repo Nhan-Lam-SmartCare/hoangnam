@@ -18,7 +18,7 @@ export const RoleBasedRedirect: React.FC = () => {
         return <Navigate to="/login" replace />;
     }
 
-    // Redirect based on role
+    // Default landing page is Service
     if (profile?.role === "staff") {
         return <Navigate to="/service" replace />;
     }

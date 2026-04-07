@@ -9,7 +9,11 @@ const PARTS_TABLE = "parts";
 
 function normalizePartRow(row: any): Part {
   const warranty =
-    row?.warrantyPeriod ?? row?.warrantyperiod ?? row?.warranty_period ?? undefined;
+    row?.warrantyPeriod ??
+    row?.warrantyperiod ??
+    row?.warranty_period ??
+    row?.warranty ??
+    undefined;
 
   return {
     ...(row || {}),
@@ -204,6 +208,7 @@ export async function createPart(
       // Legacy DB compatibility: some deployments used different column names
       warrantyperiod: input.warrantyPeriod,
       warranty_period: input.warrantyPeriod,
+      warranty: input.warrantyPeriod,
       // costPrice, vatRate không có trong schema parts của bản hiện tại => không insert
     };
     const { data, error } = await insertPartWithSchemaFallback(payload);
@@ -257,6 +262,7 @@ export async function updatePart(
     if (Object.prototype.hasOwnProperty.call(updates, "warrantyPeriod")) {
       updatePayload.warrantyperiod = (updates as any).warrantyPeriod;
       updatePayload.warranty_period = (updates as any).warrantyPeriod;
+      updatePayload.warranty = (updates as any).warrantyPeriod;
     }
 
     const { data, error } = await updatePartWithSchemaFallback(id, updatePayload);
@@ -266,6 +272,27 @@ export async function updatePart(
         message: "Cập nhật phụ tùng thất bại",
         cause: error,
       });
+
+    if (Object.prototype.hasOwnProperty.call(updates, "warrantyPeriod")) {
+      const expectedWarranty = String((updates as any).warrantyPeriod || "").trim();
+      if (expectedWarranty) {
+        const savedWarranty = String(
+          (data as any)?.warrantyPeriod ??
+          (data as any)?.warrantyperiod ??
+          (data as any)?.warranty_period ??
+          (data as any)?.warranty ??
+          ""
+        ).trim();
+
+        if (savedWarranty !== expectedWarranty) {
+          return failure({
+            code: "supabase",
+            message:
+              "Không lưu được bảo hành. Cần thêm cột bảo hành trong bảng parts (warranty hoặc warrantyPeriod).",
+          });
+        }
+      }
+    }
     // Audit cập nhật phụ tùng
     let userId: string | null = null;
     try {

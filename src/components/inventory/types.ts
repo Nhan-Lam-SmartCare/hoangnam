@@ -16,6 +16,7 @@ export interface ReceiptItem {
         barcode: string;
         category: string;
         description: string;
+        warrantyPeriod?: string;
         importPrice: number;
         retailPrice: number;
         wholesalePrice: number;

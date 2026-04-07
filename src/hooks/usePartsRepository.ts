@@ -68,8 +68,13 @@ export const useCreatePartRepo = () => {
 export const useUpdatePartRepo = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Part> }) =>
-      updatePart(id, updates),
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Part> }) => {
+      const result = await updatePart(id, updates);
+      if (!result.ok) {
+        throw result.error;
+      }
+      return result.data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["partsRepo"] });
       qc.invalidateQueries({ queryKey: ["partsRepoPaged"] });

@@ -128,6 +128,17 @@ const createEmptyRepairServiceDraft = (): RepairServiceDraft => ({
   note: "",
 });
 
+const getWarrantyText = (part: Part | null | undefined): string => {
+  if (!part) return "";
+  return String(
+    (part as any).warrantyPeriod ??
+      (part as any).warrantyperiod ??
+      (part as any).warranty_period ??
+      (part as any).warranty ??
+      ""
+  ).trim();
+};
+
 // Local type for status options if needed, or just use the one from constants
 type LocalWorkOrderStatus = "Tiếp nhận" | "Đang sửa" | "Đã sửa xong" | "Trả máy";
 
@@ -618,6 +629,11 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       Number(partRef?.wholesalePrice?.[currentBranchId]) ||
       0
     );
+  };
+
+  const getPartWarranty = (partId: string) => {
+    const partRef = parts.find((p) => p.id === partId);
+    return getWarrantyText(partRef);
   };
 
   // Keep rule same as desktop: qty1=100%, qty2=150%, qty3=200%...
@@ -2608,6 +2624,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                 >
                                   {(() => {
                                     const laborBase = getPartLaborBase(part.partId);
+                                    const warrantyText = getPartWarranty(part.partId);
                                     const lineLabor = getIntegratedLaborByQuantity(
                                       laborBase,
                                       Number(part.quantity || 0)
@@ -2628,6 +2645,11 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                       <div className="text-[10px] text-cyan-400 mt-0.5">
                                         Công theo SL: {formatCurrency(lineLabor)}
                                       </div>
+                                      {warrantyText && (
+                                        <div className="text-[10px] text-emerald-500 font-semibold mt-0.5">
+                                          Bảo hành: {warrantyText}
+                                        </div>
+                                      )}
                                       <div className="mt-2 flex items-center gap-2">
                                         <span className="text-[10px] text-slate-500">Giá:</span>
                                         <input
@@ -3439,6 +3461,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                   {filteredParts.slice(0, 50).map((part) => {
                     const stock = part.stock?.[currentBranchId] || 0;
                     const price = part.retailPrice?.[currentBranchId] || 0;
+                    const warrantyText = getWarrantyText(part);
                     const partLaborCost =
                       Number((part as any)?.laborCost?.[currentBranchId]) ||
                       Number(part.wholesalePrice?.[currentBranchId]) ||
@@ -3466,6 +3489,11 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             <div className="text-[11px] text-cyan-400 mt-0.5">
                               Công: {formatCurrency(partLaborCost)}
                             </div>
+                            {warrantyText && (
+                              <div className="text-[11px] text-emerald-400 mt-0.5 font-semibold">
+                                Bảo hành: {warrantyText}
+                              </div>
+                            )}
                             {part.category && (
                               <span
                                 className={`inline-flex items-center px-1.5 py-0.5 mt-1 rounded-full text-[9px] font-medium ${getCategoryColor(part.category).bg

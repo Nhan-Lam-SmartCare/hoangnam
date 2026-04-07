@@ -69,9 +69,10 @@ const SalesManager: React.FC = () => {
   const [uiMode, setUiMode] = useState<UiMode>(() => {
     try {
       const saved = localStorage.getItem("sales-ui-mode") as UiMode | null;
-      return saved || "enterprise";
+      if (saved === "enterprise") return "retail";
+      return saved || "retail";
     } catch {
-      return "enterprise";
+      return "retail";
     }
   });
 

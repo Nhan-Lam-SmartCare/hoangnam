@@ -130,6 +130,10 @@ const GoodsReceiptMobileWrapper: React.FC<{
           barcode: productData.barcode?.trim() || "",
           category: productData.category,
           description: productData.description || "",
+          warrantyPeriod:
+            Number(productData.warranty || 0) > 0
+              ? `${Number(productData.warranty)} ${productData.warrantyUnit || "tháng"}`
+              : undefined,
           importPrice: productData.importPrice,
           laborCost: productData.laborCost || 0,
           retailPrice: productData.retailPrice,

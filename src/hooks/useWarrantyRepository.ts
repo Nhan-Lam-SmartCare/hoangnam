@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../contexts/AuthContext";
+import { backfillWarrantyCardsForExistingWorkOrders } from "../lib/repository/workOrdersRepository";
 
 export interface WarrantyCard {
     id: string;
@@ -59,20 +60,70 @@ export interface CreateWarrantyCardInput {
 // Hook to fetch warranty cards
 export const useWarrantyCards = () => {
     const { profile } = useAuth();
+    const profileBranchId =
+        profile?.branch_id || (profile as any)?.branchId || null;
 
     return useQuery({
-        queryKey: ["warranty_cards", profile?.branch_id],
+        queryKey: ["warranty_cards", profileBranchId || "all"],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const query = supabase
                 .from("warranty_cards")
                 .select("*")
-                .eq("branch_id", profile?.branch_id)
                 .order("created_at", { ascending: false });
+            const { data, error } = await query;
 
             if (error) throw error;
-            return data as WarrantyCard[];
+
+            const rows = (data || []) as WarrantyCard[];
+            if (!profileBranchId) {
+                if (rows.length === 0) {
+                    const refill = await backfillWarrantyCardsForExistingWorkOrders();
+                    if (refill.ok && refill.data.created > 0) {
+                        const retry = await supabase
+                            .from("warranty_cards")
+                            .select("*")
+                            .order("created_at", { ascending: false });
+                        if (!retry.error && retry.data) {
+                            return retry.data as WarrantyCard[];
+                        }
+                    }
+                }
+                return rows;
+            }
+
+            const filtered = rows.filter((row: any) => {
+                const rowBranchId =
+                    row?.branch_id ?? row?.branchid ?? row?.branchId ?? null;
+
+                // Old rows may not have branch column; keep visible instead of hiding all.
+                if (!rowBranchId) return true;
+
+                return String(rowBranchId) === String(profileBranchId);
+            });
+
+            if (filtered.length === 0) {
+                const refill = await backfillWarrantyCardsForExistingWorkOrders(
+                    String(profileBranchId)
+                );
+                if (refill.ok && refill.data.created > 0) {
+                    const retry = await supabase
+                        .from("warranty_cards")
+                        .select("*")
+                        .order("created_at", { ascending: false });
+                    if (!retry.error && retry.data) {
+                        return (retry.data as WarrantyCard[]).filter((row: any) => {
+                            const rowBranchId =
+                                row?.branch_id ?? row?.branchid ?? row?.branchId ?? null;
+                            if (!rowBranchId) return true;
+                            return String(rowBranchId) === String(profileBranchId);
+                        });
+                    }
+                }
+            }
+
+            return filtered;
         },
-        enabled: !!profile?.branch_id,
+        enabled: true,
     });
 };
 

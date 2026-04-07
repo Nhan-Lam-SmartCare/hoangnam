@@ -29,11 +29,11 @@ const shouldGenerateWarrantyForWorkOrder = (order: WorkOrder): boolean => {
   );
 };
 
-async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<void> {
-  if (!shouldGenerateWarrantyForWorkOrder(order)) return;
+async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<number> {
+  if (!shouldGenerateWarrantyForWorkOrder(order)) return 0;
 
   const orderParts = Array.isArray(order.partsUsed) ? order.partsUsed : [];
-  if (orderParts.length === 0) return;
+  if (orderParts.length === 0) return 0;
 
   const partIds = Array.from(
     new Set(
@@ -42,14 +42,45 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<vo
         .filter(Boolean)
     )
   );
-  if (partIds.length === 0) return;
+  if (partIds.length === 0) return 0;
 
-  const { data: partRows, error: partsError } = await supabase
-    .from("parts")
-    .select("id, name, sku, warrantyPeriod, warrantyperiod, warranty_period")
-    .in("id", partIds);
+  const selectColumns = [
+    "id",
+    "name",
+    "sku",
+    "warrantyPeriod",
+    "warrantyperiod",
+    "warranty_period",
+    "warranty",
+  ];
 
-  if (partsError || !partRows || partRows.length === 0) return;
+  let partRows: any[] | null = null;
+  let partsError: any = null;
+  const workingColumns = [...selectColumns];
+
+  for (let i = 0; i < 5; i += 1) {
+    const res = await supabase
+      .from("parts")
+      .select(workingColumns.join(", "))
+      .in("id", partIds);
+
+    partRows = res.data as any[] | null;
+    partsError = res.error;
+
+    if (!partsError) break;
+
+    const missingColumn = getMissingColumnNameFromError(partsError);
+    if (!missingColumn) break;
+
+    const idx = workingColumns.findIndex(
+      (col) => col.toLowerCase() === String(missingColumn).toLowerCase()
+    );
+    if (idx === -1) break;
+
+    workingColumns.splice(idx, 1);
+  }
+
+  if (partsError || !partRows || partRows.length === 0) return 0;
 
   const partsById = new Map<string, any>();
   for (const row of partRows) {
@@ -94,7 +125,10 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<vo
     if (!partRow) continue;
 
     const months = parseWarrantyMonths(
-      partRow.warrantyPeriod || partRow.warrantyperiod || partRow.warranty_period
+      partRow.warrantyPeriod ||
+        partRow.warrantyperiod ||
+        partRow.warranty_period ||
+        partRow.warranty
     );
     if (months <= 0) continue;
 
@@ -128,13 +162,70 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<vo
     }
   }
 
-  if (rowsToInsert.length === 0) return;
-  const { error: insertError } = await supabase
-    .from("warranty_cards")
-    .insert(rowsToInsert);
+  if (rowsToInsert.length === 0) return 0;
+
+  const workingRows = rowsToInsert.map((row) => ({ ...row }));
+  let insertError: any = null;
+  for (let i = 0; i < 6; i += 1) {
+    const res = await supabase.from("warranty_cards").insert(workingRows);
+    insertError = res.error;
+    if (!insertError) break;
+
+    const missingColumn = getMissingColumnNameFromError(insertError);
+    if (!missingColumn) break;
+
+    let removed = 0;
+    for (const row of workingRows) {
+      removed += removeMissingColumnKeys(row, missingColumn);
+    }
+    if (removed === 0) break;
+  }
 
   if (insertError) {
     console.warn("[autoCreateWarrantyCardsForWorkOrder] insert failed", insertError);
+    return 0;
+  }
+
+  return rowsToInsert.length;
+}
+
+export async function backfillWarrantyCardsForExistingWorkOrders(
+  branchId?: string
+): Promise<RepoResult<{ processed: number; created: number }>> {
+  try {
+    let query = supabase
+      .from(WORK_ORDERS_TABLE)
+      .select("*")
+      .order("creationDate", { ascending: false })
+      .limit(500);
+
+    if (branchId) {
+      query = query.eq("branchId", branchId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return failure({
+        code: "supabase",
+        message: "Không thể quét phiếu sửa chữa để tạo bù bảo hành",
+        cause: error,
+      });
+    }
+
+    const rows = (data || []) as any[];
+    let created = 0;
+    for (const row of rows) {
+      const normalized = normalizeWorkOrder(row);
+      created += await autoCreateWarrantyCardsForWorkOrder(normalized);
+    }
+
+    return success({ processed: rows.length, created });
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi tạo bù phiếu bảo hành",
+      cause: e,
+    });
   }
 }
 
@@ -617,32 +708,62 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       ? Math.max(0, providedRemaining)
       : Math.max(0, Number(input.total || 0) - totalPaid);
 
+    const createdAtIso = input.creationDate || new Date().toISOString();
+    const customerName = input.customerName || "";
+    const customerPhone = input.customerPhone || "";
+    const vehicleModel = input.vehicleModel || "";
+    const licensePlate = input.licensePlate || "";
+    const laborCost = input.laborCost || 0;
+    const partsUsed = input.partsUsed || [];
+    const branchId = input.branchId || "CN1";
+    const paymentStatus = input.paymentStatus || "unpaid";
+    const paymentMethod = input.paymentMethod || null;
+    const paymentDate =
+      input.paymentStatus === "paid" ? new Date().toISOString() : null;
+
     const newOrder = {
       id: input.id,
-      "creationDate": input.creationDate || new Date().toISOString(),
-      "customerName": input.customerName || "",
-      "customerPhone": input.customerPhone || "",
-      "vehicleModel": input.vehicleModel || "",
-      "licensePlate": input.licensePlate || "", // Stores Serial/IMEI
+      "creationDate": createdAtIso,
+      creationdate: createdAtIso,
+      "customerName": customerName,
+      customername: customerName,
+      "customerPhone": customerPhone,
+      customerphone: customerPhone,
+      "vehicleModel": vehicleModel,
+      vehiclemodel: vehicleModel,
+      "licensePlate": licensePlate, // Stores Serial/IMEI
+      licenseplate: licensePlate,
       // Not storing vehicleId or currentKm as columns don't exist in setup script
 
       status: input.status || "Tiếp nhận",
-      "laborCost": input.laborCost || 0,
+      "laborCost": laborCost,
+      laborcost: laborCost,
       discount: input.discount || 0,
-      "partsUsed": input.partsUsed || [],
+      "partsUsed": partsUsed,
+      partsused: partsUsed,
       // additionalServices not in schema, ignoring
 
       notes: input.issueDescription || "", // Mapped to 'notes'
+      issueDescription: input.issueDescription || "",
+      issuedescription: input.issueDescription || "",
       total: input.total || 0,
-      "branchId": input.branchId || "CN1",
+      "branchId": branchId,
+      branchid: branchId,
 
-      "paymentStatus": input.paymentStatus || "unpaid",
-      "paymentMethod": input.paymentMethod || null,
+      "paymentStatus": paymentStatus,
+      paymentstatus: paymentStatus,
+      "paymentMethod": paymentMethod,
+      paymentmethod: paymentMethod,
       "depositAmount": depositAmount,
+      depositamount: depositAmount,
       "additionalPayment": additionalPayment,
+      additionalpayment: additionalPayment,
       "totalPaid": totalPaid,
+      totalpaid: totalPaid,
       "remainingAmount": remainingAmount,
-      "paymentDate": input.paymentStatus === "paid" ? new Date().toISOString() : null,
+      remainingamount: remainingAmount,
+      "paymentDate": paymentDate,
+      paymentdate: paymentDate,
     };
 
     const insertPayloads: Array<Record<string, any>> = creatorId
@@ -698,9 +819,12 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
     if (error) {
       console.error("[createWorkOrderAtomic] Insert Error:", error);
+      const rawMessage =
+        String((error as any)?.message || (error as any)?.details || "").trim() ||
+        "Lỗi Database";
       return failure({
         code: "supabase",
-        message: "Không thể tạo phiếu sửa chữa (Lỗi Database)",
+        message: `Không thể tạo phiếu sửa chữa (${rawMessage})`,
         cause: error,
       });
     }
@@ -1464,8 +1588,11 @@ export async function completeWorkOrderPayment(
         "[completeWorkOrderPayment] RPC work_order_complete_payment chưa tồn tại, đã dùng fallback update trực tiếp"
       );
 
+      const normalizedUpdatedOrder = normalizeWorkOrder(updatedRow);
+      await autoCreateWarrantyCardsForWorkOrder(normalizedUpdatedOrder);
+
       return success({
-        ...normalizeWorkOrder(updatedRow),
+        ...normalizedUpdatedOrder,
         paymentTransactionId: undefined,
         newPaymentStatus: nextStatus,
         inventoryDeducted: false,

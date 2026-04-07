@@ -79,7 +79,11 @@ const LOW_STOCK_THRESHOLD = 5;
 
 function getPartWarrantyText(part: any): string {
   return String(
-    part?.warrantyPeriod ?? part?.warrantyperiod ?? part?.warranty_period ?? ""
+    part?.warrantyPeriod ??
+    part?.warrantyperiod ??
+    part?.warranty_period ??
+    part?.warranty ??
+    ""
   ).trim();
 }
 
@@ -581,6 +585,7 @@ const InventoryManagerNew: React.FC = () => {
           barcode: string;
           category: string;
           description: string;
+          warrantyPeriod?: string;
           importPrice: number;
           laborCost?: number;
           retailPrice: number;
@@ -642,6 +647,7 @@ const InventoryManagerNew: React.FC = () => {
                   barcode: item._productData.barcode || "",
                   category: item._productData.category,
                   description: item._productData.description || "",
+                  warrantyPeriod: item._productData.warrantyPeriod,
                   stock: { [currentBranchId]: 0 }, // Stock = 0, sẽ cập nhật khi hoàn tất phiếu nhập
                   costPrice: {
                     [currentBranchId]: item._productData.importPrice,
@@ -2701,6 +2707,8 @@ const InventoryManagerNew: React.FC = () => {
               stock: updatedPart.stock,
               retailPrice: updatedPart.retailPrice,
               wholesalePrice: updatedPart.wholesalePrice,
+              laborCost: (updatedPart as any).laborCost,
+              warrantyPeriod: updatedPart.warrantyPeriod,
             };
             // Try to add costPrice if it exists in schema
             if (updatedPart.costPrice) {

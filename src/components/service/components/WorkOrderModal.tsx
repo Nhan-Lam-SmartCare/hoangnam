@@ -116,6 +116,17 @@ const mapRepairServiceToDraft = (service: RepairOrderService): RepairServiceDraf
   note: service.note || "",
 });
 
+const getWarrantyText = (part: Part | null | undefined): string => {
+  if (!part) return "";
+  return String(
+    (part as any).warrantyPeriod ??
+      (part as any).warrantyperiod ??
+      (part as any).warranty_period ??
+      (part as any).warranty ??
+      ""
+  ).trim();
+};
+
 const WorkOrderModal: React.FC<{
   order: WorkOrder;
   onClose: () => void;
@@ -860,6 +871,11 @@ const WorkOrderModal: React.FC<{
         Number(partRef?.wholesalePrice?.[currentBranchId]) ||
         0
       );
+    };
+
+    const getPartWarranty = (partId: string) => {
+      const partRef = parts.find((p) => p.id === partId);
+      return getWarrantyText(partRef);
     };
 
     // Rule: qty 1 = 100% labor, qty 2 = 150%, qty 3 = 200%, ...
@@ -4118,6 +4134,7 @@ const WorkOrderModal: React.FC<{
                       <>
                         {filteredParts.slice(0, 50).map((part) => {
                           const stock = part.stock?.[currentBranchId] || 0;
+                          const warrantyText = getWarrantyText(part);
                           const partLaborCost =
                             (part as any)?.laborCost?.[currentBranchId] ||
                             part.wholesalePrice?.[currentBranchId] ||
@@ -4141,6 +4158,11 @@ const WorkOrderModal: React.FC<{
                                 <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium mt-0.5">
                                   Công: {formatCurrency(partLaborCost)}
                                 </div>
+                                {warrantyText && (
+                                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                                    Bảo hành: {warrantyText}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-2 mt-0.5">
                                   <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">
                                     {part.sku}
@@ -4216,6 +4238,7 @@ const WorkOrderModal: React.FC<{
                                 laborPerUnit,
                                 Number(part.quantity || 0)
                               );
+                              const warrantyText = getPartWarranty(part.partId);
                               return (
                                 <>
                             <div className="text-sm text-slate-900 dark:text-slate-100 font-medium">
@@ -4227,6 +4250,11 @@ const WorkOrderModal: React.FC<{
                             <div className="text-[10px] text-cyan-500 dark:text-cyan-300 mt-0.5">
                               Công theo SL: {formatCurrency(integratedLaborLine)}
                             </div>
+                            {warrantyText && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium">
+                                Bảo hành: {warrantyText}
+                              </div>
+                            )}
                             <div className="flex items-center gap-2 mt-0.5">
                               {part.sku && (
                                 <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">
