@@ -5,6 +5,7 @@ import { formatWorkOrderId } from "../../utils/format";
 // import { safeAudit } from "./auditLogsRepository";
 
 const WORK_ORDERS_TABLE = "work_orders";
+const ADDITIONAL_SERVICES_MARKER = "[ADDITIONAL_SERVICES]:";
 
 const parseWarrantyMonths = (raw: unknown): number => {
   const text = String(raw || "").trim().toLowerCase();
@@ -52,6 +53,59 @@ const shouldGenerateWarrantyForWorkOrder = (order: WorkOrder): boolean => {
 
   return !isCanceledStatus && !isRefunded && (isPaid || isCompletedStatus);
 };
+
+function stripAdditionalServicesMarker(text: string): string {
+  const idx = text.indexOf(ADDITIONAL_SERVICES_MARKER);
+  if (idx === -1) return text;
+  return text.slice(0, idx).trim();
+}
+
+function encodeAdditionalServicesInNotes(
+  issueDescription: string,
+  additionalServices: any[]
+): string {
+  const cleanText = stripAdditionalServicesMarker(String(issueDescription || "")).trim();
+  if (!Array.isArray(additionalServices) || additionalServices.length === 0) {
+    return cleanText;
+  }
+
+  let serialized = "[]";
+  try {
+    serialized = JSON.stringify(additionalServices);
+  } catch {
+    serialized = "[]";
+  }
+
+  return `${cleanText}\n${ADDITIONAL_SERVICES_MARKER}${serialized}`.trim();
+}
+
+function decodeAdditionalServicesFromNotes(notesRaw: unknown): {
+  cleanNotes: string;
+  services: any[];
+} {
+  const notes = String(notesRaw || "");
+  const idx = notes.indexOf(ADDITIONAL_SERVICES_MARKER);
+  if (idx === -1) {
+    return { cleanNotes: notes, services: [] };
+  }
+
+  const cleanNotes = notes.slice(0, idx).trim();
+  const jsonPart = notes.slice(idx + ADDITIONAL_SERVICES_MARKER.length).trim();
+
+  if (!jsonPart) {
+    return { cleanNotes, services: [] };
+  }
+
+  try {
+    const parsed = JSON.parse(jsonPart);
+    return {
+      cleanNotes,
+      services: Array.isArray(parsed) ? parsed : [],
+    };
+  } catch {
+    return { cleanNotes, services: [] };
+  }
+}
 
 const getPartIdFromOrderItem = (item: any): string =>
   String(item?.partId ?? item?.partid ?? item?.part_id ?? "").trim();
@@ -426,6 +480,120 @@ async function clearWorkerCompensationForCanceledOrder(orderId: string): Promise
   }
 }
 
+function sumManualPartCostExpense(order: WorkOrder): {
+  total: number;
+  labels: string[];
+} {
+  const parts = Array.isArray(order.partsUsed) ? order.partsUsed : [];
+  let total = 0;
+  const labels: string[] = [];
+
+  for (const part of parts as any[]) {
+    const partId = String(part?.partId || part?.partid || part?.part_id || "").trim();
+    // Manual/free part in current flow has no stable partId.
+    if (partId) continue;
+
+    const qty = Math.max(0, Number(part?.quantity || 0));
+    const cost = Math.max(0, Number(part?.costPrice || part?.costprice || 0));
+    if (qty <= 0 || cost <= 0) continue;
+
+    total += qty * cost;
+    labels.push(String(part?.partName || part?.part_name || "Linh kiện tự do").trim());
+  }
+
+  return { total, labels };
+}
+
+async function ensureManualPartExpenseOnPayment(
+  order: WorkOrder,
+  paymentMethod?: string
+): Promise<void> {
+  const { total, labels } = sumManualPartCostExpense(order);
+  if (total <= 0) return;
+
+  const marker = "[MANUAL_PART_COST]";
+  const reference = String(order.id || "").trim();
+  if (!reference) return;
+
+  try {
+    const { data: existingRows } = await supabase
+      .from("cash_transactions")
+      .select("id, category, description, reference")
+      .eq("reference", reference)
+      .limit(20);
+
+    const exists = (existingRows || []).some((row: any) => {
+      const category = String(row?.category || "").toLowerCase();
+      const description = String(row?.description || "").toLowerCase();
+      return category === "parts_purchase" && description.includes(marker.toLowerCase());
+    });
+
+    if (exists) return;
+
+    const txId =
+      typeof crypto !== "undefined" && (crypto as any).randomUUID
+        ? (crypto as any).randomUUID()
+        : `${Math.random().toString(36).slice(2)}-${Date.now()}`;
+
+    const branchId = String(order.branchId || "CN1");
+    const orderSuffix = reference.split("-").pop() || reference;
+    const topNames = labels.slice(0, 3).join(", ");
+    const description = `${marker} Chi giá nhập linh kiện tự do - Phiếu #${orderSuffix}${
+      topNames ? ` - ${topNames}` : ""
+    }`;
+
+    const payloadAttempts: Array<Record<string, any>> = [
+      {
+        id: txId,
+        type: "expense",
+        category: "parts_purchase",
+        amount: -total,
+        date: new Date().toISOString(),
+        description,
+        reference,
+        paymentsource: paymentMethod || order.paymentMethod || "cash",
+        branchid: branchId,
+      },
+      {
+        id: txId,
+        type: "expense",
+        category: "parts_purchase",
+        amount: -total,
+        date: new Date().toISOString(),
+        description,
+        reference,
+        paymentSource: paymentMethod || order.paymentMethod || "cash",
+        branchId,
+      },
+      {
+        id: txId,
+        type: "expense",
+        category: "parts_purchase",
+        amount: -total,
+        date: new Date().toISOString(),
+        description,
+        reference,
+        branch_id: branchId,
+      },
+    ];
+
+    for (const payload of payloadAttempts) {
+      const { error } = await supabase.from("cash_transactions").insert(payload);
+      if (!error) return;
+    }
+
+    console.warn("[completeWorkOrderPayment] Failed to create manual-part expense transaction", {
+      orderId: order.id,
+      total,
+    });
+  } catch (error) {
+    console.warn("[completeWorkOrderPayment] Manual-part expense creation error", {
+      orderId: order.id,
+      error,
+    });
+  }
+}
+
 // Some deployments use camelCase columns, others use lowercase columns.
 // This helper writes technician/labor with multiple key variants so data is persisted reliably.
 async function syncTechnicianAndLaborFallback(
@@ -459,6 +627,7 @@ function normalizeWorkOrder(row: any): WorkOrder {
   if (row.id && (row.notes || row.issuedescription || row.partsused)) {
     // noop: retained as a lightweight debug checkpoint for suspicious row shapes
   }
+  const notesDecoded = decodeAdditionalServicesFromNotes(row.notes || "");
   return {
     id: row.id,
     creationDate: row.creationdate || row.creationDate,
@@ -469,15 +638,20 @@ function normalizeWorkOrder(row: any): WorkOrder {
     licensePlate: row.licenseplate || row.licensePlate,
     currentKm: row.currentkm || row.currentKm,
     // Map notes to issueDescription since we store description there
-    issueDescription: row.issuedescription || row.issueDescription || row.notes || "",
+    issueDescription:
+      row.issuedescription || row.issueDescription || notesDecoded.cleanNotes || "",
     technicianName: row.technicianname || row.technicianName,
     status: row.status,
     laborCost: row.laborcost || row.laborCost || 0,
     laborTotal: row.labor_total || row.laborTotal || row.laborcost || row.laborCost || 0,
     discount: row.discount,
     partsUsed: row.partsused || row.partsUsed,
-    additionalServices: row.additionalservices || row.additionalServices,
-    notes: row.notes || "",
+    additionalServices:
+      row.additionalservices ||
+      row.additionalServices ||
+      row.additional_services ||
+      notesDecoded.services,
+    notes: notesDecoded.cleanNotes || "",
     total: row.total,
     workerTotal: row.worker_total || row.workerTotal || 0,
     branchId: row.branchid || row.branchId,
@@ -765,11 +939,16 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     const licensePlate = input.licensePlate || "";
     const laborCost = input.laborCost || 0;
     const partsUsed = input.partsUsed || [];
+    const additionalServices = input.additionalServices || [];
     const branchId = input.branchId || "CN1";
     const paymentStatus = input.paymentStatus || "unpaid";
     const paymentMethod = input.paymentMethod || null;
     const paymentDate =
       input.paymentStatus === "paid" ? new Date().toISOString() : null;
+    const notesWithAdditionalServices = encodeAdditionalServicesInNotes(
+      String(input.issueDescription || ""),
+      additionalServices as any[]
+    );
 
     const newOrder = {
       id: input.id,
@@ -784,9 +963,11 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       "laborCost": laborCost,
       discount: input.discount || 0,
       "partsUsed": partsUsed,
-      // additionalServices not in schema, ignoring
+      "additionalServices": additionalServices,
+      additionalservices: additionalServices,
+      additional_services: additionalServices,
 
-      notes: input.issueDescription || "", // Mapped to 'notes'
+      notes: notesWithAdditionalServices, // Mapped to 'notes'
       total: input.total || 0,
       "branchId": branchId,
 
@@ -882,7 +1063,10 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         laborCost,
         discount: input.discount || 0,
         partsUsed,
-        notes: input.issueDescription || "",
+        additionalServices,
+        additionalservices: additionalServices,
+        additional_services: additionalServices,
+        notes: notesWithAdditionalServices,
         total: input.total || 0,
         branchId,
         paymentStatus,
@@ -983,6 +1167,8 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     // 🔹 FALLBACK: Use direct update since RPC function is missing/broken on user's DB
     // Map input to DB columns (based on supabase_complete_setup.sql)
     const partsToSave = input.partsUsed || (input as any).parts || [];
+    const additionalServicesToSave =
+      input.additionalServices || (input as any).additionalservices || [];
     const normalizedDepositAmount =
       input.depositAmount !== undefined
         ? Math.max(0, Number(input.depositAmount || 0))
@@ -1003,6 +1189,13 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         : normalizedTotalPaid !== undefined && input.total !== undefined
           ? Math.max(0, Number(input.total || 0) - normalizedTotalPaid)
           : undefined;
+    const notesWithAdditionalServices =
+      input.issueDescription !== undefined
+        ? encodeAdditionalServicesInNotes(
+            String(input.issueDescription || ""),
+            additionalServicesToSave as any[]
+          )
+        : undefined;
 
     // Ensure parts have valid structure (though JSONB accepts generic, we want consistency)
     // NOTE: WorkOrderMobileModal already cleans custom partIds.
@@ -1017,8 +1210,11 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       "laborCost": input.laborCost,
       discount: input.discount,
       "partsUsed": partsToSave,
+      "additionalServices": additionalServicesToSave,
+      additionalservices: additionalServicesToSave,
+      additional_services: additionalServicesToSave,
 
-      notes: input.issueDescription, // Mapped to 'notes'
+      notes: notesWithAdditionalServices, // Mapped to 'notes'
       total: input.total,
       "branchId": input.branchId, // Might not allow changing branch?
 
@@ -1707,6 +1903,9 @@ export async function completeWorkOrderPayment(
       );
 
       const normalizedUpdatedOrder = normalizeWorkOrder(updatedRow);
+      if (nextStatus === "paid") {
+        await ensureManualPartExpenseOnPayment(normalizedUpdatedOrder, paymentMethod);
+      }
       await autoCreateWarrantyCardsForWorkOrder(normalizedUpdatedOrder);
 
       return success({
@@ -1830,6 +2029,12 @@ export async function completeWorkOrderPayment(
     // Audit removed
 
     const normalizedOrder = normalizeWorkOrder(workOrderRow);
+    const paidNow =
+      String(newPaymentStatus || normalizedOrder.paymentStatus || "").toLowerCase() ===
+      "paid";
+    if (paidNow) {
+      await ensureManualPartExpenseOnPayment(normalizedOrder, paymentMethod);
+    }
     await autoCreateWarrantyCardsForWorkOrder(normalizedOrder);
 
     return success({

@@ -572,7 +572,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const partResultsRef = useRef<HTMLDivElement>(null);
   const [showAddService, setShowAddService] = useState(false);
   const [newServiceName, setNewServiceName] = useState("");
-  const [newServiceCost, setNewServiceCost] = useState(0);
   const [newServicePrice, setNewServicePrice] = useState(0);
   const [newServiceQuantity, setNewServiceQuantity] = useState(1);
   const [showAddVehicle, setShowAddVehicle] = useState(false);
@@ -1094,12 +1093,11 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         id: `srv-${Date.now()}`,
         name: newServiceName,
         quantity: newServiceQuantity,
-        costPrice: newServiceCost,
+        costPrice: 0,
         sellingPrice: newServicePrice,
       },
     ]);
     setNewServiceName("");
-    setNewServiceCost(0);
     setNewServicePrice(0);
     setNewServiceQuantity(1);
     setShowAddService(false);
@@ -2896,25 +2894,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                             className="w-24 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-orange-600 dark:text-orange-400 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all"
                                           />
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-[10px] text-slate-500 w-8">Vốn:</span>
-                                          <input
-                                            type="text"
-                                            value={formatNumberWithDots(service.costPrice || 0)}
-                                            onChange={(e) => {
-                                              const newCost = parseFormattedNumber(e.target.value);
-                                              setAdditionalServices(
-                                                additionalServices.map((s) =>
-                                                  s.id === service.id
-                                                    ? { ...s, costPrice: newCost }
-                                                    : s
-                                                )
-                                              );
-                                            }}
-                                            inputMode="numeric"
-                                            className="w-24 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 text-xs font-bold focus:border-blue-500 focus:outline-none transition-all"
-                                          />
-                                        </div>
                                       </div>
                                     </div>
                                     <button
@@ -3666,7 +3645,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                   onClick={() => {
                     setShowAddService(false);
                     setNewServiceName("");
-                    setNewServiceCost(0);
                     setNewServicePrice(0);
                     setNewServiceQuantity(1);
                   }}
@@ -3723,30 +3701,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                   </div>
                 </div>
 
-                {/* Cost & Price Section */}
+                {/* Price Section */}
                 <div>
                   <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-300 mb-3 uppercase tracking-wide">
-                    CHI PHÍ & GIÁ BÁN
+                    GIÁ BÁN
                   </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Cost Price */}
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1.5">
-                        Giá nhập (Vốn):
-                      </label>
-                      <div className="relative">
-                        <NumberInput
-                          value={newServiceCost}
-                          onChange={(val: number) => setNewServiceCost(val)}
-                          placeholder="0"
-                          className="w-full px-3 py-3 pr-8 bg-slate-50 dark:bg-[#151521] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 text-sm focus:border-slate-400 dark:focus:border-slate-600 focus:outline-none transition-colors"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">
-                          đ
-                        </span>
-                      </div>
-                    </div>
-
+                  <div className="grid grid-cols-1 gap-3">
                     {/* Selling Price */}
                     <div>
                       <label className="block text-xs text-[#ffc700] mb-1.5 font-medium">

@@ -4376,9 +4376,6 @@ const WorkOrderModal: React.FC<{
                         SL
                       </th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-300">
-                        Giá nhập
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-300">
                         Đơn giá
                       </th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -4433,24 +4430,6 @@ const WorkOrderModal: React.FC<{
                               );
                             }}
                             className="w-16 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-center bg-white dark:bg-slate-700 focus:border-blue-500 focus:outline-none"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-right relative">
-                          <NumberInput
-                            value={service.costPrice ?? 0}
-                            onChange={(val) =>
-                              setAdditionalServices(
-                                additionalServices.map((s) =>
-                                  s.id === service.id
-                                    ? { ...s, costPrice: val }
-                                    : s
-                                )
-                              )
-                            }
-                            // Always allow editing cost price for internal tracking
-                            disabled={false}
-                            className="w-full px-2 py-1 border border-orange-200 dark:border-orange-800 rounded text-right bg-orange-50 dark:bg-orange-900/10 text-orange-700 dark:text-orange-400 focus:border-orange-500 focus:bg-white dark:focus:bg-slate-700 transition-colors text-sm"
-                            placeholder="0"
                           />
                         </td>
                         <td className="px-4 py-2 text-right">
@@ -4546,19 +4525,6 @@ const WorkOrderModal: React.FC<{
                             })
                           }
                           className="w-16 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-center bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <NumberInput
-                          placeholder="Giá nhập"
-                          value={newService.costPrice ?? ""}
-                          onChange={(val) =>
-                            setNewService({
-                              ...newService,
-                              costPrice: Math.max(0, val), // Chỉ cho phép >= 0
-                            })
-                          }
-                          className="w-full px-2 py-1 border border-orange-300 dark:border-orange-600 rounded text-right bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm"
                         />
                       </td>
                       <td className="px-4 py-2">
