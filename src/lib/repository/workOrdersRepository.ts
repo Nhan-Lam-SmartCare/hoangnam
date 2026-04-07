@@ -246,9 +246,17 @@ function getMissingColumnNameFromError(error: any): string | null {
 }
 
 function removeMissingColumnKeys(payload: Record<string, any>, missingColumn: string): number {
-  const normalizedMissing = String(missingColumn || "").replace(/['"]/g, "").toLowerCase();
-  if (!normalizedMissing) return 0;
+  const cleanedMissing = String(missingColumn || "").replace(/['"]/g, "").trim();
+  if (!cleanedMissing) return 0;
 
+  // Prefer exact key removal first to avoid dropping similarly named camelCase fields
+  // such as `creationDate` when DB only reports missing `creationdate`.
+  if (Object.prototype.hasOwnProperty.call(payload, cleanedMissing)) {
+    delete payload[cleanedMissing];
+    return 1;
+  }
+
+  const normalizedMissing = cleanedMissing.toLowerCase();
   let removed = 0;
   Object.keys(payload).forEach((key) => {
     if (String(key).toLowerCase() === normalizedMissing) {
