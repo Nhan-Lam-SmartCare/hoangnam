@@ -249,22 +249,13 @@ function removeMissingColumnKeys(payload: Record<string, any>, missingColumn: st
   const cleanedMissing = String(missingColumn || "").replace(/['"]/g, "").trim();
   if (!cleanedMissing) return 0;
 
-  // Prefer exact key removal first to avoid dropping similarly named camelCase fields
-  // such as `creationDate` when DB only reports missing `creationdate`.
+  // Remove only the exact key reported by DB to avoid deleting similarly named fields.
   if (Object.prototype.hasOwnProperty.call(payload, cleanedMissing)) {
     delete payload[cleanedMissing];
     return 1;
   }
 
-  const normalizedMissing = cleanedMissing.toLowerCase();
-  let removed = 0;
-  Object.keys(payload).forEach((key) => {
-    if (String(key).toLowerCase() === normalizedMissing) {
-      delete payload[key];
-      removed += 1;
-    }
-  });
-  return removed;
+  return 0;
 }
 
 async function resolveRefundTargetWorkOrder(
@@ -733,54 +724,29 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       id: input.id,
       "creationDate": createdAtIso,
       "customerName": customerName,
-      customername: customerName,
       "customerPhone": customerPhone,
-      customerphone: customerPhone,
       "vehicleModel": vehicleModel,
-      vehiclemodel: vehicleModel,
       "licensePlate": licensePlate, // Stores Serial/IMEI
-      licenseplate: licensePlate,
       // Not storing vehicleId or currentKm as columns don't exist in setup script
 
       status: input.status || "Tiếp nhận",
       "laborCost": laborCost,
-      laborcost: laborCost,
       discount: input.discount || 0,
       "partsUsed": partsUsed,
-      partsused: partsUsed,
       // additionalServices not in schema, ignoring
 
       notes: input.issueDescription || "", // Mapped to 'notes'
-      issueDescription: input.issueDescription || "",
-      issuedescription: input.issueDescription || "",
       total: input.total || 0,
       "branchId": branchId,
-      branchid: branchId,
 
       "paymentStatus": paymentStatus,
-      paymentstatus: paymentStatus,
       "paymentMethod": paymentMethod,
-      paymentmethod: paymentMethod,
-      "depositAmount": depositAmount,
-      depositamount: depositAmount,
-      "additionalPayment": additionalPayment,
-      additionalpayment: additionalPayment,
       "totalPaid": totalPaid,
-      totalpaid: totalPaid,
       "remainingAmount": remainingAmount,
-      remainingamount: remainingAmount,
       "paymentDate": paymentDate,
-      paymentdate: paymentDate,
     };
 
-    const insertPayloads: Array<Record<string, any>> = creatorId
-      ? [
-        { ...newOrder, created_by: creatorId },
-        { ...newOrder, createdBy: creatorId },
-        { ...newOrder, createdby: creatorId },
-        { ...newOrder },
-      ]
-      : [{ ...newOrder }];
+    const insertPayloads: Array<Record<string, any>> = [{ ...newOrder }];
 
     let data: any = null;
     let error: any = null;
@@ -798,7 +764,9 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       };
       ensureCreationDate();
 
-      while (true) {
+      let retryCount = 0;
+      while (retryCount < 12) {
+        retryCount += 1;
         const res = await supabase
           .from(WORK_ORDERS_TABLE)
           .insert(sanitizedPayload)
@@ -838,8 +806,63 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         });
       }
 
+      if (retryCount >= 12 && error) {
+        console.warn("[createWorkOrderAtomic] Stop retry after max attempts", {
+          code: (error as any)?.code,
+          message: (error as any)?.message,
+        });
+      }
+
       if (!error) {
         break;
+      }
+    }
+
+    // Final rescue path: try a strict, canonical payload to bypass legacy alias noise.
+    if (error) {
+      const canonicalPayload: Record<string, any> = {
+        id: input.id,
+        creationDate: createdAtIso,
+        customerName,
+        customerPhone,
+        vehicleModel,
+        licensePlate,
+        status: input.status || "Tiếp nhận",
+        laborCost,
+        discount: input.discount || 0,
+        partsUsed,
+        notes: input.issueDescription || "",
+        total: input.total || 0,
+        branchId,
+        paymentStatus,
+        paymentMethod,
+        totalPaid,
+        remainingAmount,
+        paymentDate,
+      };
+
+      let rescuePayload = Object.fromEntries(
+        Object.entries(canonicalPayload).filter(([, value]) => value !== undefined)
+      ) as Record<string, any>;
+
+      for (let i = 0; i < 10; i += 1) {
+        const rescueRes = await supabase
+          .from(WORK_ORDERS_TABLE)
+          .insert(rescuePayload)
+          .select()
+          .single();
+
+        if (!rescueRes.error) {
+          data = rescueRes.data;
+          error = null;
+          break;
+        }
+
+        error = rescueRes.error;
+        const missingColumn = getMissingColumnNameFromError(error);
+        if (!missingColumn) break;
+        const removedCount = removeMissingColumnKeys(rescuePayload, missingColumn);
+        if (removedCount === 0) break;
       }
     }
 
@@ -940,8 +963,6 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
       "paymentStatus": input.paymentStatus,
       "paymentMethod": input.paymentMethod,
-      "depositAmount": normalizedDepositAmount,
-      "additionalPayment": normalizedAdditionalPayment,
       "totalPaid": normalizedTotalPaid,
       "remainingAmount": normalizedRemainingAmount,
       "paymentDate": input.paymentStatus === "paid" ? new Date().toISOString() : undefined,
