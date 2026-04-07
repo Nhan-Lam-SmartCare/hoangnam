@@ -783,6 +783,16 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         Object.entries(payload).filter(([, value]) => value !== undefined)
       ) as Record<string, any>;
 
+      // Defensive: ensure required creationDate is never null/empty on legacy schemas.
+      const ensureCreationDate = () => {
+        const safeNow = new Date().toISOString();
+        const currentCamel = String(sanitizedPayload["creationDate"] || "").trim();
+        const currentLower = String(sanitizedPayload["creationdate"] || "").trim();
+        if (!currentCamel) sanitizedPayload["creationDate"] = safeNow;
+        if (!currentLower) sanitizedPayload["creationdate"] = sanitizedPayload["creationDate"];
+      };
+      ensureCreationDate();
+
       while (true) {
         const res = await supabase
           .from(WORK_ORDERS_TABLE)
@@ -795,6 +805,17 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
         if (!error) {
           break;
+        }
+
+        // Retry once when DB rejects null creationDate.
+        const errCode = String((error as any)?.code || "").toUpperCase();
+        const errMessage = String((error as any)?.message || "");
+        if (
+          errCode === "23502" &&
+          errMessage.toLowerCase().includes("creationdate")
+        ) {
+          ensureCreationDate();
+          continue;
         }
 
         const missingColumn = getMissingColumnNameFromError(error);
