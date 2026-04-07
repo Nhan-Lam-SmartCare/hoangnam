@@ -1,0 +1,80 @@
+{
+  "ts": "2025-11-12T07:16:11.208Z",
+  "results": [
+    {
+      "email": "truongcuongya123@gmail.com",
+      "role": "manager",
+      "create": {
+        "success": true,
+        "data": {
+          "id": "0a64730b-f54a-4d0a-a3e6-f654ff69302f",
+          "type": "Nhập kho",
+          "partId": "test-part-1",
+          "partName": "Test Part 1",
+          "quantity": 1,
+          "date": "2025-11-12T07:16:09.228+00:00",
+          "unitPrice": 100,
+          "totalPrice": 100,
+          "branchId": "CN1",
+          "notes": "CRUD test - auto",
+          "saleId": null,
+          "workOrderId": null,
+          "created_at": "2025-11-12T07:16:09.231+00:00"
+        }
+      },
+      "delete": {
+        "success": true
+      }
+    },
+    {
+      "email": "nguyenthanhloc28052007@gmail.com",
+      "role": "staff",
+      "create": {
+        "success": true,
+        "data": {
+          "id": "ab7a626e-437f-477f-bc89-7749c54e24a1",
+          "type": "Nhập kho",
+          "partId": "test-part-1",
+          "partName": "Test Part 1",
+          "quantity": 1,
+          "date": "2025-11-12T07:16:10.146+00:00",
+          "unitPrice": 100,
+          "totalPrice": 100,
+          "branchId": "CN1",
+          "notes": "CRUD test - auto",
+          "saleId": null,
+          "workOrderId": null,
+          "created_at": "2025-11-12T07:16:10.146+00:00"
+        }
+      },
+      "delete": {
+        "success": true
+      }
+    },
+    {
+      "email": "lam.tcag@gmail.com",
+      "role": "owner",
+      "create": {
+        "success": true,
+        "data": {
+          "id": "e5c406da-be6b-4149-88e3-114f8aa3d868",
+          "type": "Nhập kho",
+          "partId": "test-part-1",
+          "partName": "Test Part 1",
+          "quantity": 1,
+          "date": "2025-11-12T07:16:10.799+00:00",
+          "unitPrice": 100,
+          "totalPrice": 100,
+          "branchId": "CN1",
+          "notes": "CRUD test - auto",
+          "saleId": null,
+          "workOrderId": null,
+          "created_at": "2025-11-12T07:16:10.799+00:00"
+        }
+      },
+      "delete": {
+        "success": true
+      }
+    }
+  ]
+}

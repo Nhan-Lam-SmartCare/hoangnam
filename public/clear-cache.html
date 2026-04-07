@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clear Cache - MotoCare</title>
+  <style>
+    body {
+      font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 500px;
+      text-align: center;
+    }
+    h1 { 
+      color: #333; 
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    p { 
+      color: #666; 
+      margin-bottom: 30px; 
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    button:hover { 
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+      font-size: 14px;
+      animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+      display: block;
+    }
+    .icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+    .steps {
+      text-align: left;
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    .steps h3 {
+      margin-top: 0;
+      color: #333;
+      font-size: 16px;
+    }
+    .steps ol {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    .steps li {
+      margin: 8px 0;
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">🔄</div>
+    <h1>Clear Cache & Reload</h1>
+    <div class="subtitle">MotoCare • SmartCare</div>
+    <p>Nếu bạn gặp vấn đề <strong>màn hình trắng</strong> hoặc app <strong>không load được</strong>, hãy nhấn nút bên dưới để xóa cache và tải lại app.</p>
+    
+    <div class="steps">
+      <h3>Thao tác sẽ thực hiện:</h3>
+      <ol>
+        <li>Xóa Local Storage</li>
+        <li>Xóa Session Storage</li>
+        <li>Gỡ bỏ Service Workers</li>
+        <li>Xóa Cache Storage</li>
+        <li>Tải lại trang</li>
+      </ol>
+    </div>
+
+    <button id="clearBtn" onclick="clearAllCache()">Xóa Cache & Tải Lại</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    async function clearAllCache() {
+      const statusEl = document.getElementById('status');
+      const btn = document.getElementById('clearBtn');
+      
+      statusEl.className = 'status info';
+      statusEl.textContent = '⏳ Đang xóa cache...';
+      statusEl.style.display = 'block';
+      btn.disabled = true;
+
+      try {
+        // Clear localStorage
+        console.log('Clearing localStorage...');
+        localStorage.clear();
+        
+        // Clear sessionStorage
+        console.log('Clearing sessionStorage...');
+        sessionStorage.clear();
+        
+        // Unregister all service workers
+        if ('serviceWorker' in navigator) {
+          console.log('Unregistering service workers...');
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+            console.log('Unregistered service worker:', registration.scope);
+          }
+        }
+        
+        // Clear cache storage
+        if ('caches' in window) {
+          console.log('Clearing cache storage...');
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map(name => {
+            console.log('Deleting cache:', name);
+            return caches.delete(name);
+          }));
+        }
+        
+        statusEl.className = 'status success';
+        statusEl.textContent = '✅ Đã xóa cache thành công! Đang tải lại...';
+        
+        console.log('Cache cleared successfully, reloading...');
+        
+        // Reload after 1.5 seconds
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } catch (error) {
+        console.error('Error clearing cache:', error);
+        statusEl.className = 'status error';
+        statusEl.textContent = '❌ Lỗi: ' + error.message;
+        btn.disabled = false;
+      }
+    }
+
+    // Show instructions on load
+    console.log('%cMotoCare Cache Cleaner', 'font-size: 20px; font-weight: bold; color: #667eea;');
+    console.log('If you see a white screen, click the button above to clear cache.');
+  </script>
+</body>
+</html>

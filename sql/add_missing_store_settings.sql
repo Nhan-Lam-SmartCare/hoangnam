@@ -1,0 +1,16 @@
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS slogan TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS store_name_en TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS facebook TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS tax_code TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS primary_color TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS business_hours TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS established_year BIGINT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS invoice_prefix TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS receipt_prefix TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS work_order_prefix TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS invoice_footer_note TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS currency TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS date_format TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS timezone TEXT;
