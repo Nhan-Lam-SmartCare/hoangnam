@@ -616,6 +616,68 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   // Tabs state for mobile form
   const [activeSection, setActiveSection] = useState<"info" | "issue" | "parts" | "payment">("info");
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setStatus((workOrder?.status as WorkOrderStatus) || WORK_ORDER_STATUS.RECEIVED);
+
+    setSelectedParts(
+      (workOrder?.partsUsed || []).map((p) => ({
+        partId: p.partId || `manual-loaded-${Math.random().toString(36).substr(2, 9)}`,
+        partName: p.partName,
+        quantity: p.quantity,
+        sellingPrice: p.price || 0,
+        costPrice: p.costPrice || 0,
+        sku: p.sku || "",
+        category: p.category || "",
+      }))
+    );
+
+    setAdditionalServices(
+      (workOrder?.additionalServices || []).map((s) => ({
+        id: s.id || `srv-${Date.now()}-${Math.random()}`,
+        name: s.description || "",
+        quantity: s.quantity || 1,
+        costPrice: s.costPrice || 0,
+        sellingPrice: s.price || 0,
+      }))
+    );
+
+    setRepairServices(
+      (workOrder?.repairServices || []).map((service) => ({
+        id: service.id,
+        serviceId: service.serviceId,
+        serviceName: service.serviceName,
+        laborCalcType: service.laborCalcType,
+        laborFixedAmount: service.laborFixedAmount,
+        laborPercentOfCost: service.laborPercentOfCost,
+        minimumLaborAmount: service.minimumLaborAmount,
+        defaultWorkerSharePercent: service.workerSharePercent || 30,
+        manualLabor: service.laborCalcType === "manual" ? service.laborAmount : 0,
+        relatedItemIds: (service.relatedItems || []).map((item) => item.partId),
+        workers: (service.workers || []).map((worker) => ({
+          worker_id: worker.workerId,
+          worker_name: worker.workerName || "",
+          share_percent: worker.sharePercent,
+        })),
+        isBillable: service.isBillable,
+        isPayableToWorker: service.isPayableToWorker,
+        note: service.note || "",
+      }))
+    );
+
+    setLaborCost(workOrder?.laborCost || 0);
+    setDiscount(workOrder?.discount || 0);
+    setDiscountType("amount");
+    setPaymentMethod(
+      workOrder?.paymentMethod === "bank" || workOrder?.paymentMethod === "cash"
+        ? workOrder.paymentMethod
+        : "cash"
+    );
+    setNewRepairServiceDraft(createEmptyRepairServiceDraft());
+    setActiveSection("info");
+  }, [isOpen, workOrder?.id]);
+
   const getSelectedPartCost = (partId: string) => {
     const part = selectedParts.find((item) => item.partId === partId);
     if (!part) return 0;
@@ -1130,6 +1192,9 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
     // Set submitting state to disable buttons
     setIsSubmitting(true);
+    const failSafeUnlockTimer = window.setTimeout(() => {
+      setIsSubmitting(false);
+    }, 20000);
 
     // Desktop parity: additional payment only applies when status is "Trả máy"
     const totalDeposit = isDeposit ? depositAmount : 0;
@@ -1420,6 +1485,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       alert(errorMessage + "\n\nDữ liệu đã được lưu tạm. Bạn có thể thử lại hoặc chụp màn hình.");
       // onClose(); // Don't close so user can retry
     } finally {
+      clearTimeout(failSafeUnlockTimer);
       setIsSubmitting(false);
     }
   };
