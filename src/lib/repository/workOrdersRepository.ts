@@ -732,7 +732,6 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     const newOrder = {
       id: input.id,
       "creationDate": createdAtIso,
-      creationdate: createdAtIso,
       "customerName": customerName,
       customername: customerName,
       "customerPhone": customerPhone,
@@ -795,9 +794,7 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       const ensureCreationDate = () => {
         const safeNow = new Date().toISOString();
         const currentCamel = String(sanitizedPayload["creationDate"] || "").trim();
-        const currentLower = String(sanitizedPayload["creationdate"] || "").trim();
         if (!currentCamel) sanitizedPayload["creationDate"] = safeNow;
-        if (!currentLower) sanitizedPayload["creationdate"] = sanitizedPayload["creationDate"];
       };
       ensureCreationDate();
 
