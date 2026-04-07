@@ -191,12 +191,6 @@ export const BottomNav: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
-  // Hide bottom nav on specific pages if needed
-  // Note: We want it visible mostly everywhere now
-  if (location.pathname === "/sales") {
-    return null;
-  }
-
   const allNavItems = [
     {
       to: "/dashboard",

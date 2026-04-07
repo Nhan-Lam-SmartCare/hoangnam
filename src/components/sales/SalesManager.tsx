@@ -45,6 +45,7 @@ const SalesManager: React.FC = () => {
   const { data: customersFromRepo = [] } = useCustomers();
   const {
     data: partsFromRepo = [],
+    isSuccess: partsLoaded,
     isFetching: syncingInventory,
     refetch: refetchParts,
   } = usePartsRepo();
@@ -119,6 +120,11 @@ const SalesManager: React.FC = () => {
   useEffect(() => {
     setPage(1);
   }, [search, currentBranchId, pageSize]);
+
+  useEffect(() => {
+    if (!partsLoaded) return;
+    setParts(partsFromRepo);
+  }, [partsLoaded, partsFromRepo, setParts]);
 
   useEffect(() => {
     try {
