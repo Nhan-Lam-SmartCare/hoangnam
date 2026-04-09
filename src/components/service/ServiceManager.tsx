@@ -1608,11 +1608,6 @@ export default function ServiceManager() {
             setShowMobileModal(true);
           }}
           onEditWorkOrder={(workOrder) => {
-            if (!canModifyOrder(workOrder)) {
-              showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
-              return;
-            }
-
             setEditingOrder(workOrder);
             setMobileModalViewMode(true); // Click vào phiếu = view mode trước
             setShowMobileModal(true);

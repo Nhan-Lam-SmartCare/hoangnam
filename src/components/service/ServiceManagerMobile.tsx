@@ -235,12 +235,11 @@ const WorkOrderCard = React.memo(({
         </button>
         <button
           onClick={() => onEdit(workOrder)}
-          disabled={!canEdit}
-          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50 disabled:text-slate-600"
-          title={canEdit ? "Sửa" : "Không có quyền sửa"}
+          className="h-10 flex items-center justify-center gap-1 text-slate-300 border-r border-[#273348] active:bg-slate-800/50"
+          title={canEdit ? "Sửa" : "Xem chi tiết"}
         >
           <Edit2 className="w-3.5 h-3.5" />
-          <span className="text-[11px] font-medium">Sửa</span>
+          <span className="text-[11px] font-medium">{canEdit ? "Sửa" : "Xem"}</span>
         </button>
         <button
           onClick={() => onDelete(workOrder)}
