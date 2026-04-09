@@ -2,7 +2,7 @@ import { supabase } from "../../supabaseClient";
 import { RepoResult, success, failure } from "./types";
 import { InventoryTransaction } from "../../types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-// import { safeAudit } from "./auditLogsRepository";
+import { safeAudit } from "./auditLogsRepository";
 
 const TABLE = "inventory_transactions";
 
@@ -186,7 +186,12 @@ export async function createInventoryTransaction(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, {
+      action: "inventory.create",
+      entityType: "inventory_transaction",
+      entityId: (data as any)?.id,
+      details: { type: input.type, partName: input.partName, quantity: input.quantity, branchId: input.branchId },
+    });
     return success(data as InventoryTransaction);
   } catch (e: any) {
     return failure({

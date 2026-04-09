@@ -2,7 +2,7 @@ import { supabase } from "../../supabaseClient";
 import type { WorkOrder, StockWarning } from "../../types";
 import { RepoResult, success, failure } from "./types";
 import { formatWorkOrderId } from "../../utils/format";
-// import { safeAudit } from "./auditLogsRepository";
+import { safeAudit } from "./auditLogsRepository";
 
 const WORK_ORDERS_TABLE = "work_orders";
 const ADDITIONAL_SERVICES_MARKER = "[ADDITIONAL_SERVICES]:";

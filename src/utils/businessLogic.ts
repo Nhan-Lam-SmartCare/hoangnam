@@ -1,0 +1,113 @@
+import { WorkOrder, Part } from "../types";
+
+/**
+ * Phân tích doanh thu từ phiếu sửa chữa để tính thuế HKD
+ * Thuế HKD:
+ * - Hàng hóa (phụ tùng): 1.5% (1% VAT + 0.5% TNCN)
+ * - Dịch vụ (công thợ): 4.5% (3% VAT + 1.5% TNCN)
+ */
+export function calculateTaxHKD(
+  partsTotal: number,
+  serviceTotal: number
+): {
+  partsTaxRate: number;
+  serviceTaxRate: number;
+  partsTaxValue: number;
+  serviceTaxValue: number;
+  totalTax: number;
+} {
+  const partsTaxRate = 0.015; // 1.5%
+  const serviceTaxRate = 0.045; // 4.5%
+
+  const partsTaxValue = partsTotal * partsTaxRate;
+  const serviceTaxValue = serviceTotal * serviceTaxRate;
+
+  return {
+    partsTaxRate,
+    serviceTaxRate,
+    partsTaxValue,
+    serviceTaxValue,
+    totalTax: partsTaxValue + serviceTaxValue,
+  };
+}
+
+/**
+ * Bóc tách doanh thu hàng hóa và dịch vụ từ phiếu sửa chữa.
+ * Ưu tiên bóc tách dựa trên tổng tiền partsUsed và tổng tiền workOrder.
+ */
+export function splitWorkOrderRevenue(order: Partial<WorkOrder>): {
+  partsRevenue: number;
+  serviceRevenue: number;
+} {
+  const total = order.total || 0;
+  const discount = order.discount || 0;
+
+  // Tính tổng phụ tùng
+  let partsRawTotal = 0;
+  if (Array.isArray(order.partsUsed)) {
+    for (const part of order.partsUsed) {
+      const qty = Math.max(0, Number(part.quantity || 0));
+      const price = Math.max(0, Number(part.price || (part as any).retailPrice || 0));
+      partsRawTotal += qty * price;
+    }
+  }
+
+  // Khấu trừ discount chia đều theo tỷ lệ (nếu cần chuẩn xác), 
+  // nhưng ở đây ta giảm trừ thẳng vào công thợ trước (hoặc chia đều).
+  // Đơn giản nhất: Doanh thu phụ tùng = partsRawTotal (không chịu discount trừ khi discount > labor)
+  // Thực tế:
+  let partsRevenue = partsRawTotal;
+  let serviceRevenue = Math.max(0, total - partsRawTotal);
+
+  if (partsRevenue > total) {
+    // Discount quá lớn lẹm vào cả phụ tùng
+    partsRevenue = total;
+    serviceRevenue = 0;
+  }
+
+  return { partsRevenue, serviceRevenue };
+}
+
+/**
+ * Tính phần trăm chia sẻ cho thợ từ doanh thu dịch vụ.
+ */
+export function calculateWorkerShare(
+  laborAmount: number,
+  workerSharePercent: number
+): number {
+  if (laborAmount <= 0) return 0;
+  const percent = Math.min(100, Math.max(0, workerSharePercent));
+  return (laborAmount * percent) / 100;
+}
+
+/**
+ * Đánh giá tình trạng khách hàng theo số tháng chưa quay lại
+ */
+export function classifyCustomer(
+  lastVisitDate: Date | null | undefined,
+  currentDate: Date = new Date()
+): "Mới" | "Thường Xuyên" | "Sắp Mất" | "Đã Mất" {
+  if (!lastVisitDate) return "Mới";
+
+  const diffMs = currentDate.getTime() - lastVisitDate.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  const diffMonths = diffDays / 30;
+
+  if (diffMonths <= 3) return "Thường Xuyên";
+  if (diffMonths <= 6) return "Sắp Mất";
+  return "Đã Mất";
+}
+
+/**
+ * Tính tồn kho khả dụng mới sau khi xuất bán
+ */
+export function calculateNewStockAfterSale(
+  currentStock: number,
+  quantitySold: number
+): { nextStock: number; hasWarning: boolean } {
+  const next = currentStock - quantitySold;
+  return {
+    nextStock: next,
+    hasWarning: next <= 3, // Cảnh báo nếu tồn kho còn <= 3
+  };
+}

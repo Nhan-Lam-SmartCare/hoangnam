@@ -7,7 +7,7 @@ import type {
   AuthChangeEvent,
   AuthenticatorAssuranceLevels,
 } from "@supabase/supabase-js";
-// import { safeAudit } from "../lib/repository/auditLogsRepository";
+import { safeAudit } from "../lib/repository/auditLogsRepository";
 
 export type UserRole = "owner" | "manager" | "staff";
 
@@ -292,14 +292,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setMfaRequired(true);
         // Audit login attempt (best-effort)
         const _userId = data?.user?.id || null;
-        // safeAudit(userId, { action: "auth.login_mfa_pending" });
+        safeAudit(_userId, { action: "auth.login_mfa_pending" });
         return { mfaRequired: true };
       }
     }
 
     // No MFA required, complete login
     const _userId = data?.user?.id || null;
-    // safeAudit(userId, { action: "auth.login" });
+    safeAudit(_userId, { action: "auth.login" });
     return { mfaRequired: false };
   };
 
@@ -309,7 +309,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentAAL("aal2");
     // Audit successful MFA login
     if (user?.id) {
-      // safeAudit(user.id, { action: "auth.login_mfa_success" });
+      safeAudit(user.id, { action: "auth.login_mfa_success" });
     }
   };
 
@@ -342,7 +342,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error) throw error;
     setError(null);
     // Audit logout (best-effort)
-    // safeAudit(currentUserId, { action: "auth.logout" });
+    safeAudit(_currentUserId, { action: "auth.logout" });
   };
 
   const hasRole = (roles: UserRole[]): boolean => {

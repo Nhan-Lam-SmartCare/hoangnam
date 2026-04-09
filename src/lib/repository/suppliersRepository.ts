@@ -1,7 +1,7 @@
 import { supabase } from "../../supabaseClient";
 import type { Supplier } from "../../types";
 import { RepoResult, success, failure } from "./types";
-// import { safeAudit } from "./auditLogsRepository";
+import { safeAudit } from "./auditLogsRepository";
 
 const SUPPLIERS_TABLE = "suppliers";
 
@@ -61,7 +61,7 @@ export async function createSupplier(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, { action: "supplier.create", entityType: "supplier", entityId: (data as any)?.id, details: { name: input.name } });
     return success(data as Supplier);
   } catch (e: any) {
     return failure({
@@ -103,7 +103,7 @@ export async function updateSupplier(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, { action: "supplier.update", entityType: "supplier", entityId: id, details: { changes: Object.keys(updates) } });
     return success((data || { id, ...oldRow, ...updates }) as Supplier);
   } catch (e: any) {
     return failure({
@@ -142,7 +142,7 @@ export async function deleteSupplier(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, { action: "supplier.delete", entityType: "supplier", entityId: id, details: { name: oldRow?.name } });
     return success({ id });
   } catch (e: any) {
     return failure({

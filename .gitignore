@@ -45,3 +45,13 @@ yarn-error.log*
 # Misc
 *.local
 *.bak
+
+# Debug/temp files - prevent clutter in root
+errors*.txt
+debug_*.html
+fix_layout.*
+check-*.mjs
+check_*.ts
+build_log.txt
+*_block.txt
+*.legacy.tsx

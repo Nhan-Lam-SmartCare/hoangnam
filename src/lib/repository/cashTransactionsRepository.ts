@@ -1,7 +1,7 @@
 import { supabase } from "../../supabaseClient";
 import type { CashTransaction } from "../../types";
 import { RepoResult, success, failure } from "./types";
-// import { safeAudit } from "./auditLogsRepository";
+import { safeAudit } from "./auditLogsRepository";
 import { canonicalizeMotocareCashTxCategory } from "../finance/cashTxCategories";
 
 const TABLE = "cash_transactions";
@@ -314,7 +314,12 @@ export async function createCashTransaction(
       if (isManual) {
         const { data: userRes } = await supabase.auth.getUser();
         const userId = userRes?.user?.id || null;
-        // Audit removed
+        safeAudit(userId, {
+          action: "cash_transaction.create",
+          entityType: "cash_transaction",
+          entityId: txId,
+          details: { type: input.type, amount: input.amount, category: canonicalCategory },
+        });
       }
     } catch { }
     return success(created);
@@ -397,7 +402,16 @@ export async function updateCashTransaction(
     try {
       const { data: userRes } = await supabase.auth.getUser();
       const userId = userRes?.user?.id || null;
-      // Audit removed
+      safeAudit(userId, {
+        action: "cash_transaction.update",
+        entityType: "cash_transaction",
+        entityId: input.id,
+        details: {
+          changes: payload,
+          oldAmount: oldData?.amount,
+          newAmount: payload.amount ?? oldData?.amount,
+        },
+      });
     } catch { }
 
     return success(updated);
@@ -440,7 +454,15 @@ export async function deleteCashTransaction(
     try {
       const { data: userRes } = await supabase.auth.getUser();
       const userId = userRes?.user?.id || null;
-      // Audit removed
+      safeAudit(userId, {
+        action: "cash_transaction.delete",
+        entityType: "cash_transaction",
+        entityId: id,
+        details: {
+          deletedAmount: oldData?.amount,
+          deletedCategory: oldData?.category,
+        },
+      });
     } catch { }
 
     return success({ id });

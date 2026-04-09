@@ -1,5 +1,6 @@
 import React from "react";
 import { showToast } from "../../utils/toast";
+import { handleApiError } from "../../utils/apiErrorHandler";
 
 type State = { hasError: boolean; error?: Error };
 
@@ -91,3 +92,29 @@ export class ErrorBoundary extends React.Component<
 }
 
 export default ErrorBoundary;
+
+/**
+ * Global wrapper to catch Unhandled Promise Rejections (e.g. unawaited RepoResult errors)
+ * and route them to our centralized API Error Handler.
+ * Typically you place this high up in your component tree, once.
+ */
+export function ApiErrorBoundary({ children }: { children: React.ReactNode }) {
+  React.useEffect(() => {
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      
+      // Look for our specific RepoError shape
+      if (reason && typeof reason === "object" && reason.code && reason.message) {
+        event.preventDefault(); // Prevent standard console red text if handled
+        handleApiError(reason);
+      }
+    };
+
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => {
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
+
+  return <>{children}</>;
+}

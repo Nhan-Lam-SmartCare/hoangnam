@@ -1,7 +1,7 @@
 import { supabase } from "../../supabaseClient";
 import type { Category } from "../../types";
 import { RepoResult, success, failure } from "./types";
-// import { safeAudit } from "./auditLogsRepository";
+import { safeAudit } from "./auditLogsRepository";
 
 const CATEGORIES_TABLE = "categories";
 
@@ -102,7 +102,7 @@ export async function createCategory(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, { action: "category.create", entityType: "category", entityId: createdRow.id, details: { name: input.name } });
     return success(createdRow);
   } catch (e: any) {
     return failure({
@@ -211,7 +211,7 @@ export async function updateCategory(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, { action: "category.update", entityType: "category", entityId: id, details: { changes: Object.keys(updates) } });
     return success(resultRow as Category);
   } catch (e: any) {
     return failure({
@@ -252,7 +252,7 @@ export async function deleteCategoryRecord(
       const { data: userData } = await supabase.auth.getUser();
       userId = userData?.user?.id || null;
     } catch { }
-    // Audit removed
+    safeAudit(userId, { action: "category.delete", entityType: "category", entityId: id, details: { name: oldRow?.name } });
     return success({ id });
   } catch (e: any) {
     return failure({
