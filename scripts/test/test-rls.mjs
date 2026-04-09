@@ -197,7 +197,7 @@ async function testUser(u) {
   const staffSummary = summary.find(
     (s) => s.role === "staff" || s.email === users[1].email
   );
-  if (staffSummary) {
+  if (staffSummary && Array.isArray(staffSummary.tableResults)) {
     const unexpected = staffSummary.tableResults.filter(
       (r) =>
         ["inventory_transactions", "cash_transactions"].includes(r.table) &&
@@ -213,6 +213,8 @@ async function testUser(u) {
         "\n✅ Staff bị chặn đúng trên inventory_transactions, cash_transactions (nếu policies thiết kế vậy)"
       );
     }
+  } else if (staffSummary) {
+    console.warn("\n⚠️ Không thể đánh giá quyền staff vì chưa có tableResults (đăng nhập có thể thất bại).");
   }
 
   console.log("\n=== HOÀN TẤT ===");

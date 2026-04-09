@@ -22,17 +22,98 @@ let userId: string | null = null;
 const email = `rls-test+${Date.now()}@example.com`;
 const password = "Rls123!test";
 
-async function upsertProfile(id: string, role: string, branch: string) {
-  // Ưu tiên bảng profiles; nếu không có, thử user_profiles
-  let { error } = await admin!
-    .from("profiles")
-    .upsert({ id, role, branch_id: branch }, { onConflict: "id" });
-  if (error) {
-    // fallback user_profiles
-    await admin!
-      .from("user_profiles")
-      .upsert({ id, role, branch_id: branch }, { onConflict: "id" });
+function getMissingColumnName(error: any): string | null {
+  const code = String(error?.code || "").toUpperCase();
+  const message = String(error?.message || "");
+  if (code !== "PGRST204" && !message.toLowerCase().includes("column")) {
+    return null;
   }
+  const quote = message.match(/'([^']+)'\s+column/i);
+  if (quote?.[1]) return quote[1];
+  const dquote = message.match(/"([^"]+)"\s+column/i);
+  if (dquote?.[1]) return dquote[1];
+  return null;
+}
+
+function removeMissingKey(payload: Record<string, any>, missingColumn: string): boolean {
+  const key = String(missingColumn || "").replace(/["']/g, "").trim();
+  if (!key) return false;
+  if (Object.prototype.hasOwnProperty.call(payload, key)) {
+    delete payload[key];
+    return true;
+  }
+  return false;
+}
+
+async function upsertProfile(id: string, role: string, branch: string) {
+  // Ưu tiên bảng profiles; nếu không có, thử user_profiles.
+  // Cần linh hoạt cột branch/email giữa các schema thực tế.
+  const profilePayload: Record<string, any> = {
+    id,
+    email,
+    role,
+    branch_id: branch,
+    branchId: branch,
+    branchid: branch,
+  };
+
+  const upsertWithFallback = async (tableName: string) => {
+    const working = { ...profilePayload };
+    for (let i = 0; i < 8; i += 1) {
+      const { error } = await admin!
+        .from(tableName)
+        .upsert(working as any, { onConflict: "id" });
+      if (!error) return true;
+      const missingColumn = getMissingColumnName(error);
+      if (!missingColumn) return false;
+      const removed = removeMissingKey(working, missingColumn);
+      if (!removed) return false;
+    }
+    return false;
+  };
+
+  const okProfiles = await upsertWithFallback("profiles");
+  if (!okProfiles) {
+    const okUserProfiles = await upsertWithFallback("user_profiles");
+    if (!okUserProfiles) {
+      throw new Error("Cannot upsert profile on profiles/user_profiles");
+    }
+  }
+}
+
+async function upsertSaleSeed(id: string, branch: string, customerName: string) {
+  const payload: Record<string, any> = {
+    id,
+    date: new Date().toISOString(),
+    items: [],
+    subtotal: 0,
+    discount: 0,
+    total: 0,
+    customer: { name: customerName },
+    paymentMethod: "cash",
+    userId: "seed",
+    branchid: branch,
+    branch_id: branch,
+    branchId: branch,
+  };
+
+  const working = { ...payload };
+  for (let i = 0; i < 10; i += 1) {
+    const { error } = await admin!
+      .from("sales")
+      .upsert(working as any, { onConflict: "id" });
+    if (!error) return;
+    const missingColumn = getMissingColumnName(error);
+    if (!missingColumn) {
+      throw error;
+    }
+    const removed = removeMissingKey(working, missingColumn);
+    if (!removed) {
+      throw error;
+    }
+  }
+
+  throw new Error("Cannot upsert seed sale after fallback attempts");
 }
 
 async function assertSalesSchemaReady() {
@@ -63,32 +144,8 @@ describe("rls_user_flow (integration)", () => {
     await upsertProfile(userId, "staff", "CN1");
 
     // Seed sales nếu chưa có (chung với file rls_access)
-    await admin.from("sales").upsert([
-      {
-        id: "RLS-SEED-A",
-        date: new Date().toISOString(),
-        items: [],
-        subtotal: 0,
-        discount: 0,
-        total: 0,
-        customer: { name: "A" },
-        paymentMethod: "cash",
-        userId: "seed",
-        branchid: "CN1",
-      },
-      {
-        id: "RLS-SEED-B",
-        date: new Date().toISOString(),
-        items: [],
-        subtotal: 0,
-        discount: 0,
-        total: 0,
-        customer: { name: "B" },
-        paymentMethod: "cash",
-        userId: "seed",
-        branchid: "CN2",
-      },
-    ] as any);
+    await upsertSaleSeed("RLS-SEED-A", "CN1", "A");
+    await upsertSaleSeed("RLS-SEED-B", "CN2", "B");
   }, 30000);
 
   afterAll(async () => {

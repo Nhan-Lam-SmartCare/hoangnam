@@ -41,6 +41,8 @@ import {
   calculateLabor,
   splitWorkerAmount,
 } from "../../../lib/services/repairLaborService";
+import { WorkOrderCustomerSection } from "./WorkOrderCustomerSection";
+import { WorkOrderVehicleSection } from "./WorkOrderVehicleSection";
 
 export interface StoreSettings {
   store_name?: string;
@@ -603,9 +605,9 @@ const WorkOrderModal: React.FC<{
     }, [order]);
 
     // Handler for Load More button
-    const handleLoadMoreCustomers = (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    const handleLoadMoreCustomers = (e?: React.MouseEvent) => {
+      e?.preventDefault();
+      e?.stopPropagation();
       const nextPage = customerPage + 1;
       setCustomerPage(nextPage);
       fetchCustomers(nextPage, debouncedCustomerSearch.trim(), true);
@@ -3023,510 +3025,102 @@ const WorkOrderModal: React.FC<{
                 </h3>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Khách hàng <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative customer-search-container">
-                      <input
-                        type="text"
-                        placeholder="Tìm khách hàng..."
-                        value={customerSearch}
-                        onChange={(e) => {
-                          setCustomerSearch(e.target.value);
-                          setShowCustomerDropdown(true);
-                          setFormData({
-                            ...formData,
-                            customerName: e.target.value,
-                          });
-                        }}
-                        onFocus={() => setShowCustomerDropdown(true)}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                      />
+                  <WorkOrderCustomerSection
+                    customerSearch={customerSearch}
+                    showCustomerDropdown={showCustomerDropdown}
+                    filteredCustomers={filteredCustomers}
+                    hasMoreCustomers={hasMoreCustomers}
+                    isSearchingCustomer={isSearchingCustomer}
+                    customersLength={customers.length}
+                    formData={formData}
+                    isEditingCustomer={isEditingCustomer}
+                    editCustomerName={editCustomerName}
+                    editCustomerPhone={editCustomerPhone}
+                    onCustomerSearchChange={(value) => {
+                      setCustomerSearch(value);
+                      setShowCustomerDropdown(true);
+                      setFormData({
+                        ...formData,
+                        customerName: value,
+                      });
+                    }}
+                    onCustomerFocus={() => setShowCustomerDropdown(true)}
+                    onSelectCustomer={(customer) => {
+                      const primaryVehicle =
+                        customer.vehicles?.find((v: Vehicle) => v.isPrimary) ||
+                        customer.vehicles?.[0];
 
-                      {/* Customer Dropdown */}
-                      {showCustomerDropdown && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {filteredCustomers.length > 0 ? (
-                            <>
-                              {filteredCustomers.map((customer) => (
-                                <button
-                                  key={customer.id}
-                                  type="button"
-                                  onClick={() => {
-                                    // Find primary vehicle or first vehicle
-                                    const primaryVehicle =
-                                      customer.vehicles?.find(
-                                        (v: Vehicle) => v.isPrimary
-                                      ) || customer.vehicles?.[0];
-
-                                    setFormData({
-                                      ...formData,
-                                      customerName: customer.name,
-                                      customerPhone: customer.phone,
-                                      vehicleId: primaryVehicle?.id,
-                                      vehicleModel:
-                                        primaryVehicle?.model ||
-                                        customer.vehicleModel ||
-                                        "",
-                                      licensePlate:
-                                        primaryVehicle?.licensePlate ||
-                                        customer.licensePlate ||
-                                        "",
-                                    });
-                                    setCustomerSearch(customer.name);
-                                    setShowCustomerDropdown(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-0"
-                                >
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-slate-900 dark:text-slate-100 text-sm truncate">
-                                        {customer.name}
-                                      </div>
-                                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                                        🔹 {customer.phone}
-                                      </div>
-                                      {(customer.vehicleModel ||
-                                        customer.licensePlate ||
-                                        customer.vehicles?.length > 0) && (
-                                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1">
-                                            <svg
-                                              className="w-3 h-3"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <circle cx="6" cy="17" r="2" />
-                                              <circle cx="18" cy="17" r="2" />
-                                              <path d="M4 17h2l4-6h2l2 3h4" />
-                                            </svg>
-                                            {(() => {
-                                              const primaryVehicle =
-                                                customer.vehicles?.find(
-                                                  (v: any) => v.isPrimary
-                                                ) || customer.vehicles?.[0];
-                                              const model =
-                                                primaryVehicle?.model ||
-                                                customer.vehicleModel;
-                                              const plate =
-                                                primaryVehicle?.licensePlate ||
-                                                customer.licensePlate;
-                                              return (
-                                                <>
-                                                  {model && <span>{model}</span>}
-                                                  {plate && (
-                                                    <span className="font-mono font-semibold text-yellow-600 dark:text-yellow-400">
-                                                      {model && " - "}
-                                                      {plate}
-                                                    </span>
-                                                  )}
-                                                  {customer.vehicles?.length > 1 && (
-                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-                                                      (+{customer.vehicles.length - 1}
-                                                      )
-                                                    </span>
-                                                  )}
-                                                </>
-                                              );
-                                            })()}
-                                          </div>
-                                        )}
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                              {hasMoreCustomers && customerSearch.trim() && (
-                                <button
-                                  type="button"
-                                  onClick={handleLoadMoreCustomers}
-                                  className="w-full text-center px-3 py-3 text-blue-600 dark:text-blue-400 text-sm font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 border-t border-slate-200 dark:border-slate-600"
-                                >
-                                  {isSearchingCustomer
-                                    ? "Đang tải..."
-                                    : "⬇️ Tải thêm khách hàng..."}
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <div className="px-3 py-4 text-center text-sm text-slate-500 dark:text-slate-400">
-                              {customers.length === 0
-                                ? "Chưa có khách hàng nào. Nhấn '+' để thêm khách hàng mới."
-                                : "Không tìm thấy khách hàng phù hợp"}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddCustomerModal(true);
-                        // Pre-fill phone if search term looks like a phone number
-                        if (customerSearch && /^[0-9]+$/.test(customerSearch)) {
-                          setNewCustomer({
-                            ...newCustomer,
-                            phone: customerSearch,
-                          });
-                        }
-                      }}
-                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium text-xl"
-                      title="Thêm khách hàng mới"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  {/* Display customer info after selection */}
-                  {formData.customerName && formData.customerPhone && (
-                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <div className="flex items-start justify-between">
-                        {/* View Mode */}
-                        {!isEditingCustomer ? (
-                          <>
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                {formData.customerName}
-                              </div>
-                              <div className="text-xs text-slate-600 dark:text-slate-400">
-                                <span className="inline-flex items-center gap-1">
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    className="w-3.5 h-3.5"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M2.25 6.75c0 8.284 6.716 15 15 15 .828 0 1.5-.672 1.5-1.5v-2.25a1.5 1.5 0 00-1.5-1.5h-1.158a1.5 1.5 0 00-1.092.468l-.936.996a1.5 1.5 0 01-1.392.444 12.035 12.035 0 01-7.29-7.29 1.5 1.5 0 01.444-1.392l.996-.936a1.5 1.5 0 00.468-1.092V6.75A1.5 1.5 0 006.75 5.25H4.5c-.828 0-1.5.672-1.5 1.5z"
-                                    />
-                                  </svg>
-                                  {formData.customerPhone}
-                                </span>
-                              </div>
-                              {(formData.vehicleModel ||
-                                formData.licensePlate) && (
-                                  <div className="text-xs text-slate-600 dark:text-slate-400">
-                                    <span className="inline-flex items-center gap-1">
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        className="w-3.5 h-3.5"
-                                      >
-                                        <circle cx="6" cy="17" r="2" />
-                                        <circle cx="18" cy="17" r="2" />
-                                        <path d="M4 17h2l4-6h2l2 3h4" />
-                                      </svg>
-                                      {formData.vehicleModel}{" "}
-                                      {formData.licensePlate &&
-                                        `- ${formData.licensePlate}`}
-                                    </span>
-                                  </div>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {/* Edit Button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditCustomerName(
-                                    formData.customerName || ""
-                                  );
-                                  setEditCustomerPhone(
-                                    formData.customerPhone || ""
-                                  );
-                                  setIsEditingCustomer(true);
-                                }}
-                                className="text-slate-400 hover:text-blue-500 text-sm flex items-center"
-                                title="Sửa thông tin khách hàng"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  className="w-4 h-4"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                                  />
-                                </svg>
-                              </button>
-                              {/* Delete Button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCustomerSearch("");
-                                  setFormData({
-                                    ...formData,
-                                    customerName: "",
-                                    customerPhone: "",
-                                    vehicleId: undefined,
-                                    vehicleModel: "",
-                                    licensePlate: "",
-                                  });
-                                }}
-                                className="text-slate-400 hover:text-red-500 text-sm flex items-center"
-                                title="Xóa khách hàng"
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  className="w-4 h-4"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          /* Edit Mode */
-                          <div className="w-full space-y-2">
-                            <div>
-                              <label className="text-xs text-slate-500 dark:text-slate-400">
-                                Tên khách hàng
-                              </label>
-                              <input
-                                type="text"
-                                value={editCustomerName}
-                                onChange={(e) =>
-                                  setEditCustomerName(e.target.value)
-                                }
-                                className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                                placeholder="Nhập tên khách hàng"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-slate-500 dark:text-slate-400">
-                                Số điện thoại
-                              </label>
-                              <input
-                                type="tel"
-                                value={editCustomerPhone}
-                                onChange={(e) =>
-                                  setEditCustomerPhone(e.target.value)
-                                }
-                                className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                                placeholder="Nhập số điện thoại"
-                              />
-                            </div>
-                            <div className="flex gap-2 justify-end pt-1">
-                              <button
-                                type="button"
-                                onClick={() => setIsEditingCustomer(false)}
-                                className="px-3 py-1 text-xs bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500"
-                              >
-                                Hủy
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleSaveEditedCustomer}
-                                className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                              >
-                                Lưu
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                      setFormData({
+                        ...formData,
+                        customerName: customer.name,
+                        customerPhone: customer.phone,
+                        vehicleId: primaryVehicle?.id,
+                        vehicleModel:
+                          primaryVehicle?.model || customer.vehicleModel || "",
+                        licensePlate:
+                          primaryVehicle?.licensePlate ||
+                          customer.licensePlate ||
+                          "",
+                      });
+                      setCustomerSearch(customer.name);
+                      setShowCustomerDropdown(false);
+                    }}
+                    onLoadMoreCustomers={() => handleLoadMoreCustomers()}
+                    onOpenAddCustomer={() => {
+                      setShowAddCustomerModal(true);
+                      if (customerSearch && /^[0-9]+$/.test(customerSearch)) {
+                        setNewCustomer({
+                          ...newCustomer,
+                          phone: customerSearch,
+                        });
+                      }
+                    }}
+                    onStartEditCustomer={() => {
+                      setEditCustomerName(formData.customerName || "");
+                      setEditCustomerPhone(formData.customerPhone || "");
+                      setIsEditingCustomer(true);
+                    }}
+                    onClearCustomer={() => {
+                      setCustomerSearch("");
+                      setFormData({
+                        ...formData,
+                        customerName: "",
+                        customerPhone: "",
+                        vehicleId: undefined,
+                        vehicleModel: "",
+                        licensePlate: "",
+                      });
+                    }}
+                    onEditCustomerNameChange={setEditCustomerName}
+                    onEditCustomerPhoneChange={setEditCustomerPhone}
+                    onCancelEditCustomer={() => setIsEditingCustomer(false)}
+                    onSaveEditedCustomer={handleSaveEditedCustomer}
+                  />
 
                   {/* Vehicle Selection & Add Vehicle (for selected customer) */}
                   {currentCustomer && (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {customerVehicles.length > 0
-                            ? "Chọn thiết bị"
-                            : "Thiết bị của khách hàng"}
-                          {customerVehicles.length > 0 && (
-                            <span className="text-xs text-slate-500 ml-1">
-                              ({customerVehicles.length} thiết bị)
-                            </span>
-                          )}
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setShowAddVehicleModal(true)}
-                          className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium"
-                          title="Thêm thiết bị mới"
-                        >
-                          + Thêm thiết bị
-                        </button>
-                      </div>
-
-                      {customerVehicles.length > 0 ? (
-                        <div className="space-y-2">
-                          {customerVehicles.map((vehicle: Vehicle) => {
-                            const isSelected = formData.vehicleId === vehicle.id;
-                            const isPrimary = vehicle.isPrimary;
-                            const isEditing = editingVehicleId === vehicle.id;
-
-                            return (
-                              <div
-                                key={vehicle.id}
-                                className={`w-full rounded-lg border-2 transition-all ${isSelected
-                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                                  : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700"
-                                  }`}
-                              >
-                                {isEditing ? (
-                                  // Edit mode
-                                  <div className="p-3 space-y-2">
-                                    <div>
-                                      <label className="text-xs text-slate-500 dark:text-slate-400">
-                                        Tên thiết bị
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={editVehicleModel}
-                                        onChange={(e) =>
-                                          setEditVehicleModel(e.target.value)
-                                        }
-                                        className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                                        placeholder="Nhập tên thiết bị (VD: iPhone 13...)"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-xs text-slate-500 dark:text-slate-400">
-                                        Serial/IMEI
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={editVehicleLicensePlate}
-                                        onChange={(e) =>
-                                          setEditVehicleLicensePlate(
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                                        placeholder="Nhập Serial/IMEI"
-                                      />
-                                    </div>
-                                    <div className="flex gap-2 justify-end pt-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingVehicleId(null);
-                                          setEditVehicleModel("");
-                                          setEditVehicleLicensePlate("");
-                                        }}
-                                        className="px-3 py-1 text-xs bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500"
-                                      >
-                                        Hủy
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={handleSaveEditedVehicle}
-                                        className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                                      >
-                                        Lưu
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  // Display mode
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSelectVehicle(vehicle)}
-                                    className="w-full text-left px-3 py-2.5"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      {isPrimary && (
-                                        <span
-                                          className="text-yellow-500"
-                                          title="Xe chính"
-                                        >
-                                          ⭐
-                                        </span>
-                                      )}
-                                      <div className="flex-1">
-                                        <div className="font-medium text-sm text-slate-900 dark:text-slate-100">
-                                          {vehicle.model}
-                                        </div>
-                                        <div className="text-xs font-mono text-slate-600 dark:text-slate-400 mt-0.5">
-                                          {vehicle.licensePlate}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditingVehicleId(vehicle.id);
-                                            setEditVehicleModel(
-                                              vehicle.model || ""
-                                            );
-                                            setEditVehicleLicensePlate(
-                                              vehicle.licensePlate || ""
-                                            );
-                                          }}
-                                          className="text-slate-400 hover:text-blue-500 p-1"
-                                          title="Sửa thông tin xe"
-                                        >
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            className="w-4 h-4"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                            />
-                                          </svg>
-                                        </button>
-                                        {isSelected && (
-                                          <svg
-                                            className="w-5 h-5 text-blue-500"
-                                            fill="currentColor"
-                                            viewBox="0 0 20 20"
-                                          >
-                                            <path
-                                              fillRule="evenodd"
-                                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                              clipRule="evenodd"
-                                            />
-                                          </svg>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 px-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Chưa có thiết bị nào. Nhấn "+ Thêm thiết bị" để thêm.
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <WorkOrderVehicleSection
+                      customerVehicles={customerVehicles}
+                      selectedVehicleId={formData.vehicleId}
+                      editingVehicleId={editingVehicleId}
+                      editVehicleModel={editVehicleModel}
+                      editVehicleLicensePlate={editVehicleLicensePlate}
+                      onOpenAddVehicleModal={() => setShowAddVehicleModal(true)}
+                      onSelectVehicle={(vehicle) => handleSelectVehicle(vehicle)}
+                      onStartEditVehicle={(vehicle) => {
+                        setEditingVehicleId(vehicle.id);
+                        setEditVehicleModel(vehicle.model || "");
+                        setEditVehicleLicensePlate(vehicle.licensePlate || "");
+                      }}
+                      onCancelEditVehicle={() => {
+                        setEditingVehicleId(null);
+                        setEditVehicleModel("");
+                        setEditVehicleLicensePlate("");
+                      }}
+                      onSaveEditedVehicle={handleSaveEditedVehicle}
+                      onEditVehicleModelChange={setEditVehicleModel}
+                      onEditVehicleLicensePlateChange={setEditVehicleLicensePlate}
+                    />
                   )}
                 </div>
 

@@ -920,7 +920,17 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
 
     // 🔹 FALLBACK: Use direct insert since RPC function is missing/broken on user's DB
     // Map input to DB columns (based on supabase_complete_setup.sql)
-    const creatorId = (input as any).created_by || (input as any).createdBy || null;
+    const { data: authData } = await supabase.auth.getUser();
+    const authUser = authData.user;
+
+    // Always trust the authenticated session user for creator identity.
+    // This avoids RLS mismatch when UI payload carries a stale/non-auth profile id.
+    const creatorId =
+      authUser?.id ||
+      (input as any).created_by ||
+      (input as any).createdBy ||
+      (input as any).createdby ||
+      null;
     const depositAmount = Math.max(0, Number(input.depositAmount || 0));
     const additionalPayment = Math.max(0, Number(input.additionalPayment || 0));
     const providedTotalPaid = Number(input.totalPaid);
@@ -940,7 +950,58 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     const laborCost = input.laborCost || 0;
     const partsUsed = input.partsUsed || [];
     const additionalServices = input.additionalServices || [];
-    const branchId = input.branchId || "CN1";
+    const branchCandidates = [
+      (input as any).branchId,
+      (input as any).branchid,
+      (input as any).branch_id,
+    ];
+    const rawBranchId = String(
+      branchCandidates.find((value) => String(value || "").trim().length > 0) ||
+      ""
+    ).trim();
+
+    const isWildcardBranch = (value: string) => {
+      const normalized = value.trim().toLowerCase();
+      return (
+        normalized === "all" ||
+        normalized === "all-branches" ||
+        normalized === "all_branches" ||
+        normalized === "tatca" ||
+        normalized === "tat-ca"
+      );
+    };
+
+    let branchId = !rawBranchId || isWildcardBranch(rawBranchId) ? "" : rawBranchId;
+
+    if (!branchId && creatorId) {
+      const profileBranchRes = await supabase
+        .from("profiles")
+        .select("branch_id, branchId, branchid")
+        .eq("id", String(creatorId))
+        .maybeSingle();
+
+      if (!profileBranchRes.error && profileBranchRes.data) {
+        branchId = String(
+          (profileBranchRes.data as any).branch_id ||
+          (profileBranchRes.data as any).branchId ||
+          (profileBranchRes.data as any).branchid ||
+          ""
+        ).trim();
+      }
+    }
+
+    if (!branchId) {
+      branchId = String(
+        authUser?.user_metadata?.branch_id ||
+        authUser?.user_metadata?.branchId ||
+        authUser?.user_metadata?.branchid ||
+        ""
+      ).trim();
+    }
+
+    if (!branchId) {
+      branchId = "CN1";
+    }
     const paymentStatus = input.paymentStatus || "unpaid";
     const paymentMethod = input.paymentMethod || null;
     const paymentDate =
@@ -970,6 +1031,12 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       notes: notesWithAdditionalServices, // Mapped to 'notes'
       total: input.total || 0,
       "branchId": branchId,
+      branchid: branchId,
+      branch_id: branchId,
+
+      created_by: creatorId || undefined,
+      createdBy: creatorId || undefined,
+      createdby: creatorId || undefined,
 
       "paymentStatus": paymentStatus,
       "paymentMethod": paymentMethod,
@@ -1069,6 +1136,11 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         notes: notesWithAdditionalServices,
         total: input.total || 0,
         branchId,
+        branchid: branchId,
+        branch_id: branchId,
+        created_by: creatorId || undefined,
+        createdBy: creatorId || undefined,
+        createdby: creatorId || undefined,
         paymentStatus,
         paymentMethod,
         totalPaid,
