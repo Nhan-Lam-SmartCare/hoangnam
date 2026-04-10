@@ -1,9 +1,8 @@
-import React, { useEffect, useState, Suspense } from "react";
+import React, { Suspense } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
   useLocation,
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -20,7 +19,6 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { RoleBasedRedirect } from "./components/auth/RoleBasedRedirect";
 import { useAppContext } from "./contexts/AppContext";
 import { BottomNav, Nav } from "./components/layout";
-import { ShopLayout } from "./components/layout/ShopLayout";
 import Dashboard from "./components/dashboard/Dashboard";
 import RepoErrorPanel from "./components/common/RepoErrorPanel";
 import { lazyImport } from "./utils/lazyImport";
@@ -162,11 +160,6 @@ const CashBook = () => (
 const EmployeesPage = () => (
   <Suspense fallback={<PageLoader />}>
     <EmployeesManager />
-  </Suspense>
-);
-const MigrationPage = () => (
-  <Suspense fallback={<PageLoader />}>
-    <MigrationTool />
   </Suspense>
 );
 const WarrantyPage = () => (

@@ -9,13 +9,14 @@ export function mapRepoErrorForUser(err: RepoErrorDetail): string {
       return err.message;
     case "not_found":
       return "Không tìm thấy bản ghi.";
-    case "supabase":
+    case "supabase": {
       // Attempt to map specific DB codes to user-friendly messages
       const dbCode = (err.cause as any)?.code;
       if (dbCode === "23505") return "Dữ liệu đã tồn tại (trùng lặp).";
       if (dbCode === "42501") return "Bạn không có quyền thực hiện thao tác này.";
       if (dbCode === "23503") return "Không thể thao tác vì dữ liệu đang được sử dụng ở nơi khác.";
       return "Có lỗi dữ liệu. Thử lại hoặc liên hệ quản trị.";
+    }
     // New codes mapped here
     case "timeout" as any:
       return "Máy chủ phản hồi quá chậm. Vui lòng thử lại sau.";

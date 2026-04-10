@@ -3254,7 +3254,7 @@ const WorkOrderModal: React.FC<{
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none"
                   />
                 </div>
-                {false && (
+                {import.meta.env.VITE_ENABLE_WORKORDER_REPAIR_SECTION === "1" && (
                 <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>

@@ -283,12 +283,13 @@ export const SettingsManager = ({
   };
 
   // Load staff when tab changes to staff
+  // Intentionally keyed by tab switch to avoid repeated loads from callback identity changes.
   useEffect(() => {
     if (activeTab === "staff" && hasRole(["owner"])) {
       loadStaff();
       loadBranches();
     }
-  }, [activeTab]);
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refreshStaffScreen() {
     await Promise.allSettled([loadStaff(), loadBranches()]);
@@ -625,6 +626,7 @@ export const SettingsManager = ({
 
           // Show info toast about RPC function
           if (rpcError) {
+            console.warn("[Settings] staff RPC unavailable, using fallback source.");
           }
         }
       }
@@ -1297,7 +1299,7 @@ export const SettingsManager = ({
 
     const safeName = String(selectedSalaryWorker.workerName || "NhanVien")
       .replace(/\s+/g, "_")
-      .replace(/[^\w\-]/g, "");
+      .replace(/[^\w-]/g, "");
     const fileName = `ChiTietCong_${safeName}_T${salaryMonth}_${salaryYear}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
@@ -1390,7 +1392,7 @@ export const SettingsManager = ({
     };
   }, [activeTab, filteredStaffList, salaryMonth, salaryYear, salaryStaffIdsKey]);
 
-  const payrollSummaryByDepartment = STAFF_DEPARTMENTS.map((department) => {
+  const _payrollSummaryByDepartment = STAFF_DEPARTMENTS.map((department) => {
     const staffInDepartment = filteredStaffList.filter(
       (staff) => (staff.department || "Chưa phân loại") === department
     );
@@ -1411,7 +1413,7 @@ export const SettingsManager = ({
     0
   );
 
-  const averageBaseSalary = filteredStaffList.length
+  const _averageBaseSalary = filteredStaffList.length
     ? Math.round(totalBaseSalary / filteredStaffList.length)
     : 0;
 
@@ -1576,7 +1578,7 @@ export const SettingsManager = ({
 
     setSaving(true);
     try {
-      const previous = { ...settings };
+      const _previous = { ...settings };
 
 
       let payload = buildStoreSettingsPayload(settings);
@@ -1595,7 +1597,7 @@ export const SettingsManager = ({
       while (!saved && attempts < maxAttempts) {
         attempts += 1;
 
-        const { error, data } = await supabase
+        const { error } = await supabase
           .from("store_settings")
           .upsert(payload, { onConflict: "id" })
           .select();
@@ -1620,7 +1622,7 @@ export const SettingsManager = ({
 
         missingStoreSettingsColumnsRef.current.add(missingColumn);
         payload = nextPayload;
-        console.info(
+        console.warn(
           `[Settings] Legacy schema missing '${missingColumn}', retrying with compatible payload.`
         );
       }

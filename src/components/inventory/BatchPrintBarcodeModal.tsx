@@ -5,7 +5,6 @@ import {
   Search,
   Check,
   Package,
-  Filter,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -159,7 +158,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
 
   // Print settings
   const [labelPreset, setLabelPreset] = useState<LabelPreset>("40x30");
-  const [barcodeFormat, setBarcodeFormat] = useState<BarcodeFormat>("CODE128");
+  const [barcodeFormat] = useState<BarcodeFormat>("CODE128");
   const [showPrice, setShowPrice] = useState(true);
   const [showName, setShowName] = useState(true);
   const [quantityMode, setQuantityMode] = useState<QuantityMode>(

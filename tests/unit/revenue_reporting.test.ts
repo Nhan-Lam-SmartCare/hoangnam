@@ -4,7 +4,7 @@ import {
   aggregateDaily,
 } from "../../src/lib/reporting/revenue";
 
-describe.skip("revenue reporting utils (đã vô hiệu hoá)", () => {
+describe("revenue reporting utils", () => {
   it("mapSalesToCsvRows maps core fields and falls back to branchid", () => {
     const rows = mapSalesToCsvRows([
       {

@@ -8,11 +8,11 @@ const LookupManagerMobile: React.FC = () => {
   const { sales, workOrders, currentBranchId } = useAppContext();
 
   // Fetch parts data directly from Supabase
-  const { data: pagedResult, isLoading } = usePartsRepoPaged({
+  const { data: pagedResult } = usePartsRepoPaged({
     page: 1,
     pageSize: 20, // Load 20 products at a time for better performance
   });
-  const parts = pagedResult?.data || [];
+  const parts = useMemo(() => pagedResult?.data ?? [], [pagedResult?.data]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");

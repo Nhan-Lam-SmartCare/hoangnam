@@ -16,7 +16,7 @@ const LookupManager: React.FC = () => {
     page,
     pageSize,
   });
-  const parts = pagedResult?.data || [];
+  const parts = useMemo(() => pagedResult?.data ?? [], [pagedResult?.data]);
   const totalParts = pagedResult?.meta?.total || 0;
   const totalPages = Math.max(1, Math.ceil(totalParts / pageSize));
 

@@ -2,10 +2,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { showToast } from '../../../utils/toast';
 import { supabase } from '../../../supabaseClient';
-import { X, Calendar, Search, Filter, DownloadCloud, Trash2, ChevronDown, ChevronUp, Printer, FileText } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../../utils/format';
 import { InventoryTransaction } from '../../../types';
-import InventoryHistorySection from '../InventoryHistorySection';
 // Inventory History Modal Component (Ảnh 3)
 const InventoryHistoryModal: React.FC<{
   isOpen: boolean;
@@ -29,20 +27,23 @@ const InventoryHistoryModal: React.FC<{
 
     // Apply time filter
     switch (activeTimeFilter) {
-      case "7days":
+      case "7days": {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         filtered = filtered.filter((t) => new Date(t.date) >= sevenDaysAgo);
         break;
-      case "30days":
+      }
+      case "30days": {
         const thirtyDaysAgo = new Date(
           now.getTime() - 30 * 24 * 60 * 60 * 1000
         );
         filtered = filtered.filter((t) => new Date(t.date) >= thirtyDaysAgo);
         break;
-      case "thisMonth":
+      }
+      case "thisMonth": {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         filtered = filtered.filter((t) => new Date(t.date) >= startOfMonth);
         break;
+      }
       case "custom":
         filtered = filtered.filter((t) => {
           const date = new Date(t.date);

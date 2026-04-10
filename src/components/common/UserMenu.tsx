@@ -20,7 +20,7 @@ export const UserMenu = () => {
       await signOut();
       showToast.success("Đã đăng xuất");
       navigate("/login");
-    } catch (err) {
+    } catch {
       showToast.error("Lỗi khi đăng xuất");
     }
   };

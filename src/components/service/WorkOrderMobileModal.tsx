@@ -1,10 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   X,
   Plus,
   Minus,
   Check,
-  ChevronDown,
   Search,
   AlertTriangle,
   Printer,
@@ -22,20 +21,13 @@ import {
   ChevronRight,
   TrendingUp,
   UserPlus,
-  CreditCard,
-  Banknote,
-  MessageSquare,
   Package,
   ScanBarcode,
-  Upload,
-  Camera,
-  ArrowLeft,
   Lock,
   Grid3x3,
   DollarSign,
 } from "lucide-react";
 import { useCheckWarranty } from "../../hooks/useWarrantyRepository";
-import { WarrantyCardModal } from "../warranty/WarrantyCardModal";
 import { ScannerModal } from "../common/ScannerModal";
 import { AndroidPatternLock } from "../common/AndroidPatternLock";
 import { formatCurrency, formatWorkOrderId, normalizeSearchText } from "../../utils/format";
@@ -50,8 +42,6 @@ import type {
 } from "../../types";
 import {
   checkVehicleMaintenance,
-  formatKm,
-  getWarningBadgeColor,
   type MaintenanceWarning,
 } from "../../utils/maintenanceReminder";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "../../constants";
@@ -139,9 +129,6 @@ const getWarrantyText = (part: Part | null | undefined): string => {
   ).trim();
 };
 
-// Local type for status options if needed, or just use the one from constants
-type LocalWorkOrderStatus = "Tiếp nhận" | "Đang sửa" | "Đã sửa xong" | "Trả máy";
-
 export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   isOpen,
   onClose,
@@ -165,6 +152,8 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 }) => {
   const { profile } = useAuth();
   const { data: serviceConfigs = [] } = useServiceConfigs();
+  const showLegacyRepairSection =
+    import.meta.env.VITE_ENABLE_MOBILE_REPAIR_SECTION === "1";
   // Popular electronic devices for repair
   const POPULAR_DEVICES = [
     // === ĐIỆN THOẠI (PHONES) ===
@@ -533,7 +522,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     createEmptyRepairServiceDraft()
   );
   const [includeIntegratedLabor, setIncludeIntegratedLabor] = useState(true);
-  const [laborCost, setLaborCost] = useState(workOrder?.laborCost || 0);
+  const [, setLaborCost] = useState(workOrder?.laborCost || 0);
   const [discount, setDiscount] = useState(workOrder?.discount || 0);
   const [discountType, setDiscountType] = useState<"amount" | "percent">(
     "amount"
@@ -590,9 +579,6 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const [newManualPartPrice, setNewManualPartPrice] = useState(0);
   const [newManualPartQuantity, setNewManualPartQuantity] = useState(1);
 
-  // Warranty modal state
-  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
-
   // State for vehicle model dropdowns
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
   const [showCustomerVehicleDropdown, setShowCustomerVehicleDropdown] =
@@ -623,6 +609,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   // Tabs state for mobile form
   const [activeSection, setActiveSection] = useState<"info" | "issue" | "parts" | "payment">("info");
 
+  // Intentionally re-initialize only when modal opens or switching to another work order.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -683,22 +670,22 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     );
     setNewRepairServiceDraft(createEmptyRepairServiceDraft());
     setActiveSection("info");
-  }, [isOpen, workOrder?.id]);
+  }, [isOpen, workOrder?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const getSelectedPartCost = (partId: string) => {
+  const getSelectedPartCost = useCallback((partId: string) => {
     const part = selectedParts.find((item) => item.partId === partId);
     if (!part) return 0;
     return Number(part.costPrice || 0) * Number(part.quantity || 0);
-  };
+  }, [selectedParts]);
 
-  const getPartLaborBase = (partId: string) => {
+  const getPartLaborBase = useCallback((partId: string) => {
     const partRef = parts.find((p) => p.id === partId);
     return (
       Number((partRef as any)?.laborCost?.[currentBranchId]) ||
       Number(partRef?.wholesalePrice?.[currentBranchId]) ||
       0
     );
-  };
+  }, [parts, currentBranchId]);
 
   const getPartWarranty = (partId: string) => {
     const partRef = parts.find((p) => p.id === partId);
@@ -749,7 +736,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     return laborBase * (1 + 0.5 * (quantity - 1));
   };
 
-  const getRepairServiceLaborAmount = (service: RepairServiceDraft) =>
+  const getRepairServiceLaborAmount = useCallback((service: RepairServiceDraft) =>
     calculateLabor(
       {
         labor_calc_type: service.laborCalcType,
@@ -759,7 +746,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       },
       service.relatedItemIds.reduce((sum, partId) => sum + getSelectedPartCost(partId), 0),
       service.manualLabor
-    );
+    ), [getSelectedPartCost]);
 
   const getRepairServiceWorkers = (service: RepairServiceDraft) => {
     if (service.workers.length > 0) return service.workers;
@@ -773,14 +760,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     );
   };
 
-  const repairLaborTotal = useMemo(
+  const _repairLaborTotal = useMemo(
     () =>
       repairServices.reduce(
         (sum, service) =>
           sum + (service.isBillable ? getRepairServiceLaborAmount(service) : 0),
         0
       ),
-    [repairServices, selectedParts]
+    [repairServices, getRepairServiceLaborAmount]
   );
 
   // Combined fetch function
@@ -909,7 +896,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   }, [selectedCustomer, selectedVehicle]);
 
   // Check maintenance warnings for selected vehicle
-  const maintenanceWarnings = useMemo((): MaintenanceWarning[] => {
+  const _maintenanceWarnings = useMemo((): MaintenanceWarning[] => {
     if (!selectedVehicle) return [];
     // Update currentKm in vehicle for accurate check
     const vehicleWithKm = {
@@ -947,7 +934,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       const laborBase = getPartLaborBase(item.partId);
       return sum + getIntegratedLaborByQuantity(laborBase, Number(item.quantity || 0));
     }, 0);
-  }, [selectedParts, parts, currentBranchId]);
+  }, [selectedParts, getPartLaborBase]);
 
   const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
 
@@ -2402,7 +2389,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                             </div>
                           </div>
                         </div>
-                        {false && (
+                        {showLegacyRepairSection && (
                         <div className="px-4 pb-4 space-y-3">
                           <div className="flex items-center justify-between ml-1">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
@@ -2736,7 +2723,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                           {/* Parts List */}
                           {selectedParts.length > 0 && (
                             <div className="space-y-2.5">
-                              {selectedParts.map((part, index) => (
+                              {selectedParts.map((part, _index) => (
                                 <div
                                   key={part.partId}
                                   className="p-4 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700/30 rounded-2xl shadow-sm"

@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
 import {
   FileText,
   Wrench,
@@ -9,23 +8,13 @@ import {
   DollarSign,
   Search,
   Plus,
-  Filter,
   Phone,
   Edit2,
   Trash2,
   Printer,
-  ChevronRight,
-  MoreVertical,
-  Menu,
-  Bell,
-  Settings,
-  History,
-  ClipboardList,
   Package,
   Eye,
   EyeOff,
-  X,
-  MessageSquare,
 } from "lucide-react";
 import type { WorkOrder } from "../../types";
 import {
@@ -37,9 +26,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { ServiceHistory } from "./ServiceHistory";
 import { useRepairTemplates, type RepairTemplate } from "../../hooks/useRepairTemplatesRepository";
 
-import { RepairTemplatesModal } from "./components/RepairTemplatesModal";
 import { PullToRefresh } from "../common/PullToRefresh";
-import Skeleton, { CardSkeleton } from "../common/Skeleton";
+import Skeleton from "../common/Skeleton";
 
 interface ServiceManagerMobileProps {
   workOrders: WorkOrder[];
@@ -256,99 +244,6 @@ const WorkOrderCard = React.memo(({
 });
 
 
-// Action Drawer Component
-const WorkOrderActionDrawer = ({
-  isOpen,
-  onClose,
-  workOrder,
-  onEdit,
-  onCall,
-  onPrint,
-  onDelete,
-  canDelete
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  workOrder: WorkOrder | null;
-  onEdit: (wo: WorkOrder) => void;
-  onCall: (phone: string) => void;
-  onPrint: (wo: WorkOrder) => void;
-  onDelete: (wo: WorkOrder) => void;
-  canDelete: boolean;
-}) => {
-  if (!isOpen || !workOrder) return null;
-
-  return (
-    <div className="fixed inset-0 z-[110] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
-
-      <div className="bg-white dark:bg-[#1e1e2d] w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-4 z-10 animate-slide-up space-y-4">
-        {/* Header */}
-        <div className="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-            <FileText className="w-5 h-5 text-blue-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-slate-900 dark:text-white">
-              {workOrder.customerName}
-            </h3>
-            <div className="text-xs text-slate-500 flex items-center gap-2">
-              <span className="font-mono">{formatWorkOrderId(workOrder.id)}</span>
-              <span>•</span>
-              <span>{workOrder.vehicleModel}</span>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Primary Actions Grid */}
-        <div className="grid grid-cols-4 gap-3">
-          <button onClick={() => { onCall(workOrder.customerPhone || ""); onClose(); }} className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600">
-              <Phone className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-medium">Gọi điện</span>
-          </button>
-          <button onClick={() => { onEdit(workOrder); onClose(); }} className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
-              <Edit2 className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-medium">Sửa phiếu</span>
-          </button>
-          <button onClick={() => { onPrint(workOrder); onClose(); }} className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600">
-              <Printer className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-medium">In phiếu</span>
-          </button>
-          {/* Placeholder for more actions like SMS */}
-          <button className="flex flex-col items-center gap-2 opacity-50">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-              <MessageSquare className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-medium">Nhắn tin</span>
-          </button>
-        </div>
-
-        {/* Secondary Actions List */}
-        <div className="space-y-1 pt-2">
-          {canDelete && (
-            <button
-              onClick={() => { onDelete(workOrder); onClose(); }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 text-red-600 transition-colors"
-            >
-              <Trash2 className="w-5 h-5" />
-              <span className="font-medium">Xóa phiếu sửa chữa này</span>
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export function ServiceManagerMobile({
   workOrders,
   canCreateWorkOrder = true,
@@ -366,8 +261,7 @@ export function ServiceManagerMobile({
   currentBranchId,
   dateFilter,
   setDateFilter,
-
-  setDateRangeDays,
+  setDateRangeDays: _setDateRangeDays,
   isLoading = false,
   onRefresh,
 }: ServiceManagerMobileProps) {
@@ -378,22 +272,13 @@ export function ServiceManagerMobile({
   const [showFilterPopup, setShowFilterPopup] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "history" | "templates">("orders");
-  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
 
   // Financial data visibility state (owner-only feature)
   const [showFinancials, setShowFinancials] = useState(false);
   const isOwner = profile?.role === "owner";
 
-  // Date filter state
-  const [showDateFilter, setShowDateFilter] = useState(false);
-  const [customDateStart, setCustomDateStart] = useState("");
-  const [customDateEnd, setCustomDateEnd] = useState("");
-
   // Templates data
   const { data: templates } = useRepairTemplates();
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<any>(null);
-  const [actionOrder, setActionOrder] = useState<WorkOrder | null>(null);
 
   const isOwnWorkOrder = useCallback(
     (order: WorkOrder) => {

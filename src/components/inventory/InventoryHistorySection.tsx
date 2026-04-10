@@ -87,20 +87,23 @@ const InventoryHistorySection: React.FC<{
 
     // Apply time filter
     switch (activeTimeFilter) {
-      case "7days":
+      case "7days": {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         filtered = filtered.filter((t) => new Date(t.date) >= sevenDaysAgo);
         break;
-      case "30days":
+      }
+      case "30days": {
         const thirtyDaysAgo = new Date(
           now.getTime() - 30 * 24 * 60 * 60 * 1000
         );
         filtered = filtered.filter((t) => new Date(t.date) >= thirtyDaysAgo);
         break;
-      case "thisMonth":
+      }
+      case "thisMonth": {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         filtered = filtered.filter((t) => new Date(t.date) >= startOfMonth);
         break;
+      }
       case "custom":
         filtered = filtered.filter((t) => {
           const date = new Date(t.date);

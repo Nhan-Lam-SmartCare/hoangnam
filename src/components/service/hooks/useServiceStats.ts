@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import type { WorkOrder, WorkOrderPart, Part } from "../../../types";
 import type { ServiceStats } from "../types/service.types";
 
@@ -55,10 +55,10 @@ export function useServiceStats({
     }, [parts, currentBranchId]);
 
     // Helper to get part cost with fallback
-    const getPartCost = (partId: string, sku: string, fallbackCost: number) => {
+    const getPartCost = useCallback((partId: string, sku: string, fallbackCost: number) => {
         if (fallbackCost > 0) return fallbackCost;
         return partCostMap.get(partId) || partCostMap.get(sku) || 0;
-    };
+    }, [partCostMap]);
 
     // Filter orders by date
     const dateFilteredOrders = useMemo(() => {
@@ -159,7 +159,7 @@ export function useServiceStats({
             filteredRevenue,
             filteredProfit,
         };
-    }, [dateFilteredOrders, partCostMap]);
+    }, [dateFilteredOrders, getPartCost]);
 
     // Calculate derived metrics
     const totalOpenTickets = stats.pending + stats.inProgress + stats.done;

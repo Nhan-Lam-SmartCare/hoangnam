@@ -40,6 +40,15 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run ci:test:critical
 
+      - name: Run grouped critical DB integration tests
+        if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.VITE_SUPABASE_ANON_KEY != '' }}
+        env:
+          RUN_DB_INTEGRATION: "1"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run test:integration:critical
+
       - name: Skip critical integration test (missing secrets)
         if: ${{ secrets.SUPABASE_URL == '' || secrets.SUPABASE_SERVICE_ROLE_KEY == '' || secrets.VITE_SUPABASE_ANON_KEY == '' }}
         run: echo "Skipping critical integration test because required Supabase secrets are not configured."

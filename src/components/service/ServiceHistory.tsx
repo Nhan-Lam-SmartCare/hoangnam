@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useAppContext } from "../../contexts/AppContext";
 import {
   formatCurrency,
@@ -16,7 +16,7 @@ import {
 import { printElementById } from "../../utils/print";
 import type { WorkOrder, WorkOrderPart } from "../../types";
 import { useNavigate } from "react-router-dom";
-import { WORK_ORDER_STATUS, PAYMENT_STATUS } from "../../constants";
+import { WORK_ORDER_STATUS } from "../../constants";
 import { useWorkOrdersRepo } from "../../hooks/useWorkOrdersRepository";
 import PrintOrderPreviewModal from "./modals/PrintOrderPreviewModal";
 import {
@@ -58,7 +58,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
   }, [fetchedWorkOrders, setWorkOrders]);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter] = useState("all");
   const [technicianFilter, setTechnicianFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
 
@@ -76,15 +76,6 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
   const [customDateStart, setCustomDateStart] = useState("");
   const [customDateEnd, setCustomDateEnd] = useState("");
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
-
-  // Default to current month (kept for backward compatibility)
-  const getCurrentMonthFilter = () => {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const year = now.getFullYear();
-    return `Tháng ${month}/${year}`;
-  };
-  const [dateFilter, setDateFilter] = useState(getCurrentMonthFilter());
 
   // State for print preview modal
   const [printOrder, setPrintOrder] = useState<WorkOrder | null>(null);
@@ -110,30 +101,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
     fetchStoreSettings();
   }, [currentBranchId]);
 
-  const getDateRange = (filter: string) => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-
-    if (filter.includes("Tháng")) {
-      const match = filter.match(/Tháng (\d+)\/(\d+)/);
-      if (match) {
-        const filterMonth = parseInt(match[1]) - 1;
-        const filterYear = parseInt(match[2]);
-        const start = new Date(filterYear, filterMonth, 1);
-        const end = new Date(filterYear, filterMonth + 1, 0, 23, 59, 59);
-        return { start, end };
-      }
-    }
-
-    return {
-      start: new Date(year, month, 1),
-      end: new Date(year, month + 1, 0, 23, 59, 59),
-    };
-  };
-
   // Get date range based on current filter type
-  const getCurrentDateRange = () => {
+  const getCurrentDateRange = useCallback(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -151,7 +120,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               59
             ),
           };
-        case "yesterday":
+        case "yesterday": {
           const yesterday = new Date(today);
           yesterday.setDate(yesterday.getDate() - 1);
           return {
@@ -165,7 +134,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               59
             ),
           };
-        case "3days":
+        }
+        case "3days": {
           const threeDaysAgo = new Date(today);
           threeDaysAgo.setDate(threeDaysAgo.getDate() - 2);
           return {
@@ -179,7 +149,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               59
             ),
           };
-        case "7days":
+        }
+        case "7days": {
           const sevenDaysAgo = new Date(today);
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
           return {
@@ -193,7 +164,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               59
             ),
           };
-        case "thisWeek":
+        }
+        case "thisWeek": {
           const startOfWeek = new Date(today);
           const day = startOfWeek.getDay();
           const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
@@ -209,7 +181,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               59
             ),
           };
-        case "lastWeek":
+        }
+        case "lastWeek": {
           const startOfLastWeek = new Date(today);
           const lastWeekDay = startOfLastWeek.getDay();
           const lastWeekDiff = startOfLastWeek.getDate() - lastWeekDay - 6;
@@ -218,6 +191,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
           endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
           endOfLastWeek.setHours(23, 59, 59);
           return { start: startOfLastWeek, end: endOfLastWeek };
+        }
         default:
           return {
             start: today,
@@ -250,7 +224,13 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
       start: new Date(now.getFullYear(), now.getMonth(), 1),
       end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
     };
-  };
+  }, [
+    dateFilterType,
+    quickDateFilter,
+    monthFilter,
+    customDateStart,
+    customDateEnd,
+  ]);
 
   // Get display text for current date filter
   const getDateFilterDisplay = () => {
@@ -340,33 +320,16 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
     workOrders,
     searchTerm,
     statusFilter,
-    dateFilterType,
-    quickDateFilter,
-    monthFilter,
-    customDateStart,
-    customDateEnd,
     technicianFilter,
     paymentFilter,
     currentBranchId,
+    getCurrentDateRange,
   ]);
 
   const totalRevenue = filteredOrders.reduce(
     (sum, order) => sum + (order.total || 0),
     0
   );
-
-  // Generate month options (last 12 months)
-  const getMonthOptions = () => {
-    const options = [];
-    const now = new Date();
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const year = date.getFullYear();
-      options.push(`Tháng ${month}/${year}`);
-    }
-    return options;
-  };
 
   const exportToCSV = () => {
     const headers = [

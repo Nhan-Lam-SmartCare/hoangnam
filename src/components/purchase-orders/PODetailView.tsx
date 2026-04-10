@@ -12,16 +12,11 @@ import {
   User,
   Building,
   FileText,
-  ChevronDown,
-  ChevronUp,
-  ArrowRight,
-  Info,
 } from "lucide-react";
 import {
   usePurchaseOrder,
   usePurchaseOrderItems,
   useUpdatePurchaseOrder,
-  useUpdatePurchaseOrderItem,
   useConvertPOToReceipt,
 } from "../../hooks/usePurchaseOrders";
 import { formatCurrency, formatDate } from "../../utils/format";
@@ -29,7 +24,6 @@ import { showToast } from "../../utils/toast";
 import { useConfirm } from "../../hooks/useConfirm";
 import ConfirmModal from "../common/ConfirmModal";
 import type {
-  PurchaseOrder,
   UpdatePurchaseOrderInput,
   PurchaseOrderStatus,
 } from "../../types";
@@ -79,7 +73,6 @@ export const PODetailView: React.FC<PODetailViewProps> = ({
   const { data: items = [], isLoading: itemsLoading } =
     usePurchaseOrderItems(poId);
   const updatePOMutation = useUpdatePurchaseOrder();
-  const updateItemMutation = useUpdatePurchaseOrderItem();
   const convertMutation = useConvertPOToReceipt();
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 

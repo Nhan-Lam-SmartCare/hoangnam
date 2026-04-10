@@ -53,7 +53,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
     if (numValue !== currentNumInDisplay || (displayValue === "" && numValue !== 0)) {
       setDisplayValue(numValue ? formatNumberWithDots(numValue) : "");
     }
-  }, [value]);
+  }, [value, displayValue]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

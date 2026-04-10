@@ -1,17 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import Tesseract from 'tesseract.js';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import {
     X,
-    Maximize,
-    Minimize,
     ZoomIn,
     ZoomOut,
     Type,
     ScanLine,
     Camera,
-    Image as ImageIcon,
     Flashlight,
     RefreshCcw
 } from "lucide-react";
@@ -30,9 +26,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     isOpen,
     onClose,
     onScan,
-    title = "Smart Scanner",
 }) => {
-    const [error, setError] = useState<string | null>(null);
     const [mode, setMode] = useState<ScanMode>('barcode');
     const [zoom, setZoom] = useState(1);
     const [maxZoom, setMaxZoom] = useState(3);
@@ -49,7 +43,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
     // Initialize Camera
     const startCamera = useCallback(async () => {
         try {
-            setError(null);
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(t => t.stop());
             }
@@ -62,7 +55,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                     focusMode: "continuous"
                 }
             };
-            // @ts-ignore
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             streamRef.current = stream;
 
@@ -76,20 +68,20 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
 
             // Get capabilities for Zoom/Flash
             const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-            // @ts-ignore - non-standard zoom property
+            // @ts-expect-error non-standard zoom capability
             if (capabilities.zoom) {
-                // @ts-ignore
+                // @ts-expect-error non-standard zoom capability
                 const z = capabilities.zoom;
                 setMaxZoom(z.max || 3);
                 // Also set initial zoom
-                // @ts-ignore
-                const settings = track.getSettings();
-                // @ts-ignore
+                const settings = track.getSettings() as MediaTrackSettings & {
+                    zoom?: number;
+                };
                 if (settings.zoom) setZoom(settings.zoom);
             }
         } catch (err: any) {
             console.error("Camera error:", err);
-            setError("Cannot access camera. Please ensure permissions are granted.");
+            showToast.error("Cannot access camera. Please ensure permissions are granted.");
         }
     }, []);
 
@@ -109,7 +101,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         setZoom(newZoom);
         if (trackRef.current) {
             try {
-                // @ts-ignore
                 await trackRef.current.applyConstraints({
                     advanced: [{ zoom: newZoom } as any]
                 });
@@ -126,26 +117,31 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         if (trackRef.current) {
             try {
                 const newFlashState = !flashOn;
-                // @ts-ignore
                 await trackRef.current.applyConstraints({
                     advanced: [{ torch: newFlashState } as any]
                 });
                 setFlashOn(newFlashState);
-            } catch (e) {
+            } catch {
                 showToast.error("Flash/Torch not supported on this device");
             }
         }
     };
 
+    const onResult = useCallback((result: string) => {
+        if (navigator.vibrate) navigator.vibrate(200);
+        onScan(result);
+        onClose();
+    }, [onClose, onScan]);
+
     // --- BARCODE DETECTION (Native + Fallback) ---
-    const scanBarcodeFrame = async () => {
+    const scanBarcodeFrame = useCallback(async () => {
         if (!videoRef.current || isProcessing) return;
 
         // 1. Try Native BarcodeDetector (Android/Chrome/iOS 17+)
-        // @ts-ignore
+        // @ts-expect-error BarcodeDetector is not in default TS DOM lib for some versions
         if (window.BarcodeDetector) {
             try {
-                // @ts-ignore
+            // @ts-expect-error BarcodeDetector is not in default TS DOM lib for some versions
                 const barcodeDetector = new BarcodeDetector({
                     formats: [
                         "qr_code",
@@ -162,7 +158,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                     onResult(code);
                     return;
                 }
-            } catch (e) {
+            } catch {
                 // Fallback will run below
             }
         }
@@ -200,7 +196,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 // console.error(e);
             }
         }
-    };
+    }, [isProcessing, onResult]);
 
     // --- OCR DETECTION (Tesseract) ---
     const captureAndOCR = async () => {
@@ -262,36 +258,36 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
                 dataUrl,
                 'eng',
                 {
-                    logger: m => { }, // Quiet
+                    logger: _m => { }, // Quiet
                 }
             );
 
             // Parse result for IMEI/Serial patterns
             // CRITICAL FIX: Must allow '/' and ':' so that "S/N:" doesn't become "S N "
-            const cleanText = text.toUpperCase().replace(/[^A-Z0-9\n\-\.\:\/]/g, " ");
+            const cleanText = text.toUpperCase().replace(/[^A-Z0-9\n\-.:/]/g, " ");
 
             // Regex for IMEI (15 digits) or general long alphanumeric sequences
             const imeiMatch = cleanText.match(/\b\d{15}\b/);
 
             // MEID (14 hex chars mostly, or 18 digits)
-            const meidMatch = cleanText.match(/(?:MEID|MEIDDEC|MEIDHEX)[:\.\s]*([A-F0-9]{14,18})/i);
+            const meidMatch = cleanText.match(/(?:MEID|MEIDDEC|MEIDHEX)[:.\s]*([A-F0-9]{14,18})/i);
 
             // Dell Service Tag (7 alphanumeric) or Express Service Code (10-11 digits)
-            const serviceTagMatch = cleanText.match(/(?:SERVICE TAG|ST|S\/T|SVC TAG)[:\.\s]*([A-Z0-9]{7})\b/i);
-            const expressCodeMatch = cleanText.match(/(?:EXPRESS SERVICE CODE|EXPRESS SVC)[:\.\s]*(\d{10,11})\b/i);
+            const serviceTagMatch = cleanText.match(/(?:SERVICE TAG|ST|S\/T|SVC TAG)[:.\s]*([A-Z0-9]{7})\b/i);
+            const expressCodeMatch = cleanText.match(/(?:EXPRESS SERVICE CODE|EXPRESS SVC)[:.\s]*(\d{10,11})\b/i);
 
             // MAC Address (e.g. 00:1A:2B:3C:4D:5E or 00-1A...)
             // Matches 6 groups of 2 hex chars separated by : or -
-            const macMatch = cleanText.match(/(?:MAC|MAC ADD|MAC ADDRESS)[:\.\s]*([A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2})/i);
+            const macMatch = cleanText.match(/(?:MAC|MAC ADD|MAC ADDRESS)[:.\s]*([A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2}[:-][A-F0-9]{2})/i);
 
             // S/N regex: Strict Serial Number (Highest Priority)
             // Matches: "S/N: ...", "Serial No.: ...", "SPS#", "ASSY#" 
             // REMOVED "DATE" and "MANUFACTURED" to avoid capturing dates like "2023-09" as Serial Numbers
-            const strictSnMatch = cleanText.match(/(?:S\/N|SN|S\.N\.|5\/N|S\/M|SER\.?\s*NO\.?|SERIAL(?:\s+(?:NO\.?|NUMBER|NUM))?|SPS#|ASSY#|FCC ID|IC)[:\.\_\-\s]*([A-Z0-9\-\.]{5,})/i);
+            const strictSnMatch = cleanText.match(/(?:S\/N|SN|S\.N\.|5\/N|S\/M|SER\.?\s*NO\.?|SERIAL(?:\s+(?:NO\.?|NUMBER|NUM))?|SPS#|ASSY#|FCC ID|IC)[:._\-\s]*([A-Z0-9\-.]{5,})/i);
 
             // P/N regex: Part Number or Model (Lower Priority)
             // Matches: "P/N: ...", "Model: ..."
-            const pnMatch = cleanText.match(/(?:P\/N|PN|PART(?:\s+(?:NO\.?|NUMBER|NUM))?|MODEL)[:\.\_\-\s]*([A-Z0-9\-\.]{5,})/i);
+            const pnMatch = cleanText.match(/(?:P\/N|PN|PART(?:\s+(?:NO\.?|NUMBER|NUM))?|MODEL)[:._\-\s]*([A-Z0-9\-.]{5,})/i);
 
             // Specific Hardware Serial format (e.g., QQQQQ-QQQQQ-...) and Dell Monitor (CN-...)
             const hardwareSerialMatch = cleanText.match(/\b([A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5})\b/);
@@ -301,7 +297,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             const applianceMatch = cleanText.match(/\b(\d{12,20})\b/);
             // Fallback: look for long alphanumeric string
             // Exclude common words
-            const rawSerialMatch = cleanText.match(/\b(?!(?:TYPE|MODEL|INPUT|OUTPUT|MADE|CHINA|VIETNAM|NGUON|SOURCE|VOLT|WATT|TOTAL|POWER|HERTZ|FREQ|CLASS|CONSUMER|CAMERA|WARNING|CAUTION|LIMITED|NETWORK|TECHNOLOGY))[A-Z0-9\-\.]{8,25}\b/i);
+            const rawSerialMatch = cleanText.match(/\b(?!(?:TYPE|MODEL|INPUT|OUTPUT|MADE|CHINA|VIETNAM|NGUON|SOURCE|VOLT|WATT|TOTAL|POWER|HERTZ|FREQ|CLASS|CONSUMER|CAMERA|WARNING|CAUTION|LIMITED|NETWORK|TECHNOLOGY))[A-Z0-9\-.]{8,25}\b/i);
 
             if (strictSnMatch && strictSnMatch[1]) {
                 // Priority 1: Explicit Serial Number (User requested high priority)
@@ -375,12 +371,6 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
         return fixed;
     };
 
-    const onResult = (result: string) => {
-        if (navigator.vibrate) navigator.vibrate(200);
-        onScan(result);
-        onClose();
-    };
-
     // Start scanning loop
     useEffect(() => {
         if (isOpen) {
@@ -392,7 +382,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({
             stopCamera();
         }
         return () => stopCamera();
-    }, [isOpen, mode, startCamera]);
+    }, [isOpen, mode, scanBarcodeFrame, startCamera, stopCamera]);
 
     if (!isOpen) return null;
 

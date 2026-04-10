@@ -39,11 +39,6 @@ interface ReceiptItem {
 
 const DEFAULT_MARKUP_PERCENT = 50;
 
-const calcMarkupPercent = (importPrice: number, sellingPrice: number) => {
-  if (importPrice <= 0 || sellingPrice <= 0) return DEFAULT_MARKUP_PERCENT;
-  return Math.max(0, Math.round(((sellingPrice / importPrice) - 1) * 100));
-};
-
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -95,9 +90,8 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
   setPaymentType,
   partialAmount,
   setPartialAmount,
-  showAddProductModal,
   setShowAddProductModal,
-  onAddNewProduct,
+  onAddNewProduct: _onAddNewProduct,
   currentBranchId,
   canViewImportPrice = true,
   canCreatePart = false,

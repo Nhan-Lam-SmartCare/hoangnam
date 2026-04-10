@@ -60,8 +60,8 @@ import WorkOrderModal from "../service/components/WorkOrderModal";
 import { ServiceManagerMobile } from "../service/ServiceManagerMobile";
 import PrintOrderPreviewModal from "../service/modals/PrintOrderPreviewModal";
 import StatusBadge from "../service/components/StatusBadge";
-import { getQuickStatusFilters } from "../service/components/QuickStatusFilters";
-import { getStatusSnapshotCards } from "../service/components/StatusSnapshotCards";
+import { getQuickStatusFilters } from "../service/components/quickStatusFiltersData";
+import { getStatusSnapshotCards } from "../service/components/statusSnapshotCardsData";
 import {
   detectMaintenancesFromWorkOrder,
   updateVehicleMaintenances,

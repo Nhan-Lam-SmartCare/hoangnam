@@ -14,6 +14,92 @@ interface WarrantyCardModalProps {
     workOrderId?: string;
 }
 
+type WarrantyFormData = {
+    customerName: string;
+    customerPhone: string;
+    deviceModel: string;
+    imeiSerial: string;
+    warrantyPeriodMonths: number;
+    warrantyType: "standard" | "extended" | "premium";
+    coveredParts: string;
+    coverageTerms: string;
+    notes: string;
+};
+
+const CustomerInfoSection: React.FC<{
+    formData: WarrantyFormData;
+    setFormData: React.Dispatch<React.SetStateAction<WarrantyFormData>>;
+}> = ({ formData, setFormData }) => (
+    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">
+            Thông tin khách hàng
+        </h4>
+        <div className="space-y-2">
+            <input
+                type="text"
+                value={formData.customerName}
+                onChange={(e) =>
+                    setFormData({ ...formData, customerName: e.target.value })
+                }
+                placeholder="Tên khách hàng"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+            />
+            <input
+                type="tel"
+                value={formData.customerPhone}
+                onChange={(e) =>
+                    setFormData({ ...formData, customerPhone: e.target.value })
+                }
+                placeholder="Số điện thoại"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+            />
+        </div>
+    </div>
+);
+
+const DeviceInfoSection: React.FC<{
+    formData: WarrantyFormData;
+    setFormData: React.Dispatch<React.SetStateAction<WarrantyFormData>>;
+    onOpenScanner: () => void;
+}> = ({ formData, setFormData, onOpenScanner }) => (
+    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">
+            Thông tin thiết bị
+        </h4>
+        <div className="space-y-2">
+            <input
+                type="text"
+                value={formData.deviceModel}
+                onChange={(e) =>
+                    setFormData({ ...formData, deviceModel: e.target.value })
+                }
+                placeholder="Tên thiết bị / Model *"
+                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                required
+            />
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    value={formData.imeiSerial}
+                    onChange={(e) =>
+                        setFormData({ ...formData, imeiSerial: e.target.value })
+                    }
+                    placeholder="IMEI / Serial Number"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm uppercase font-mono"
+                />
+                <button
+                    type="button"
+                    onClick={onOpenScanner}
+                    className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg active:scale-95 transition-all"
+                    title="Quét mã vạch"
+                >
+                    <Scan className="w-5 h-5" />
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
 export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
     isOpen,
     onClose,
@@ -23,7 +109,7 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
     imeiSerial = "",
     workOrderId,
 }) => {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<WarrantyFormData>({
         customerName,
         customerPhone,
         deviceModel,
@@ -101,70 +187,16 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {/* Customer Info */}
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">
-                            Thông tin khách hàng
-                        </h4>
-                        <div className="space-y-2">
-                            <input
-                                type="text"
-                                value={formData.customerName}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, customerName: e.target.value })
-                                }
-                                placeholder="Tên khách hàng"
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
-                            />
-                            <input
-                                type="tel"
-                                value={formData.customerPhone}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, customerPhone: e.target.value })
-                                }
-                                placeholder="Số điện thoại"
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
-                            />
-                        </div>
-                    </div>
+                    <CustomerInfoSection
+                        formData={formData}
+                        setFormData={setFormData}
+                    />
 
-                    {/* Device Info */}
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">
-                            Thông tin thiết bị
-                        </h4>
-                        <div className="space-y-2">
-                            <input
-                                type="text"
-                                value={formData.deviceModel}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, deviceModel: e.target.value })
-                                }
-                                placeholder="Tên thiết bị / Model *"
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
-                                required
-                            />
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={formData.imeiSerial}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, imeiSerial: e.target.value })
-                                    }
-                                    placeholder="IMEI / Serial Number"
-                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm uppercase font-mono"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowScanner(true)}
-                                    className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg active:scale-95 transition-all"
-                                    title="Quét mã vạch"
-                                >
-                                    <Scan className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <DeviceInfoSection
+                        formData={formData}
+                        setFormData={setFormData}
+                        onOpenScanner={() => setShowScanner(true)}
+                    />
 
                     {/* Warranty Period */}
                     <div>

@@ -7,7 +7,6 @@ import {
   ShoppingCart,
   AlertCircle,
   Package,
-  Filter,
   FileText,
   Edit3,
   Share2, // Changed from Printer to Share2
@@ -53,7 +52,7 @@ export const CreatePOModal: React.FC<CreatePOModalProps> = ({
   const { data: categories = [] } = useCategories();
   const createPOMutation = useCreatePurchaseOrder();
   const updatePOFullMutation = useUpdatePurchaseOrderFull(); // ✅ New hook
-  const createPartMutation = useCreatePartRepo();
+  const _createPartMutation = useCreatePartRepo();
   const { data: storeSettings } = useStoreSettings();
 
   const [supplierId, setSupplierId] = useState(existingPO?.supplier_id || "");

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState } from "react";
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";

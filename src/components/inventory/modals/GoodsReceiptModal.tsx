@@ -18,33 +18,6 @@ import BarcodeScannerModal from '../../common/BarcodeScannerModal';
 import SupplierModal from '../../inventory/components/SupplierModal';
 import AddProductModal from './AddProductModal';
 import type { Part } from '../../../types';
-import { 
-  X, Plus, Save, Scan, Printer, ShoppingCart, Trash2, Search, 
-  ChevronDown, ChevronUp, AlertCircle, CheckCircle, Package, ArrowRight,
-  Camera, FileText 
-} from 'lucide-react';
-
-interface ReceiptItem {
-  partId: string;
-  partName: string;
-  sku: string;
-  quantity: number;
-  unitPrice: number; // Giá nhập
-  sellingPrice: number; // Giá bán lẻ (đề xuất)
-  wholesalePrice: number; // Giá bán buôn (đề xuất)
-  currentStock: number;
-  newStock: number;
-  category: string;
-  unit: string;
-  image?: string;
-  notes?: string;
-}
-
-interface PaymentInfo {
-  method: "cash" | "bank_transfer";
-  paidAmount: number;
-  notes?: string;
-}
 
 const DEFAULT_MARKUP_PERCENT = 50;
 
@@ -86,7 +59,6 @@ const GoodsReceiptModal: React.FC<{
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [showBarcodeInput, setShowBarcodeInput] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [step, setStep] = useState<1 | 2>(1); // 1: Chọn hàng, 2: Thanh toán
   const { data: suppliers = [] } = useSuppliers();
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const createPartMutation = useCreatePartRepo();
@@ -420,9 +392,6 @@ const GoodsReceiptModal: React.FC<{
       showToast.warning("Vui lòng chọn sản phẩm nhập kho");
       return;
     }
-    const supplierName =
-      suppliers.find((s: any) => s.id === selectedSupplier)?.name || "";
-
     // Calculate paidAmount based on paymentType
     // Default to "full" if paymentType is null (user selected payment method but didn't explicitly click payment type)
     const effectivePaymentType = paymentType || "full";

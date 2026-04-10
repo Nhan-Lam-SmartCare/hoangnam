@@ -4,7 +4,6 @@ import { canDo } from '../../../utils/permissions';
 import { GoodsReceiptMobileModal } from '../../inventory/GoodsReceiptMobileModal';
 import { showToast } from '../../../utils/toast';
 import { generateSKU } from '../../../utils/sku';
-import { useCreatePartRepo } from '../../../hooks/usePartsRepository';
 import { getCategoryPricingRule, type RoundingRule } from '../../../utils/categoryPricingRules';
 import AddProductModal from './AddProductModal';
 import type { Part } from '../../../types';
@@ -65,7 +64,6 @@ const GoodsReceiptMobileWrapper: React.FC<{
   const [partialAmount, setPartialAmount] = useState(0);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const createPartMutation = useCreatePartRepo();
 
   // Debug logging
 

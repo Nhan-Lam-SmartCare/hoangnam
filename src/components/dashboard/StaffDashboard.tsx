@@ -5,7 +5,6 @@ import {
   ShoppingCart,
   Users,
   FileText,
-  BarChart3,
   List,
   Search,
   History,

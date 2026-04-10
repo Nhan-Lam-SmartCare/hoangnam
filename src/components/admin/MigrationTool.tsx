@@ -25,7 +25,7 @@ export const MigrationTool: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [results, setResults] = useState<MigrationResults | null>(null);
-  const [localData, setLocalData] = useState<any>(null);
+  const [_localData, setLocalData] = useState<any>(null);
   const [supabaseCounts, setSupabaseCounts] = useState<SupabaseCounts | null>(
     null
   );
@@ -53,7 +53,7 @@ export const MigrationTool: React.FC = () => {
         `   - InventoryTransactions: ${data.inventoryTransactions?.length || 0}`
       );
       return data;
-    } catch (e) {
+    } catch {
       addLog("❌ Lỗi parse dữ liệu localStorage");
       return null;
     }
@@ -109,7 +109,7 @@ export const MigrationTool: React.FC = () => {
           } else {
             res.customers.success++;
           }
-        } catch (e: any) {
+        } catch {
           res.customers.failed++;
         }
       }
@@ -150,7 +150,7 @@ export const MigrationTool: React.FC = () => {
           } else {
             res.suppliers.success++;
           }
-        } catch (e: any) {
+        } catch {
           res.suppliers.failed++;
         }
       }
@@ -191,7 +191,7 @@ export const MigrationTool: React.FC = () => {
           } else {
             res.paymentSources.success++;
           }
-        } catch (e: any) {
+        } catch {
           res.paymentSources.failed++;
         }
       }
@@ -249,7 +249,7 @@ export const MigrationTool: React.FC = () => {
           } else {
             res.parts.success++;
           }
-        } catch (e: any) {
+        } catch {
           res.parts.failed++;
         }
       }
@@ -298,7 +298,7 @@ export const MigrationTool: React.FC = () => {
           } else {
             res.sales.success++;
           }
-        } catch (e: any) {
+        } catch {
           res.sales.failed++;
         }
       }
@@ -349,7 +349,7 @@ export const MigrationTool: React.FC = () => {
           } else {
             res.inventoryTransactions.success++;
           }
-        } catch (e: any) {
+        } catch {
           res.inventoryTransactions.failed++;
         }
       }

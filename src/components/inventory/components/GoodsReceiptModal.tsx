@@ -1,5 +1,4 @@
 ﻿import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Plus, Search, Trash2, X } from "lucide-react";
 import { useSuppliers, useCreateSupplier } from "../../../hooks/useSuppliers";
 import { useCreatePartRepo } from "../../../hooks/usePartsRepository";
 import { showToast } from "../../../utils/toast";
@@ -10,7 +9,6 @@ import { canDo } from "../../../utils/permissions";
 import { validatePriceAndQty } from "../../../utils/validation";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import { generateSKU } from "../../../utils/sku";
-import { fetchPartBySku } from "../../../lib/repository/partsRepository";
 import AddProductModal from "./AddProductModal";
 import type { Part } from "../../../types";
 const GoodsReceiptModal: React.FC<{
@@ -41,7 +39,6 @@ const GoodsReceiptModal: React.FC<{
   const [barcodeInput, setBarcodeInput] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [step, setStep] = useState<1 | 2>(1); // 1: Ch�n h�ng, 2: Thanh to�n
   const { data: suppliers = [] } = useSuppliers();
   const createSupplier = useCreateSupplier();
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -265,9 +262,6 @@ const GoodsReceiptModal: React.FC<{
       showToast.warning("Vui l�ng ch�n s�n ph�m nh�p kho");
       return;
     }
-    const supplierName =
-      suppliers.find((s: any) => s.id === selectedSupplier)?.name || "";
-
     // Calculate paidAmount based on paymentType
     // Default to "full" if paymentType is null (user selected payment method but didn't explicitly click payment type)
     const effectivePaymentType = paymentType || "full";
@@ -724,7 +718,7 @@ const GoodsReceiptModal: React.FC<{
                           });
                           setSelectedSupplier(res.id);
                           setShowSupplierModal(false);
-                        } catch (e: any) {
+                        } catch {
                           // mutation hook �� show toast
                         }
                       }}

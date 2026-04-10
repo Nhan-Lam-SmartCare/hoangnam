@@ -12,13 +12,9 @@ import {
   Calendar,
   User,
   Phone,
-  CreditCard,
-  Package,
-  CheckCircle,
   Clock,
   Star,
   History,
-  ChevronRight,
   MapPin,
   Edit2,
   Trash2,
@@ -38,14 +34,11 @@ import {
   useCreateSupplier,
   useDeleteSupplier,
 } from "../../hooks/useSuppliers";
-import type { Customer, Sale, WorkOrder, Vehicle } from "../../types";
+import type { Customer, WorkOrder, Vehicle } from "../../types";
 // Sales repo removed
 import { useWorkOrdersRepo } from "../../hooks/useWorkOrdersRepository";
 import { showToast } from "../../utils/toast";
-import {
-  getVehiclesNeedingMaintenance,
-  MAINTENANCE_CYCLES,
-} from "../../utils/maintenanceReminder";
+import { getVehiclesNeedingMaintenance } from "../../utils/maintenanceReminder";
 
 // --- COMPONENTS ---
 
@@ -325,14 +318,13 @@ const classifyCustomer = (customer: Customer): Customer["segment"] => {
 
 const CustomerManager: React.FC = () => {
   // Lấy danh sách khách hàng từ Supabase
-  const { data: customers = [], isLoading, refetch } = useCustomers();
+  const { data: customers = [], refetch } = useCustomers();
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const deleteCustomer = useDeleteCustomer();
 
   // Lấy danh sách nhà cung cấp từ Supabase
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
-  const createSupplier = useCreateSupplier();
   const deleteSupplierMutation = useDeleteSupplier();
 
   // State cho Load More
@@ -421,7 +413,7 @@ const CustomerManager: React.FC = () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
     };
-  }, [customers.length]);
+  }, [customers]);
 
   // Helper function to calculate actual stats for a customer (consistent with CustomerHistoryModal)
   const calculateCustomerStats = (customer: Customer) => {
@@ -471,11 +463,9 @@ const CustomerManager: React.FC = () => {
 
   // Auto-classify customers on mount only
   useEffect(() => {
-    let hasChanges = false;
     customers.forEach((customer) => {
       if (!customer.segment) {
         const newSegment = classifyCustomer(customer);
-        hasChanges = true;
         // Cập nhật segment lên Supabase
         updateCustomer.mutate({
           id: customer.id,
@@ -483,7 +473,7 @@ const CustomerManager: React.FC = () => {
         });
       }
     });
-  }, [customers.length]);
+  }, [customers, updateCustomer]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -1176,8 +1166,6 @@ const CustomerManager: React.FC = () => {
                     const pointsPercent = Math.min((points / 10000) * 100, 100);
                     const vehicles =
                       (customer.vehicles as Vehicle[] | undefined) || [];
-                    const primaryVehicle =
-                      vehicles.find((v) => v.isPrimary) || vehicles[0];
                     const hasExtraVehicles = vehicles.length > 2;
 
                     return (
@@ -1610,7 +1598,7 @@ const CustomerModal: React.FC<{
   onClose: () => void;
 }> = ({ customer, onSave, onClose }) => {
   // Danh sách dòng xe phổ biến tại Việt Nam
-  const POPULAR_MOTORCYCLES = [
+  const POPULAR_MOTORCYCLES = useMemo(() => [
     // === HONDA ===
     "Honda Wave Alpha",
     "Honda Wave RSX",
@@ -1711,7 +1699,7 @@ const CustomerModal: React.FC<{
     // === Khác ===
     "Xe điện khác",
     "Khác",
-  ];
+  ], []);
 
   const [name, setName] = useState(customer.name || "");
   const [phone, setPhone] = useState(customer.phone || "");
@@ -1744,7 +1732,7 @@ const CustomerModal: React.FC<{
     return POPULAR_MOTORCYCLES.filter((m) =>
       m.toLowerCase().includes(search)
     ).slice(0, 15);
-  }, [newVehicle.model]);
+  }, [newVehicle.model, POPULAR_MOTORCYCLES]);
 
   const addVehicle = () => {
     if (!newVehicle.model.trim() && !newVehicle.licensePlate.trim()) return;
@@ -2245,7 +2233,7 @@ const SupplierModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         address: address.trim(),
       });
       onClose();
-    } catch (err: any) {
+    } catch {
       // Hook đã show toast error
     } finally {
       setSaving(false);

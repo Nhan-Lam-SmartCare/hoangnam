@@ -3,7 +3,7 @@
  * Component quản lý mẫu sửa chữa thường dùng
  */
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Plus, X, Trash2, Search, Package } from "lucide-react";
 import { formatCurrency } from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";

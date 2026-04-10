@@ -2,7 +2,6 @@ import { supabase } from "../../supabaseClient";
 import type { WorkOrder, StockWarning } from "../../types";
 import { RepoResult, success, failure } from "./types";
 import { formatWorkOrderId } from "../../utils/format";
-import { safeAudit } from "./auditLogsRepository";
 
 const WORK_ORDERS_TABLE = "work_orders";
 const ADDITIONAL_SERVICES_MARKER = "[ADDITIONAL_SERVICES]:";
@@ -1148,7 +1147,7 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         paymentDate,
       };
 
-      let rescuePayload = Object.fromEntries(
+      const rescuePayload = Object.fromEntries(
         Object.entries(canonicalPayload).filter(([, value]) => value !== undefined)
       ) as Record<string, any>;
 

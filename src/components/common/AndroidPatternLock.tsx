@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCcw } from 'lucide-react';
 
 interface AndroidPatternLockProps {
@@ -39,13 +39,13 @@ export const AndroidPatternLock: React.FC<AndroidPatternLockProps> = ({
     const OFFSET = 40;
 
     // 1-9 coordinates
-    const dots = Array.from({ length: 9 }, (_, i) => ({
+    const dots = useMemo(() => Array.from({ length: 9 }, (_, i) => ({
         id: i + 1,
         x: (i % GRID_SIZE) * GAP + OFFSET,
         y: Math.floor(i / GRID_SIZE) * GAP + OFFSET
-    }));
+    })), [GRID_SIZE, GAP, OFFSET]);
 
-    const getTouchedDot = (clientX: number, clientY: number) => {
+    const getTouchedDot = useCallback((clientX: number, clientY: number) => {
         if (!svgRef.current) return null;
         const rect = svgRef.current.getBoundingClientRect();
         const x = clientX - rect.left;
@@ -55,7 +55,7 @@ export const AndroidPatternLock: React.FC<AndroidPatternLockProps> = ({
             const distance = Math.sqrt(Math.pow(dot.x - x, 2) + Math.pow(dot.y - y, 2));
             return distance < HIT_RADIUS;
         });
-    };
+    }, [dots, HIT_RADIUS]);
 
     const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
         if (readOnly) return; // Disable interaction if readOnly
@@ -99,7 +99,7 @@ export const AndroidPatternLock: React.FC<AndroidPatternLockProps> = ({
             }
             setPattern(prev => [...prev, dot.id]);
         }
-    }, [isDragging, pattern, readOnly]);
+    }, [dots, getTouchedDot, isDragging, pattern, readOnly]);
 
     const handleEnd = useCallback(() => {
         if (isDragging) {

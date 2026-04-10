@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { Upload, Save, X, Search, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Upload, Save, X, CheckCircle, RefreshCw } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { showToast } from "../../utils/toast";
 import { formatCurrency } from "../../utils/format";
-import type { ExternalPart } from "../../types";
 
 interface ExternalDataImportProps {
     onClose: () => void;

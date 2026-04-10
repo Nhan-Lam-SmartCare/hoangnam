@@ -9,7 +9,7 @@ export type CardColorKey =
     | "rose"
     | "cyan";
 
-export const CARD_COLORS: Record<
+const CARD_COLORS: Record<
     CardColorKey,
     { card: string; icon: string; accent: string }
 > = {

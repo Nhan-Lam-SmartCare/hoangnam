@@ -52,10 +52,8 @@ const Dashboard: React.FC = () => {
 
   // Load data using custom hook
   const {
-    todayStats,
     filteredStats,
     last7DaysRevenue,
-    incomeExpenseData,
     topProducts,
     workOrderStats,
     alerts,

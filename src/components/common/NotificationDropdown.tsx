@@ -11,7 +11,6 @@ import {
   CheckCheck,
   Trash2,
   ShoppingCart,
-  Banknote,
 } from "lucide-react";
 import { usePartsRepo } from "../../hooks/usePartsRepository";
 import { useWorkOrders } from "../../hooks/useSupabase";

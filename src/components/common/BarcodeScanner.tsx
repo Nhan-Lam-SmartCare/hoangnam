@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Html5Qrcode, Html5QrcodeResult } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { X } from "lucide-react";
 
 interface BarcodeScannerProps {
@@ -36,9 +36,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
             // Stop scanning after successful read? Usually yes for this use case
             // But let parent handle closing
           },
-          (errorMessage) => {
+          () => {
             // scan failure, usually ignore
-            // console.warn(errorMessage);
           }
         )
         .catch((err) => {

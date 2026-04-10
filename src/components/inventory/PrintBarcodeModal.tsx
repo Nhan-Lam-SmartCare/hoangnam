@@ -83,7 +83,6 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
   const [showName, setShowName] = useState(true);
   const [labelPreset, setLabelPreset] = useState<LabelPreset>("40x30");
   const [barcodeFormat, setBarcodeFormat] = useState<BarcodeFormat>("CODE128");
-  const [columns, setColumns] = useState(1); // Số cột khi in
 
   // Sử dụng barcode field nếu có, nếu không dùng SKU
   const barcodeValue = part.barcode || part.sku || part.id.slice(0, 12);

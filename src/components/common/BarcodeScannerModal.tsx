@@ -45,7 +45,7 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         if (state === Html5QrcodeScannerState.SCANNING) {
           await scannerRef.current.stop();
         }
-      } catch (e) {
+      } catch {
         // Ignore
       }
     }
@@ -67,21 +67,7 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      hasScannedRef.current = false;
-      setLastScanned("");
-      startScanner();
-    } else {
-      stopScanner();
-    }
-
-    return () => {
-      stopScanner();
-    };
-  }, [isOpen, facingMode]);
-
-  const startScanner = async () => {
+  const startScanner = useCallback(async () => {
     try {
       setError(null);
 
@@ -93,7 +79,7 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             await scannerRef.current.stop();
           }
           scannerRef.current.clear();
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }
@@ -151,9 +137,9 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       }
       setIsScanning(false);
     }
-  };
+  }, [facingMode, handleSuccessfulScan]);
 
-  const stopScanner = async () => {
+  const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
         const state = scannerRef.current.getState();
@@ -161,13 +147,27 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           await scannerRef.current.stop();
         }
         scannerRef.current.clear();
-      } catch (e) {
+      } catch {
         // Ignore cleanup errors
       }
       scannerRef.current = null;
     }
     setIsScanning(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      hasScannedRef.current = false;
+      setLastScanned("");
+      startScanner();
+    } else {
+      stopScanner();
+    }
+
+    return () => {
+      stopScanner();
+    };
+  }, [isOpen, startScanner, stopScanner]);
 
   const toggleTorch = async () => {
     try {
@@ -176,7 +176,7 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         await track.torchFeature.apply(!torchOn);
         setTorchOn(!torchOn);
       }
-    } catch (e) {
+    } catch {
     }
   };
 

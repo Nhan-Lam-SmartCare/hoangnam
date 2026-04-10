@@ -1,4 +1,4 @@
-import { WorkOrder, Part } from "../types";
+import { WorkOrder } from "../types";
 
 /**
  * Phân tích doanh thu từ phiếu sửa chữa để tính thuế HKD
@@ -40,14 +40,22 @@ export function splitWorkOrderRevenue(order: Partial<WorkOrder>): {
   serviceRevenue: number;
 } {
   const total = order.total || 0;
-  const discount = order.discount || 0;
 
   // Tính tổng phụ tùng
   let partsRawTotal = 0;
   if (Array.isArray(order.partsUsed)) {
     for (const part of order.partsUsed) {
       const qty = Math.max(0, Number(part.quantity || 0));
-      const price = Math.max(0, Number(part.price || (part as any).retailPrice || 0));
+      const anyPart = part as any;
+      const unitPriceRaw =
+        anyPart.price ??
+        anyPart.retailPrice ??
+        anyPart.retailprice ??
+        anyPart.retail_price ??
+        anyPart.unitPrice ??
+        anyPart.unit_price ??
+        0;
+      const price = Math.max(0, Number(unitPriceRaw));
       partsRawTotal += qty * price;
     }
   }

@@ -5,8 +5,10 @@
 // Components
 export { default as WorkOrderModal } from "./WorkOrderModal";
 export { default as StatusBadge } from "./StatusBadge";
-export { QuickStatusFilters, getQuickStatusFilters } from "./QuickStatusFilters";
-export { StatusSnapshotCards, getStatusSnapshotCards } from "./StatusSnapshotCards";
+export { QuickStatusFilters } from "./QuickStatusFilters";
+export { StatusSnapshotCards } from "./StatusSnapshotCards";
+export { getQuickStatusFilters } from "./quickStatusFiltersData";
+export { getStatusSnapshotCards } from "./statusSnapshotCardsData";
 
 // Types
 export type { WorkOrderStatus } from "./StatusBadge";

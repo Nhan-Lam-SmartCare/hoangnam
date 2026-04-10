@@ -155,7 +155,7 @@ export const handleCallCustomer = (phone: string): void => {
 export const shareInvoiceAsImage = async (
     element: HTMLElement,
     orderId: string,
-    orderPrefix?: string
+    _orderPrefix?: string
 ): Promise<boolean> => {
     try {
         const html2canvas = (await import("html2canvas")).default;

@@ -49,7 +49,7 @@ const FLUSH_INTERVAL_MS = 5_000; // Flush every 5 seconds
 const LOCAL_STORAGE_KEY = "motocare_audit_queue";
 const TABLE_MISSING_FLAG = "motocare_audit_table_missing";
 
-let queue: QueuedEntry[] = [];
+const queue: QueuedEntry[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let tableMissing = false;
 

@@ -1,14 +1,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 
-import { useSuppliers } from "../../../hooks/useSuppliers";
 import { supabase } from "../../../supabaseClient";
 import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
-import type { Part, InventoryTransaction } from "../../../types";
+import type { InventoryTransaction } from "../../../types";
 import SupplierModal from "./SupplierModal";
 import AddProductToReceiptModal from "./AddProductToReceiptModal";
 

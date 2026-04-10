@@ -4,16 +4,18 @@ import "dotenv/config";
 
 const url = process.env.SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const shouldRunDbIntegration = process.env.RUN_DB_INTEGRATION === "1";
 
 if (!url || !serviceKey) {
   console.warn("[inventory_trigger_correctness.test] Thiếu env – sẽ skip.");
 }
 
 const admin = url && serviceKey ? createClient(url, serviceKey) : (null as any);
+const dbDescribe = shouldRunDbIntegration ? describe : describe.skip;
 
-describe("inventory trigger correctness (integration)", () => {
-  // SKIPPED: Trigger is intentionally disabled. Stock updates are handled in application layer (InventoryManager.tsx).
-  it.skip("AFTER INSERT cập nhật parts.stock", async () => {
+dbDescribe("inventory trigger correctness (integration)", () => {
+  // Trigger DB đã tắt chủ đích, update stock chạy ở tầng ứng dụng.
+  it("AFTER INSERT không tự cập nhật parts.stock khi trigger disabled", async () => {
     if (!admin) return expect(true).toBe(true);
     // Tạo part tạm
     const partId = "TRIG-PART-" + Date.now();
@@ -47,6 +49,11 @@ describe("inventory trigger correctness (integration)", () => {
       .eq("id", partId)
       .single();
     const stockAfter = data?.stock?.CN1 ?? 0;
-    expect(stockAfter).toBeGreaterThanOrEqual(3);
+
+    // Với trigger disabled, stock không tự cộng từ bảng inventory_transactions.
+    expect(stockAfter).toBe(0);
+
+    await admin.from("inventory_transactions").delete().eq("partId", partId);
+    await admin.from("parts").delete().eq("id", partId);
   }, 30000);
 });

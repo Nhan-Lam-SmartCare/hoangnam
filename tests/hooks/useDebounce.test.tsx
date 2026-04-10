@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { render, fireEvent, screen } from "@testing-library/react";
-import { act } from "react-dom/test-utils";
+import { act } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { useDebounce } from "../../src/hooks/useDebounce";
 
