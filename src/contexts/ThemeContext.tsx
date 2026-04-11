@@ -14,7 +14,11 @@ export type { ThemeContextType, Theme };
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme');
-    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    if (saved === 'light' || saved === 'dark') return saved;
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
   });
 
   useEffect(() => {
@@ -23,9 +27,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#0f172a'); // slate-900
     } else {
       document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff'); // white
     }
   }, [theme]);

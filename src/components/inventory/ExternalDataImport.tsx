@@ -9,12 +9,170 @@ interface ExternalDataImportProps {
     onImported?: () => void;
 }
 
+interface PreviewItem {
+    name: string;
+    sku: string;
+    price: number;
+    category: string;
+    image_url: string;
+    source_url: string;
+}
+
+const UploadStep: React.FC<{
+    file: File | null;
+    loading: boolean;
+    onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onPreview: () => void;
+}> = ({ file, loading, onFileChange, onPreview }) => (
+    <div className="flex flex-col items-center justify-center h-full space-y-6 py-12">
+        <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+            <Upload className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+        </div>
+        <div className="text-center space-y-2">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Chọn file dữ liệu (JSON hoặc CSV)
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                File được tạo từ công cụ quét dữ liệu (scrape-xemay.js).
+            </p>
+        </div>
+
+        <div className="w-full max-w-md">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">
+                        <span className="font-semibold">Nhấn để chọn tệp</span>
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                        JSON, CSV
+                    </p>
+                </div>
+                <input type="file" className="hidden" accept=".json,.csv" onChange={onFileChange} />
+            </label>
+        </div>
+
+        {file && (
+            <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 rounded-lg border border-blue-100 dark:border-blue-800">
+                <div className="p-2 bg-white dark:bg-slate-800 rounded-md shadow-sm">
+                    <span className="text-xs font-bold text-blue-600">TẬP TIN</span>
+                </div>
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {file.name}
+                </div>
+                <div className="text-xs text-slate-500">
+                    ({(file.size / 1024).toFixed(1)} KB)
+                </div>
+            </div>
+        )}
+
+        <button
+            onClick={onPreview}
+            disabled={!file || loading}
+            className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all active:scale-95"
+        >
+            {loading ? (
+                <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Đang xử lý...
+                </>
+            ) : (
+                <>
+                    Tiếp tục
+                    <CheckCircle className="w-5 h-5" />
+                </>
+            )}
+        </button>
+    </div>
+);
+
+const PreviewStep: React.FC<{
+    previewData: PreviewItem[];
+    importing: boolean;
+    onBackToUpload: () => void;
+    onClose: () => void;
+    onImport: () => void;
+}> = ({ previewData, importing, onBackToUpload, onClose, onImport }) => (
+    <div className="space-y-4">
+        <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                Xem trước dữ liệu ({previewData.length} sản phẩm)
+            </h3>
+            <button
+                onClick={onBackToUpload}
+                className="text-sm text-blue-600 hover:underline"
+            >
+                Chọn file khác
+            </button>
+        </div>
+
+        <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
+            <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
+                    <tr>
+                        <th className="px-6 py-3">Tên sản phẩm</th>
+                        <th className="px-6 py-3 text-right">Giá bán</th>
+                        <th className="px-6 py-3">Danh mục</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {previewData.slice(0, 100).map((item, index) => (
+                        <tr key={index} className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-100">
+                                {item.name}
+                            </td>
+                            <td className="px-6 py-3 text-right text-slate-600 dark:text-slate-300">
+                                {formatCurrency(item.price)}
+                            </td>
+                            <td className="px-6 py-3 text-slate-500 dark:text-slate-400">
+                                {item.category}
+                            </td>
+                        </tr>
+                    ))}
+                    {previewData.length > 100 && (
+                        <tr>
+                            <td colSpan={3} className="px-6 py-3 text-center text-slate-500 italic bg-slate-50 dark:bg-slate-800/50">
+                                ... và {previewData.length - 100} sản phẩm khác
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <button
+                onClick={onClose}
+                className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium"
+            >
+                Hủy
+            </button>
+            <button
+                onClick={onImport}
+                disabled={importing}
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+                {importing ? (
+                    <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        Đang nhập...
+                    </>
+                ) : (
+                    <>
+                        <Save className="w-5 h-5" />
+                        Xác nhận nhập
+                    </>
+                )}
+            </button>
+        </div>
+    </div>
+);
+
 export const ExternalDataImport: React.FC<ExternalDataImportProps> = ({
     onClose,
     onImported,
 }) => {
     const [file, setFile] = useState<File | null>(null);
-    const [previewData, setPreviewData] = useState<any[]>([]);
+    const [previewData, setPreviewData] = useState<PreviewItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [importing, setImporting] = useState(false);
     const [step, setStep] = useState<"upload" | "preview">("upload");
@@ -54,7 +212,7 @@ export const ExternalDataImport: React.FC<ExternalDataImportProps> = ({
             }
 
             // Validate and map data
-            const mappedData = data
+            const mappedData: PreviewItem[] = data
                 .filter((item: Record<string, any>) => item.name) // Must have name
                 .map((item: Record<string, any>) => ({
                     name: item.name,
@@ -114,139 +272,20 @@ export const ExternalDataImport: React.FC<ExternalDataImportProps> = ({
 
                 <div className="flex-1 overflow-y-auto p-6">
                     {step === "upload" ? (
-                        <div className="flex flex-col items-center justify-center h-full space-y-6 py-12">
-                            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-                                <Upload className="w-10 h-10 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div className="text-center space-y-2">
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                    Chọn file dữ liệu (JSON hoặc CSV)
-                                </h3>
-                                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                                    File được tạo từ công cụ quét dữ liệu (scrape-xemay.js).
-                                </p>
-                            </div>
-
-                            <div className="w-full max-w-md">
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">
-                                            <span className="font-semibold">Nhấn để chọn tệp</span>
-                                        </p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            JSON, CSV
-                                        </p>
-                                    </div>
-                                    <input type="file" className="hidden" accept=".json,.csv" onChange={handleFileChange} />
-                                </label>
-                            </div>
-
-                            {file && (
-                                <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 rounded-lg border border-blue-100 dark:border-blue-800">
-                                    <div className="p-2 bg-white dark:bg-slate-800 rounded-md shadow-sm">
-                                        <span className="text-xs font-bold text-blue-600">TẬP TIN</span>
-                                    </div>
-                                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        {file.name}
-                                    </div>
-                                    <div className="text-xs text-slate-500">
-                                        ({(file.size / 1024).toFixed(1)} KB)
-                                    </div>
-                                </div>
-                            )}
-
-                            <button
-                                onClick={handlePreview}
-                                disabled={!file || loading}
-                                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all active:scale-95"
-                            >
-                                {loading ? (
-                                    <>
-                                        <RefreshCw className="w-5 h-5 animate-spin" />
-                                        Đang xử lý...
-                                    </>
-                                ) : (
-                                    <>
-                                        Tiếp tục
-                                        <CheckCircle className="w-5 h-5" />
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                        <UploadStep
+                            file={file}
+                            loading={loading}
+                            onFileChange={handleFileChange}
+                            onPreview={handlePreview}
+                        />
                     ) : (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-                                    Xem trước dữ liệu ({previewData.length} sản phẩm)
-                                </h3>
-                                <button
-                                    onClick={() => setStep("upload")}
-                                    className="text-sm text-blue-600 hover:underline"
-                                >
-                                    Chọn file khác
-                                </button>
-                            </div>
-
-                            <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
-                                        <tr>
-                                            <th className="px-6 py-3">Tên sản phẩm</th>
-                                            <th className="px-6 py-3 text-right">Giá bán</th>
-                                            <th className="px-6 py-3">Danh mục</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                                        {previewData.slice(0, 100).map((item, index) => (
-                                            <tr key={index} className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                                <td className="px-6 py-3 font-medium text-slate-900 dark:text-slate-100">
-                                                    {item.name}
-                                                </td>
-                                                <td className="px-6 py-3 text-right text-slate-600 dark:text-slate-300">
-                                                    {formatCurrency(item.price)}
-                                                </td>
-                                                <td className="px-6 py-3 text-slate-500 dark:text-slate-400">
-                                                    {item.category}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {previewData.length > 100 && (
-                                            <tr>
-                                                <td colSpan={3} className="px-6 py-3 text-center text-slate-500 italic bg-slate-50 dark:bg-slate-800/50">
-                                                    ... và {previewData.length - 100} sản phẩm khác
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                <button
-                                    onClick={onClose}
-                                    className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium"
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    onClick={handleImport}
-                                    disabled={importing}
-                                    className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {importing ? (
-                                        <>
-                                            <RefreshCw className="w-5 h-5 animate-spin" />
-                                            Đang nhập...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="w-5 h-5" />
-                                            Xác nhận nhập
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
+                        <PreviewStep
+                            previewData={previewData}
+                            importing={importing}
+                            onBackToUpload={() => setStep("upload")}
+                            onClose={onClose}
+                            onImport={handleImport}
+                        />
                     )}
                 </div>
             </div>

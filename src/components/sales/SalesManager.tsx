@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Search,
   ShoppingCart,
@@ -475,7 +475,7 @@ const SalesManager: React.FC = () => {
   }, [uiMode]);
 
   return (
-    <div className={ui.pageBg}>
+    <div className={`${ui.pageBg} sales-screen`}>
       <div className={ui.header}>
         <div className="w-full md:w-auto">
           <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 font-semibold">
@@ -1033,3 +1033,4 @@ const SalesManager: React.FC = () => {
 };
 
 export default SalesManager;
+

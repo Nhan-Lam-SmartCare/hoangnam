@@ -36,6 +36,7 @@ import {
   setCategoryPricingRule,
   type RoundingRule,
 } from "../../utils/categoryPricingRules";
+import { UiCard } from "../ui";
 
 const CategoriesManager: React.FC = () => {
   const navigate = useNavigate();
@@ -234,9 +235,9 @@ const CategoriesManager: React.FC = () => {
   const icons = Object.keys(iconMap);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-[#0f172a]">
+    <div className="categories-screen h-full flex flex-col bg-slate-50 dark:bg-[#0f172a]">
       {/* Header */}
-      <div className="bg-white dark:bg-[#1e293b] shadow-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+      <UiCard className="rounded-none border-x-0 border-t-0 px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
@@ -254,7 +255,7 @@ const CategoriesManager: React.FC = () => {
             Thêm danh mục
           </button>
         </div>
-      </div>
+      </UiCard>
 
       {/* Loading & Error States */}
       {isLoading && (
@@ -272,7 +273,7 @@ const CategoriesManager: React.FC = () => {
       )}
 
       {/* Stats */}
-      <div className="px-4 py-3 bg-white dark:bg-[#1e293b] border-b border-slate-200 dark:border-slate-700">
+      <UiCard className="rounded-none border-x-0 px-4 py-3">
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-lg border border-blue-200 dark:border-blue-700">
             <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
@@ -299,7 +300,7 @@ const CategoriesManager: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </UiCard>
 
       {/* Categories Table */}
       <div className="flex-1 overflow-auto">

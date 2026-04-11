@@ -187,7 +187,7 @@ const MainLayout: React.FC = () => {
   ].some((path) => location.pathname.startsWith(path));
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors pb-20 md:pb-0 relative overflow-hidden">
+    <div className="app-shell min-h-screen transition-colors pb-20 md:pb-0 relative overflow-hidden">
       {!isShopPage && <Nav />}
       <main
         className={

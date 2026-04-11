@@ -24,9 +24,9 @@ export function ShopLayout({ children }: ShopLayoutProps) {
             {/* Logo */}
             <Link to="/san-pham" className="flex items-center gap-3 group">
               <img
-                src="/logo-smartcare.png"
+                src="/logo.png"
                 alt="SmartCare Logo"
-                className="h-10 w-10 rounded-lg shadow-sm group-hover:shadow-md transition"
+                className="h-10 w-10 rounded-lg bg-white dark:bg-slate-800 p-1 ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm group-hover:shadow-md transition"
               />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Sơn Nam</h1>
@@ -103,7 +103,7 @@ export function ShopLayout({ children }: ShopLayoutProps) {
             {/* About */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <img src="/logo-smartcare.png" alt="Logo" className="h-10 w-10 rounded-lg" />
+                <img src="/logo.png" alt="Logo" className="h-10 w-10 rounded-lg bg-slate-800 p-1 ring-1 ring-slate-700" />
                 <h3 className="text-lg font-bold text-white">Sơn Nam</h3>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">

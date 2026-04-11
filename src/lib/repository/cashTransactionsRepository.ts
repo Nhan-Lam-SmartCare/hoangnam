@@ -33,34 +33,65 @@ export async function fetchCashTransactions(params?: {
   type?: "income" | "expense";
 }): Promise<RepoResult<CashTransaction[]>> {
   try {
-    const runQuery = async (table: string) => {
-      let query = supabase.from(table).select("*").order("date", { ascending: false });
+    const tableCandidates = [READ_TABLE, TABLE, "cashtransactions"];
+    const branchColumns: Array<"branchid" | "branch_id" | "branchId" | undefined> = [
+      "branchid",
+      "branch_id",
+      "branchId",
+      undefined,
+    ];
 
-      // Filter by branchId - PostgreSQL stores column as lowercase "branchid"
-      if (params?.branchId) {
-        query = query.eq("branchid", params.branchId);
+    let data: any[] | null = null;
+    let error: any = null;
+    let matchedTable = "";
+    let matchedBranchColumn: string | undefined;
+
+    outerLoop: for (const tableName of tableCandidates) {
+      for (const branchColumn of branchColumns) {
+        let query = supabase
+          .from(tableName)
+          .select("*")
+          .order("date", { ascending: false });
+
+        if (params?.branchId && branchColumn) {
+          query = query.eq(branchColumn, params.branchId);
+        }
+        if (params?.startDate) query = query.gte("date", params.startDate);
+        if (params?.endDate) query = query.lte("date", params.endDate);
+        if (params?.limit) query = query.limit(params.limit);
+
+        const res = await query;
+        if (!res.error) {
+          data = res.data || [];
+          error = null;
+          matchedTable = tableName;
+          matchedBranchColumn = branchColumn;
+          break outerLoop;
+        }
+
+        error = res.error;
       }
-      if (params?.startDate) query = query.gte("date", params.startDate);
-      if (params?.endDate) query = query.lte("date", params.endDate);
-      if (params?.limit) query = query.limit(params.limit);
-      // Don't filter by type at DB level - some old records may not have it
-
-      return await query;
-    };
-
-    // Prefer normalized ledger view for consistent reads.
-    // Safe fallback to base table when the view hasn't been deployed yet.
-    let { data, error } = await runQuery(READ_TABLE);
-    if (error && (error as any)?.message?.toLowerCase?.().includes("does not exist")) {
-      ({ data, error } = await runQuery(TABLE));
     }
 
-    if (error)
+    if (error && (!data || data.length === 0))
       return failure({
         code: "supabase",
         message: "Không thể tải sổ quỹ",
         cause: error,
       });
+
+    if (params?.branchId && data && data.length === 0 && matchedTable && matchedBranchColumn) {
+      const quickProbe = await supabase.from(matchedTable).select("*").limit(5);
+      if (!quickProbe.error && (quickProbe.data || []).length > 0) {
+        const refetchAll = await supabase
+          .from(matchedTable)
+          .select("*")
+          .order("date", { ascending: false });
+        if (!refetchAll.error) {
+          data = refetchAll.data || [];
+        }
+      }
+    }
 
     // Map DB columns to TypeScript interface (handle both lowercase and camelCase)
     let mappedData = (data || []).map((row: any) => ({
@@ -85,6 +116,12 @@ export async function fetchCashTransactions(params?: {
     // Filter by type at client level (for backwards compatibility)
     if (params?.type) {
       mappedData = mappedData.filter((tx) => tx.type === params.type);
+    }
+
+    if (params?.branchId) {
+      mappedData = mappedData.filter(
+        (tx: any) => !tx.branchId || tx.branchId === params.branchId
+      );
     }
 
     return success(mappedData);

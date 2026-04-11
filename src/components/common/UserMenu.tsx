@@ -10,6 +10,46 @@ const roleLabels: Record<string, { label: string; icon?: React.ReactNode }> = {
   staff: { label: "Nhân viên", icon: <UserIcon className="w-4 h-4" /> },
 };
 
+type UserProfileLike = {
+  name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  role?: string | null;
+} | null;
+
+const pickFirstText = (...values: Array<string | null | undefined>) => {
+  for (const value of values) {
+    if (value && value.trim()) {
+      return value;
+    }
+  }
+
+  return "";
+};
+
+const getRoleInfo = (role: string | null | undefined) => {
+  if (role && roleLabels[role]) {
+    return roleLabels[role];
+  }
+
+  return roleLabels.staff;
+};
+
+const getUserPresentation = (profile: UserProfileLike) => {
+  const displayName = pickFirstText(profile?.name, profile?.full_name, profile?.email);
+  const initialsSource = displayName || "?";
+  const initial = initialsSource.charAt(0).toUpperCase() || "?";
+  const roleInfo = getRoleInfo(profile?.role);
+
+  return {
+    displayName,
+    email: profile?.email || "",
+    initial,
+    roleLabel: roleInfo?.label || roleLabels.staff.label,
+    roleIcon: roleInfo?.icon,
+  };
+};
+
 export const UserMenu = () => {
   const [showMenu, setShowMenu] = useState(false);
   const { profile, signOut, hasRole } = useAuth();
@@ -26,6 +66,7 @@ export const UserMenu = () => {
   };
 
   const canAction = hasRole(["manager", "owner"]);
+  const userPresentation = getUserPresentation(profile);
 
   return (
     <div className="relative inline-block text-left">
@@ -34,17 +75,15 @@ export const UserMenu = () => {
         className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
       >
         <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-          {profile?.name?.[0] ||
-            profile?.full_name?.[0] ||
-            profile?.email?.[0]?.toUpperCase()}
+          {userPresentation.initial}
         </div>
         <div className="text-left hidden sm:block">
           <div className="text-sm font-medium text-slate-900 dark:text-white">
-            {profile?.name || profile?.full_name || profile?.email}
+            {userPresentation.displayName}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-            {roleLabels[profile?.role || "staff"]?.icon}
-            <span>{roleLabels[profile?.role || "staff"]?.label}</span>
+            {userPresentation.roleIcon}
+            <span>{userPresentation.roleLabel}</span>
           </div>
         </div>
         <svg
@@ -74,7 +113,7 @@ export const UserMenu = () => {
                 Đăng nhập với
               </div>
               <div className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                {profile?.email}
+                {userPresentation.email}
               </div>
             </div>
 

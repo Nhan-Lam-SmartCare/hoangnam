@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
@@ -35,7 +35,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
   const [laborCost, setLaborCost] = useState<number>(0);
   const [retailPrice, setRetailPrice] = useState<number>(0);
   const [warranty, setWarranty] = useState<number>(0);
-  const [warrantyUnit, setWarrantyUnit] = useState("tháng");
+  const [warrantyUnit, setWarrantyUnit] = useState("th├íng");
   const [retailOverridden, setRetailOverridden] = useState<boolean>(false);
   const { data: categories = [] } = useCategories();
   const createCategory = useCreateCategory();
@@ -44,7 +44,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      showToast.warning("Vui lòng nhập tên sản phẩm");
+      showToast.warning("Vui l├▓ng nhß║¡p t├¬n sß║ún phß║⌐m");
       return;
     }
 
@@ -52,7 +52,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
       name: name.trim(),
       description: description.trim(),
       barcode: barcode.trim(),
-      category: category || "Chưa phân loại",
+      category: category || "Ch╞░a ph├ón loß║íi",
       quantity: Number(quantity) || 1,
       importPrice: Number(importPrice) || 0,
       laborCost: Number(laborCost) || 0,
@@ -72,7 +72,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
     setRetailPrice(0);
     setWarranty(0);
     setRetailOverridden(false);
-    setWarrantyUnit("tháng");
+    setWarrantyUnit("th├íng");
   };
 
   if (!isOpen) return null;
@@ -84,44 +84,44 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
         {/* Header - Sticky */}
         <div className="flex justify-between items-center px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-blue-600 to-blue-700 sm:from-white sm:to-white sm:dark:from-slate-800 sm:dark:to-slate-800 flex-shrink-0">
           <h2 className="text-base font-bold text-white sm:text-slate-900 sm:dark:text-slate-100">
-            Thêm sản phẩm mới
+            Th├¬m sß║ún phß║⌐m mß╗¢i
           </h2>
           <button
             onClick={onClose}
             className="text-white sm:text-slate-500 hover:text-slate-300 sm:hover:text-slate-700 sm:dark:hover:text-slate-300 text-2xl w-8 h-8 flex items-center justify-center"
           >
-            ×
+            ├ù
           </button>
         </div>
 
         {/* Form Content - Scrollable */}
         <div className="flex-1 overflow-y-auto px-4 py-4 overscroll-contain bg-slate-50 dark:bg-slate-900 sm:bg-white sm:dark:bg-slate-800">
           <div className="space-y-4 pb-4">
-            {/* Card 1: Thông tin cơ bản */}
+            {/* Card 1: Th├┤ng tin c╞í bß║ún */}
             <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
               <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-3">
-                📦 Thông tin sản phẩm
+                ≡ƒôª Th├┤ng tin sß║ún phß║⌐m
               </h3>
               
-              {/* Tên sản phẩm */}
+              {/* T├¬n sß║ún phß║⌐m */}
               <div className="mb-3">
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tên sản phẩm <span className="text-red-500">*</span>
+                  T├¬n sß║ún phß║⌐m <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Nhập tên sản phẩm"
+                  placeholder="Nhß║¡p t├¬n sß║ún phß║⌐m"
                   autoFocus
                 />
               </div>
 
-              {/* Danh mục */}
+              {/* Danh mß╗Ñc */}
               <div className="mb-3">
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  Danh mục sản phẩm
+                  Danh mß╗Ñc sß║ún phß║⌐m
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -129,7 +129,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                     onChange={(e) => setCategory(e.target.value)}
                     className="flex-1 px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                   >
-                    <option value="">-- Chọn hoặc tạo mới --</option>
+                    <option value="">-- Chß╗ìn hoß║╖c tß║ío mß╗¢i --</option>
                     {categories.map((c: any) => (
                       <option key={c.id} value={c.name}>
                         {c.name}
@@ -140,7 +140,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                     type="button"
                     onClick={() => setShowInlineCat(true)}
                     className="w-12 h-12 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50"
-                    aria-label="Thêm danh mục mới"
+                    aria-label="Th├¬m danh mß╗Ñc mß╗¢i"
                   >
                     <span className="text-xl text-blue-600 dark:text-blue-400 font-bold">
                       +
@@ -157,11 +157,11 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                     e.preventDefault();
                     const trimmed = inlineCatName.trim();
                     if (!trimmed) {
-                      showToast.warning("Vui lòng nhập tên danh mục");
+                      showToast.warning("Vui l├▓ng nhß║¡p t├¬n danh mß╗Ñc");
                       return;
                     }
                     if (trimmed.length < 2) {
-                      showToast.warning("Tên quá ngắn");
+                      showToast.warning("T├¬n qu├í ngß║»n");
                       return;
                     }
                     try {
@@ -172,7 +172,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                       setInlineCatName("");
                       setShowInlineCat(false);
                     } catch (err: any) {
-                      showToast.error(err?.message || "Lỗi tạo danh mục");
+                      showToast.error(err?.message || "Lß╗ùi tß║ío danh mß╗Ñc");
                     }
                   }}
                   className="flex gap-2"
@@ -182,14 +182,14 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                     type="text"
                     value={inlineCatName}
                     onChange={(e) => setInlineCatName(e.target.value)}
-                    placeholder="Nhập tên danh mục mới"
+                    placeholder="Nhß║¡p t├¬n danh mß╗Ñc mß╗¢i"
                     className="flex-1 px-3 py-2.5 text-sm border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                   />
                   <button
                     type="submit"
                     className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
                   >
-                    Lưu
+                    L╞░u
                   </button>
                   <button
                     type="button"
@@ -199,16 +199,16 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                     }}
                     className="px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                   >
-                    Hủy
+                    Hß╗ºy
                   </button>
                 </form>
               </div>
             )}
 
-              {/* Mã sản phẩm */}
+              {/* M├ú sß║ún phß║⌐m */}
               <div>
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  Mã sản phẩm (SKU)
+                  M├ú sß║ún phß║⌐m (SKU)
                 </label>
                 <input
                   type="text"
@@ -218,36 +218,36 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                   className="w-full px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 font-mono"
                 />
                 <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                  Để trống để tự sinh mã PT-xxxxx
+                  ─Éß╗â trß╗æng ─æß╗â tß╗▒ sinh m├ú PT-xxxxx
                 </p>
               </div>
             </div>
 
-            {/* Card 2: Mô tả */}
+            {/* Card 2: M├┤ tß║ú */}
             <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
               <h3 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
-                📝 Mô tả
+                ≡ƒô¥ M├┤ tß║ú
               </h3>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
                 className="w-full px-3 py-3 text-base border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none"
-                placeholder="Mô tả sản phẩm (tùy chọn)"
+                placeholder="M├┤ tß║ú sß║ún phß║⌐m (t├╣y chß╗ìn)"
               />
             </div>
 
-            {/* Card 3: Thông tin nhập kho */}
+            {/* Card 3: Th├┤ng tin nhß║¡p kho */}
             <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
               <h3 className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mb-3">
-                💰 Thông tin nhập kho
+                ≡ƒÆ░ Th├┤ng tin nhß║¡p kho
               </h3>
               
               {/* Grid 2x2 on mobile, 3 columns on desktop */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                    Số lượng
+                    Sß╗æ l╞░ß╗úng
                   </label>
                   <FormattedNumberInput
                     value={quantity}
@@ -262,7 +262,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                    Giá nhập
+                    Gi├í nhß║¡p
                   </label>
                   <FormattedNumberInput
                     value={importPrice}
@@ -282,7 +282,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                    Tiền công
+                    Tiß╗ün c├┤ng
                   </label>
                   <FormattedNumberInput
                     value={laborCost}
@@ -292,7 +292,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                    Giá bán lẻ
+                    Gi├í b├ín lß║╗
                   </label>
                   <FormattedNumberInput
                     value={retailPrice}
@@ -305,7 +305,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1 font-medium">
-                    Bảo hành
+                    Bß║úo h├ánh
                   </label>
                   <div className="flex gap-1">
                     <FormattedNumberInput
@@ -318,9 +318,9 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
                       onChange={(e) => setWarrantyUnit(e.target.value)}
                       className="w-20 px-1 py-3 text-sm border border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                     >
-                      <option value="tháng">tháng</option>
-                      <option value="năm">năm</option>
-                      <option value="ngày">ngày</option>
+                      <option value="th├íng">th├íng</option>
+                      <option value="n─âm">n─âm</option>
+                      <option value="ng├áy">ng├áy</option>
                     </select>
                   </div>
                 </div>
@@ -335,7 +335,7 @@ const AddProductModal: React.FC<AddProductModalProps> = ({
             onClick={handleSubmit}
             className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-4 rounded-xl font-bold text-base shadow-lg shadow-orange-500/30 active:scale-98 transition-all"
           >
-            ✓ Lưu và Thêm vào giỏ hàng
+            Γ£ô L╞░u v├á Th├¬m v├áo giß╗Å h├áng
           </button>
         </div>
       </div>

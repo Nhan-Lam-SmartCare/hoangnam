@@ -1710,7 +1710,7 @@ export default function ServiceManager() {
   }
 
   return (
-    <div className="space-y-3 mx-auto w-full max-w-[1800px] px-3 sm:px-4 xl:px-6 2xl:px-8">
+    <div className="service-screen space-y-3 mx-auto w-full max-w-[1800px] px-3 sm:px-4 xl:px-6 2xl:px-8">
       {/* Desktop insight cards */}
       <div className={`grid gap-3 ${isOwner ? "lg:grid-cols-[2fr,1fr]" : "lg:grid-cols-1"}`}>
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">

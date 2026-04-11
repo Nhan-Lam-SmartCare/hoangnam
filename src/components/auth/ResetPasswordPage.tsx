@@ -9,6 +9,63 @@ import { showToast } from "../../utils/toast";
 import { validatePassword } from "../../utils/validation";
 import { Lock, Eye, EyeOff, CheckCircle, Loader2 } from "lucide-react";
 
+const ResetPasswordLoading: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+    <div className="text-center">
+      <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-4" />
+      <p className="text-slate-600 dark:text-slate-400">Đang xác thực...</p>
+    </div>
+  </div>
+);
+
+const ResetPasswordSuccess: React.FC<{ onGoLogin: () => void }> = ({
+  onGoLogin,
+}) => (
+  <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+    <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 text-center">
+      <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+        <CheckCircle className="w-8 h-8 text-green-600" />
+      </div>
+      <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+        Thành công!
+      </h2>
+      <p className="text-slate-600 dark:text-slate-400 mb-6">
+        Mật khẩu của bạn đã được đặt lại. Đang chuyển hướng đến trang đăng
+        nhập...
+      </p>
+      <button
+        onClick={onGoLogin}
+        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+      >
+        Đăng nhập ngay
+      </button>
+    </div>
+  </div>
+);
+
+const InvalidResetLink: React.FC<{
+  error: string;
+  onGoLogin: () => void;
+}> = ({ error, onGoLogin }) => (
+  <div className="text-center py-4">
+    <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+      <Lock className="w-8 h-8 text-red-600" />
+    </div>
+    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
+      Link không hợp lệ
+    </h3>
+    <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+      {error || "Link đặt lại mật khẩu đã hết hạn hoặc không hợp lệ."}
+    </p>
+    <button
+      onClick={onGoLogin}
+      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+    >
+      Quay lại đăng nhập
+    </button>
+  </div>
+);
+
 export const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
@@ -86,41 +143,11 @@ export const ResetPasswordPage = () => {
   };
 
   // Loading state while checking session
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 dark:text-slate-400">Đang xác thực...</p>
-        </div>
-      </div>
-    );
-  }
+  if (checkingSession) return <ResetPasswordLoading />;
 
   // Success state
   if (isSuccess) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-            Thành công!
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            Mật khẩu của bạn đã được đặt lại. Đang chuyển hướng đến trang đăng
-            nhập...
-          </p>
-          <button
-            onClick={() => navigate("/login")}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-          >
-            Đăng nhập ngay
-          </button>
-        </div>
-      </div>
-    );
+    return <ResetPasswordSuccess onGoLogin={() => navigate("/login")} />;
   }
 
   return (
@@ -142,23 +169,10 @@ export const ResetPasswordPage = () => {
         {/* Form Card */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
           {!isValidSession ? (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-red-600" />
-              </div>
-              <h3 className="font-semibold text-slate-900 dark:text-white mb-2">
-                Link không hợp lệ
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-                {error || "Link đặt lại mật khẩu đã hết hạn hoặc không hợp lệ."}
-              </p>
-              <button
-                onClick={() => navigate("/login")}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-              >
-                Quay lại đăng nhập
-              </button>
-            </div>
+            <InvalidResetLink
+              error={error}
+              onGoLogin={() => navigate("/login")}
+            />
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (

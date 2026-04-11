@@ -206,7 +206,7 @@ export function useNotifications() {
       try {
         const notificationOptions: NotificationOptions & { vibrate?: number[] } = {
           body,
-          icon: "/logo-smartcare.png",
+          icon: "/logo.png",
           vibrate: [200, 100, 200]
         };
         new Notification(title, notificationOptions);

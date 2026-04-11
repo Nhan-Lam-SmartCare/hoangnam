@@ -147,6 +147,44 @@ export function useFinanceActions(
           return;
         }
 
+        const cashRes = await createCashTransaction({
+          type: "income",
+          amount: total,
+          branchId: newSale.branchId,
+          paymentSourceId: newSale.paymentMethod,
+          date: newSale.date,
+          category: "sale_income",
+          notes: data.note || "Thu tiền bán hàng",
+          saleId: newSale.id,
+          recipient: newSale.customer?.name || "Khách lẻ",
+        });
+
+        if (!cashRes.ok) {
+          showToast.warning(
+            `Đơn bán đã lưu nhưng chưa ghi sổ quỹ: ${mapRepoErrorForUser(cashRes.error)}`
+          );
+        } else {
+          const effectivePaymentSourceId =
+            cashRes.data.paymentSourceId || newSale.paymentMethod;
+          const balRes = await updatePaymentSourceBalance(
+            effectivePaymentSourceId,
+            newSale.branchId,
+            total
+          );
+          if (!balRes.ok) {
+            showToast.warning(
+              `Đơn bán đã lưu nhưng chưa cập nhật số dư nguồn tiền: ${mapRepoErrorForUser(
+                balRes.error
+              )}`
+            );
+          }
+
+          await supabase
+            .from("sales")
+            .update({ cashtransactionid: cashRes.data.id })
+            .eq("id", newSale.id);
+        }
+
         const warrantyRows: Array<Record<string, unknown>> = [];
         for (const item of newSale.items) {
           const part = parts.find((p) => p.id === item.partId);

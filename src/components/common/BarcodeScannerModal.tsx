@@ -9,6 +9,112 @@ interface BarcodeScannerModalProps {
   title?: string;
 }
 
+const ScannerFrameOverlay: React.FC = () => (
+  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+    <div className="w-[300px] h-[180px] relative">
+      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl" />
+      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr" />
+      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl" />
+      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br" />
+      <div className="absolute inset-x-0 h-0.5 bg-green-400 animate-scan" />
+    </div>
+  </div>
+);
+
+const ScannerInstructions: React.FC = () => (
+  <div className="mt-4 text-center px-4">
+    <p className="text-white/70 text-sm">Đưa mã vạch vào khung hình để quét</p>
+    <p className="text-amber-400/80 text-xs mt-1">📱 iPhone: Giữ cách 15-25cm để tránh bị mờ</p>
+  </div>
+);
+
+type ScannerControlsProps = {
+  isScanning: boolean;
+  torchOn: boolean;
+  onToggleTorch: () => Promise<void>;
+  onSwitchCamera: () => void;
+};
+
+const ScannerControls: React.FC<ScannerControlsProps> = ({
+  isScanning,
+  torchOn,
+  onToggleTorch,
+  onSwitchCamera,
+}) => {
+  if (!isScanning) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-6 p-6 bg-black/50">
+      <button
+        onClick={onToggleTorch}
+        className={`p-4 rounded-full ${torchOn ? "bg-yellow-500 text-black" : "bg-white/20 text-white"}`}
+        title="Đèn flash"
+      >
+        {torchOn ? <Flashlight className="w-6 h-6" /> : <FlashlightOff className="w-6 h-6" />}
+      </button>
+      <button
+        onClick={onSwitchCamera}
+        className="p-4 rounded-full bg-white/20 text-white"
+        title="Đổi camera"
+      >
+        <SwitchCamera className="w-6 h-6" />
+      </button>
+    </div>
+  );
+};
+
+type ScannerContentProps = {
+  error: string | null;
+  isScanning: boolean;
+  lastScanned: string;
+  onRetry: () => Promise<void>;
+};
+
+const ScannerContent: React.FC<ScannerContentProps> = ({
+  error,
+  isScanning,
+  lastScanned,
+  onRetry,
+}) => {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-4">
+      {error ? (
+        <div className="text-center">
+          <div className="text-red-400 mb-4 px-4">{error}</div>
+          <button
+            onClick={onRetry}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="relative w-full max-w-sm">
+            <div
+              id="barcode-scanner-container"
+              className="w-full rounded-xl overflow-hidden bg-black"
+              style={{ minHeight: 300 }}
+            />
+
+            {isScanning && <ScannerFrameOverlay />}
+          </div>
+
+          {lastScanned && (
+            <div className="mt-4 px-4 py-2 bg-green-600/20 border border-green-500 rounded-lg">
+              <p className="text-green-400 text-sm text-center font-mono">✓ Đã quét: {lastScanned}</p>
+            </div>
+          )}
+
+          <ScannerInstructions />
+        </>
+      )}
+    </div>
+  );
+};
+
 const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   isOpen,
   onClose,
@@ -207,86 +313,19 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         </button>
       </div>
 
-      {/* Scanner Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        {error ? (
-          <div className="text-center">
-            <div className="text-red-400 mb-4 px-4">{error}</div>
-            <button
-              onClick={startScanner}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium"
-            >
-              Thử lại
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Scanner container */}
-            <div className="relative w-full max-w-sm">
-              <div
-                id="barcode-scanner-container"
-                className="w-full rounded-xl overflow-hidden bg-black"
-                style={{ minHeight: 300 }}
-              />
+      <ScannerContent
+        error={error}
+        isScanning={isScanning}
+        lastScanned={lastScanned}
+        onRetry={startScanner}
+      />
 
-              {/* Scan frame overlay */}
-              {isScanning && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-[300px] h-[180px] relative">
-                    {/* Corner markers */}
-                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 rounded-tl" />
-                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 rounded-tr" />
-                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 rounded-bl" />
-                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 rounded-br" />
-
-                    {/* Scanning line animation */}
-                    <div className="absolute inset-x-0 h-0.5 bg-green-400 animate-scan" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Last scanned */}
-            {lastScanned && (
-              <div className="mt-4 px-4 py-2 bg-green-600/20 border border-green-500 rounded-lg">
-                <p className="text-green-400 text-sm text-center font-mono">
-                  ✓ Đã quét: {lastScanned}
-                </p>
-              </div>
-            )}
-
-            {/* Instructions - with iOS distance guidance */}
-            <div className="mt-4 text-center px-4">
-              <p className="text-white/70 text-sm">
-                Đưa mã vạch vào khung hình để quét
-              </p>
-              <p className="text-amber-400/80 text-xs mt-1">
-                📱 iPhone: Giữ cách 15-25cm để tránh bị mờ
-              </p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Controls */}
-      {isScanning && (
-        <div className="flex items-center justify-center gap-6 p-6 bg-black/50">
-          <button
-            onClick={toggleTorch}
-            className={`p-4 rounded-full ${torchOn ? "bg-yellow-500 text-black" : "bg-white/20 text-white"}`}
-            title="Đèn flash"
-          >
-            {torchOn ? <Flashlight className="w-6 h-6" /> : <FlashlightOff className="w-6 h-6" />}
-          </button>
-          <button
-            onClick={switchCamera}
-            className="p-4 rounded-full bg-white/20 text-white"
-            title="Đổi camera"
-          >
-            <SwitchCamera className="w-6 h-6" />
-          </button>
-        </div>
-      )}
+      <ScannerControls
+        isScanning={isScanning}
+        torchOn={torchOn}
+        onToggleTorch={toggleTorch}
+        onSwitchCamera={switchCamera}
+      />
 
       {/* CSS for scan animation */}
       <style>{`

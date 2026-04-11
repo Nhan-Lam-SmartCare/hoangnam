@@ -201,9 +201,9 @@ export function Nav() {
                 aria-label="Mở cài đặt và tài khoản"
               >
                 <img
-                  src="/logo-smartcare.png"
+                  src="/logo.png"
                   alt="Sơn Nam"
-                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 group-hover:shadow-md group-hover:ring-emerald-400/60 dark:group-hover:ring-emerald-500/60 transition"
+                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white dark:bg-slate-900 p-1 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 group-hover:shadow-md group-hover:ring-emerald-400/60 dark:group-hover:ring-emerald-500/60 transition"
                 />
                 {/* Mobile: Shorter name */}
                 <span className="font-bold text-xs tracking-tight text-white lg:hidden">

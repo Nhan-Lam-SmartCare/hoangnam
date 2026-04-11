@@ -39,6 +39,7 @@ import type { Customer, WorkOrder, Vehicle } from "../../types";
 import { useWorkOrdersRepo } from "../../hooks/useWorkOrdersRepository";
 import { showToast } from "../../utils/toast";
 import { getVehiclesNeedingMaintenance } from "../../utils/maintenanceReminder";
+import { supabaseHelpers } from "../../lib/supabase";
 
 // --- COMPONENTS ---
 
@@ -332,6 +333,24 @@ const CustomerManager: React.FC = () => {
 
   // Hàm lưu khách hàng (tạo mới hoặc cập nhật)
   const handleSaveCustomer = async (c: Partial<Customer> & { id?: string }) => {
+    const normalizePhone = (value?: string) =>
+      String(value || "")
+        .replace(/\D/g, "")
+        .trim();
+
+    const incomingPhone = normalizePhone(c.phone);
+    if (incomingPhone) {
+      const duplicated = customers.find((item) => {
+        if (c.id && item.id === c.id) return false;
+        return normalizePhone(item.phone) === incomingPhone;
+      });
+
+      if (duplicated) {
+        showToast.error("Số điện thoại đã tồn tại, vui lòng nhập số khác");
+        return;
+      }
+    }
+
     if (c.id) {
       // Cập nhật
       await updateCustomer.mutateAsync({ id: c.id, updates: c });
@@ -361,8 +380,8 @@ const CustomerManager: React.FC = () => {
     useState<Customer | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showActionSheet, setShowActionSheet] = useState(false);
+  const didAutoClassifyRef = useRef(false);
 
-  // Fetch sales and work orders for history
   // Sales repo removed
   const { data: allWorkOrders = [] } = useWorkOrdersRepo();
 
@@ -462,18 +481,27 @@ const CustomerManager: React.FC = () => {
   };
 
   // Auto-classify customers on mount only
+  // Auto-classify once to avoid mutation invalidation loops
   useEffect(() => {
-    customers.forEach((customer) => {
-      if (!customer.segment) {
-        const newSegment = classifyCustomer(customer);
-        // Cập nhật segment lên Supabase
-        updateCustomer.mutate({
-          id: customer.id,
-          updates: { segment: newSegment },
-        });
-      }
+    if (didAutoClassifyRef.current || customers.length === 0) return;
+
+    const missingSegmentCustomers = customers.filter((customer) => !customer.segment);
+    if (missingSegmentCustomers.length === 0) {
+      didAutoClassifyRef.current = true;
+      return;
+    }
+
+    didAutoClassifyRef.current = true;
+    Promise.allSettled(
+      missingSegmentCustomers.map((customer) =>
+        supabaseHelpers.updateCustomer(customer.id, {
+          segment: classifyCustomer(customer),
+        })
+      )
+    ).finally(() => {
+      refetch();
     });
-  }, [customers, updateCustomer]);
+  }, [customers, refetch]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -528,8 +556,17 @@ const CustomerManager: React.FC = () => {
       // Xóa khách hàng thực sự từ Supabase
       await deleteCustomer.mutateAsync(id);
       showToast.success("Đã xóa khách hàng thành công");
-      refetch();
     } catch (error: any) {
+      if (error?.code === "23503") {
+        await updateCustomer.mutateAsync({
+          id,
+          updates: { status: "inactive" },
+        });
+        showToast.warning(
+          "Khách hàng đã có dữ liệu liên quan, đã chuyển sang ngừng hoạt động"
+        );
+        return;
+      }
       console.error("Error deleting customer:", error);
       showToast.error(
         "Không thể xóa khách hàng: " + (error.message || "Lỗi không xác định")
@@ -1574,6 +1611,7 @@ const CustomerManager: React.FC = () => {
       {editCustomer && (
         <CustomerModal
           customer={editCustomer}
+          existingCustomers={customers}
           onSave={handleSaveCustomer}
           onClose={() => setEditCustomer(null)}
         />
@@ -1594,9 +1632,10 @@ const CustomerManager: React.FC = () => {
 
 const CustomerModal: React.FC<{
   customer: Customer;
+  existingCustomers: Customer[];
   onSave: (c: Partial<Customer> & { id?: string }) => void;
   onClose: () => void;
-}> = ({ customer, onSave, onClose }) => {
+}> = ({ customer, existingCustomers, onSave, onClose }) => {
   // Danh sách dòng xe phổ biến tại Việt Nam
   const POPULAR_MOTORCYCLES = useMemo(() => [
     // === HONDA ===
@@ -1704,6 +1743,29 @@ const CustomerModal: React.FC<{
   const [name, setName] = useState(customer.name || "");
   const [phone, setPhone] = useState(customer.phone || "");
 
+  const normalizePhone = (value?: string) =>
+    String(value || "")
+      .replace(/\D/g, "")
+      .trim();
+
+  const phoneError = useMemo(() => {
+    const currentPhone = phone.trim();
+    if (!currentPhone) return "";
+
+    const phoneValidation = validatePhoneNumber(currentPhone);
+    if (!phoneValidation.ok) {
+      return phoneValidation.error || "Số điện thoại không hợp lệ";
+    }
+
+    const normalizedCurrentPhone = normalizePhone(currentPhone);
+    const duplicated = existingCustomers.some((item) => {
+      if (customer.id && item.id === customer.id) return false;
+      return normalizePhone(item.phone) === normalizedCurrentPhone;
+    });
+
+    return duplicated ? "Số điện thoại đã tồn tại" : "";
+  }, [phone, existingCustomers, customer.id]);
+
   const initVehicles = () => {
     if (customer.vehicles && customer.vehicles.length > 0) {
       return customer.vehicles;
@@ -1766,13 +1828,9 @@ const CustomerModal: React.FC<{
       return;
     }
 
-    // Validate phone if provided
-    if (phone.trim()) {
-      const phoneValidation = validatePhoneNumber(phone.trim());
-      if (!phoneValidation.ok) {
-        showToast.error(phoneValidation.error || "Số điện thoại không hợp lệ");
-        return;
-      }
+    if (phoneError) {
+      showToast.error(phoneError);
+      return;
     }
 
     const primaryVehicle = vehicles.find((v) => v.isPrimary) || vehicles[0];
@@ -1863,9 +1921,16 @@ const CustomerModal: React.FC<{
                     placeholder="VD: 0912345678"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                    className={`w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                      phoneError
+                        ? "border-red-400 dark:border-red-500 focus:ring-red-500/20 focus:border-red-500"
+                        : "border-slate-200 dark:border-slate-700 focus:ring-blue-500/20 focus:border-blue-500"
+                    }`}
                   />
                 </div>
+                {phoneError && (
+                  <p className="text-xs text-red-500 ml-1 mt-1">{phoneError}</p>
+                )}
               </div>
             </div>
           </div>

@@ -3,12 +3,12 @@
 
 // IMPORTANT: Change this version when deploying new code
 // Format: YYYYMMDD-HHMM (e.g., 20251222-0743)
-const CACHE_VERSION = '20260406-1635';
+const CACHE_VERSION = '20260411-0001';
 const CACHE_NAME = `motocare-v${CACHE_VERSION}`;
 
 // Static assets to cache (images, fonts, etc.)
 const STATIC_CACHE_URLS = [
-    '/logo-smartcare.png',
+    '/logo.png',
     '/clear-cache.html'
 ];
 
@@ -137,8 +137,8 @@ self.addEventListener('push', function (event) {
         const data = event.data.json();
         const options = {
             body: data.body,
-            icon: '/logo-smartcare.png',
-            badge: '/logo-smartcare.png',
+            icon: '/logo.png',
+            badge: '/logo.png',
             vibrate: [100, 50, 100],
             data: {
                 dateOfArrival: Date.now(),

@@ -79,23 +79,23 @@ const GoodsReceiptModal: React.FC<{
   // Auto-save key cho localStorage
   const DRAFT_KEY = `goods_receipt_draft_${currentBranchId}`;
 
-  // Khôi phục dữ liệu từ localStorage khi mở modal
+  // Khï¿½i phï¿½c dï¿½ liï¿½u tï¿½ localStorage khi mï¿½ modal
   useEffect(() => {
     if (isOpen) {
       try {
         const savedDraft = localStorage.getItem(DRAFT_KEY);
         if (savedDraft) {
           const draft = JSON.parse(savedDraft);
-          // Kiểm tra draft không quá 24h
+          // Kiï¿½m tra draft khï¿½ng quï¿½ 24h
           if (
             draft.timestamp &&
             Date.now() - draft.timestamp < 24 * 60 * 60 * 1000
           ) {
             if (draft.receiptItems?.length > 0 || draft.selectedSupplier) {
               const shouldRestore = window.confirm(
-                `Phát hiện phiếu nhập chưa hoàn tất (${
+                `Phï¿½t hiï¿½n phiï¿½u nhï¿½p chï¿½a hoï¿½n tï¿½t (${
                   draft.receiptItems?.length || 0
-                } sản phẩm).\n\nBạn có muốn khôi phục không?`
+                } sï¿½n phï¿½m).\n\nBï¿½n cï¿½ muï¿½n khï¿½i phï¿½c khï¿½ng?`
               );
               if (shouldRestore) {
                 setReceiptItems(draft.receiptItems || []);
@@ -103,23 +103,23 @@ const GoodsReceiptModal: React.FC<{
                 setDiscount(draft.discount || 0);
                 setDiscountType(draft.discountType || "amount");
                 setDiscountPercent(draft.discountPercent || 0);
-                showToast.success("Đã khôi phục phiếu nhập từ bản nháp");
+                showToast.success("ï¿½ khï¿½i phï¿½c phiï¿½u nhï¿½p tï¿½ bï¿½n nhï¿½p");
               } else {
                 localStorage.removeItem(DRAFT_KEY);
               }
             }
           } else {
-            // Draft quá cũ, xóa đi
+            // Draft quï¿½ ci, xï¿½a i
             localStorage.removeItem(DRAFT_KEY);
           }
         }
       } catch (e) {
-        console.error("Lỗi khôi phục draft:", e);
+        console.error("Lï¿½i khï¿½i phï¿½c draft:", e);
       }
     }
   }, [isOpen, DRAFT_KEY]);
 
-  // Auto-save vào localStorage mỗi khi có thay đổi
+  // Auto-save vï¿½o localStorage mï¿½i khi cï¿½ thay ï¿½i
   useEffect(() => {
     if (isOpen && (receiptItems.length > 0 || selectedSupplier)) {
       const draft = {
@@ -142,7 +142,7 @@ const GoodsReceiptModal: React.FC<{
     DRAFT_KEY,
   ]);
 
-  // Xóa draft khi hoàn tất phiếu nhập thành công
+  // Xï¿½a draft khi hoï¿½n tï¿½t phiï¿½u nhï¿½p thï¿½nh cï¿½ng
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_KEY);
   };
@@ -176,7 +176,7 @@ const GoodsReceiptModal: React.FC<{
             : item
         )
       );
-      showToast.success(`� tng s� l��ng ${part.name}`);
+      showToast.success(`ï¿½ tng sï¿½ lï¿½ï¿½ng ${part.name}`);
     } else {
       setReceiptItems([
         ...receiptItems,
@@ -190,7 +190,7 @@ const GoodsReceiptModal: React.FC<{
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
         },
       ]);
-      showToast.success(`� th�m ${part.name} v�o phi�u nh�p`);
+      showToast.success(`ï¿½ thï¿½m ${part.name} vï¿½o phiï¿½u nhï¿½p`);
     }
     setSearchTerm("");
     // Auto focus back to barcode input
@@ -213,7 +213,7 @@ const GoodsReceiptModal: React.FC<{
       addToReceipt(foundPart);
       setBarcodeInput("");
     } else {
-      showToast.error(`Kh�ng t�m th�y s�n ph�m c� m�: ${barcode}`);
+      showToast.error(`Khï¿½ng tï¿½m thï¿½y sï¿½n phï¿½m cï¿½ mï¿½: ${barcode}`);
       setBarcodeInput("");
     }
   };
@@ -255,11 +255,11 @@ const GoodsReceiptModal: React.FC<{
   const { profile } = useAuth();
   const handleSave = () => {
     if (!canDo(profile, "part.update_price")) {
-      showToast.error("B�n kh�ng c� quy�n c�p nh�t gi�");
+      showToast.error("Bï¿½n khï¿½ng cï¿½ quyï¿½n cï¿½p nhï¿½t giï¿½");
       return;
     }
     if (receiptItems.length === 0) {
-      showToast.warning("Vui l�ng ch�n s�n ph�m nh�p kho");
+      showToast.warning("Vui lï¿½ng chï¿½n sï¿½n phï¿½m nhï¿½p kho");
       return;
     }
     // Calculate paidAmount based on paymentType
@@ -278,7 +278,7 @@ const GoodsReceiptModal: React.FC<{
       paidAmount: calculatedPaidAmount,
       discount,
     });
-    clearDraft(); // Xóa draft sau khi hoàn tất
+    clearDraft(); // Xï¿½a draft sau khi hoï¿½n tï¿½t
     setReceiptItems([]);
     setSelectedSupplier("");
     setSearchTerm("");
@@ -288,30 +288,30 @@ const GoodsReceiptModal: React.FC<{
   };
 
   const handleAddNewProduct = (productData: any) => {
-    // Tạo sản phẩm mới với stock = 0, stock sẽ được cập nhật khi hoàn tất phiếu nhập
+    // Tï¿½o sï¿½n phï¿½m mï¿½i vï¿½i stock = 0, stock sï¿½ ï¿½ï¿½c cï¿½p nhï¿½t khi hoï¿½n tï¿½t phiï¿½u nhï¿½p
     (async () => {
       try {
-        // Nếu người dùng nhập mã thì dùng, không thì tự sinh SKU ngắn gọn thống nhất.
+        // Nï¿½u ngï¿½ï¿½i dï¿½ng nhï¿½p mï¿½ thï¿½ dï¿½ng, khï¿½ng thï¿½ tï¿½ sinh SKU ngï¿½n gï¿½n thï¿½ng nhï¿½t.
         const productSku =
           productData.barcode?.trim() || productData.sku?.trim() || generateSKU();
         const createRes = await createPartMutation.mutateAsync({
           name: productData.name,
           sku: productSku,
-          barcode: productData.barcode?.trim() || "", // Lưu lại để tìm kiếm
+          barcode: productData.barcode?.trim() || "", // Lï¿½u lï¿½i ï¿½ tï¿½m kiï¿½m
           category: productData.category,
           description: productData.description,
           warrantyPeriod:
             Number(productData.warranty || 0) > 0
-              ? `${Number(productData.warranty)} ${productData.warrantyUnit || "tháng"}`
+              ? `${Number(productData.warranty)} ${productData.warrantyUnit || "thï¿½ng"}`
               : undefined,
-          stock: { [currentBranchId]: 0 }, // Stock = 0, sẽ cập nhật khi hoàn tất phiếu nhập
+          stock: { [currentBranchId]: 0 }, // Stock = 0, sï¿½ cï¿½p nhï¿½t khi hoï¿½n tï¿½t phiï¿½u nhï¿½p
           costPrice: { [currentBranchId]: productData.importPrice },
           retailPrice: { [currentBranchId]: productData.retailPrice },
           wholesalePrice: {
             [currentBranchId]: Math.round(productData.retailPrice * 0.9),
           },
         });
-        // Xử lý response - có thể là { ok, data } hoặc trực tiếp Part object
+        // Xï¿½ lï¿½ response - cï¿½ thï¿½ lï¿½ { ok, data } hoï¿½c trï¿½c tiï¿½p Part object
         const partData = (createRes as any)?.data || createRes;
         const partId =
           partData?.id ||
@@ -330,9 +330,9 @@ const GoodsReceiptModal: React.FC<{
             wholesalePrice: productData.wholesalePrice || 0,
           },
         ]);
-        showToast.success("� t�o ph� t�ng m�:i v� th�m v�o phi�u nh�p");
+        showToast.success("ï¿½ tï¿½o phï¿½ tï¿½ng mï¿½:i vï¿½ thï¿½m vï¿½o phiï¿½u nhï¿½p");
       } catch (e: any) {
-        showToast.error(e?.message || "L�i t�o ph� t�ng m�:i");
+        showToast.error(e?.message || "Lï¿½i tï¿½o phï¿½ tï¿½ng mï¿½:i");
       } finally {
         setShowAddProductModal(false);
       }
@@ -370,10 +370,10 @@ const GoodsReceiptModal: React.FC<{
                 </button>
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    Danh m�c s�n ph�m
+                    Danh mï¿½c sï¿½n phï¿½m
                   </h2>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    Ch�n �� th�m v�o gi�
+                    Chï¿½n ï¿½ï¿½ thï¿½m vï¿½o giï¿½
                   </p>
                 </div>
               </div>
@@ -394,7 +394,7 @@ const GoodsReceiptModal: React.FC<{
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                <span>Th�m m�:i</span>
+                <span>Thï¿½m mï¿½:i</span>
               </button>
             </div>
 
@@ -419,7 +419,7 @@ const GoodsReceiptModal: React.FC<{
                   <input
                     ref={barcodeInputRef}
                     type="text"
-                    placeholder="Qu�t m� v�ch ho�c nh�p SKU �� th�m nhanh..."
+                    placeholder="Quï¿½t mï¿½ vï¿½ch hoï¿½c nhï¿½p SKU ï¿½ï¿½ thï¿½m nhanh..."
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border-2 border-blue-300 dark:border-blue-600 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 text-slate-900 dark:text-slate-100 text-sm placeholder:text-blue-500/60 dark:placeholder:text-blue-400/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-mono"
@@ -465,7 +465,7 @@ const GoodsReceiptModal: React.FC<{
                 </svg>
                 <input
                   type="text"
-                  placeholder="Ho�c t�m ki�m th� c�ng..."
+                  placeholder="Hoï¿½c tï¿½m kiï¿½m thï¿½ cï¿½ng..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
@@ -490,8 +490,8 @@ const GoodsReceiptModal: React.FC<{
                       d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                     />
                   </svg>
-                  <p className="text-sm font-medium">Kh�ng t�m th�y s�n ph�m</p>
-                  <p className="text-xs mt-1">Th� t�m ki�m v�:i t� kh�a kh�c</p>
+                  <p className="text-sm font-medium">Khï¿½ng tï¿½m thï¿½y sï¿½n phï¿½m</p>
+                  <p className="text-xs mt-1">Thï¿½ tï¿½m kiï¿½m vï¿½:i tï¿½ khï¿½a khï¿½c</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -534,7 +534,7 @@ const GoodsReceiptModal: React.FC<{
                                   : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                               }`}
                             >
-                              {part.category || "Chưa phân loại"}
+                              {part.category || "Chï¿½a phï¿½n loï¿½i"}
                             </span>
                           </div>
                         </div>
@@ -578,7 +578,7 @@ const GoodsReceiptModal: React.FC<{
                   />
                 </svg>
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Nh� cung c�p
+                  Nhï¿½ cung cï¿½p
                 </label>
                 <button
                   onClick={() => {
@@ -605,7 +605,7 @@ const GoodsReceiptModal: React.FC<{
                       d="M12 4v16m8-8H4"
                     />
                   </svg>
-                  Th�m NCC
+                  Thï¿½m NCC
                 </button>
               </div>
               <select
@@ -613,7 +613,7 @@ const GoodsReceiptModal: React.FC<{
                 onChange={(e) => setSelectedSupplier(e.target.value)}
                 className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-medium focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
               >
-                <option value="">Ch�n nh� cung c�p...</option>
+                <option value="">Chï¿½n nhï¿½ cung cï¿½p...</option>
                 {suppliers.map((s: any) => (
                   <option key={s.id} value={s.id}>
                     {s.name} {s.phone ? `" ${s.phone}` : ""}
@@ -626,12 +626,12 @@ const GoodsReceiptModal: React.FC<{
               <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
                 <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
                   <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                    Th�m nh� cung c�p
+                    Thï¿½m nhï¿½ cung cï¿½p
                   </h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium mb-1 text-slate-600 dark:text-slate-400">
-                        T�n *
+                        Tï¿½n *
                       </label>
                       <input
                         autoFocus
@@ -643,12 +643,12 @@ const GoodsReceiptModal: React.FC<{
                           }))
                         }
                         className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm"
-                        placeholder="T�n nh� cung c�p"
+                        placeholder="Tï¿½n nhï¿½ cung cï¿½p"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1 text-slate-600 dark:text-slate-400">
-                        i�!n tho�i
+                        iï¿½!n thoï¿½i
                       </label>
                       <input
                         value={newSupplier.phone}
@@ -664,7 +664,7 @@ const GoodsReceiptModal: React.FC<{
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1 text-slate-600 dark:text-slate-400">
-                        �9a ch�0
+                        ï¿½9a chï¿½0
                       </label>
                       <textarea
                         rows={2}
@@ -676,12 +676,12 @@ const GoodsReceiptModal: React.FC<{
                           }))
                         }
                         className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm resize-none"
-                        placeholder="�9a ch�0 nh� cung c�p"
+                        placeholder="ï¿½9a chï¿½0 nhï¿½ cung cï¿½p"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1 text-slate-600 dark:text-slate-400">
-                        Ghi ch�
+                        Ghi chï¿½
                       </label>
                       <textarea
                         rows={2}
@@ -693,7 +693,7 @@ const GoodsReceiptModal: React.FC<{
                           }))
                         }
                         className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm resize-none"
-                        placeholder="Th�ng tin th�m (t�y ch�n)"
+                        placeholder="Thï¿½ng tin thï¿½m (tï¿½y chï¿½n)"
                       />
                     </div>
                   </div>
@@ -702,12 +702,12 @@ const GoodsReceiptModal: React.FC<{
                       onClick={() => setShowSupplierModal(false)}
                       className="px-4 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
                     >
-                      H�y
+                      Hï¿½y
                     </button>
                     <button
                       onClick={async () => {
                         if (!newSupplier.name.trim()) {
-                          showToast.warning("Nh�p t�n nh� cung c�p");
+                          showToast.warning("Nhï¿½p tï¿½n nhï¿½ cung cï¿½p");
                           return;
                         }
                         try {
@@ -719,13 +719,13 @@ const GoodsReceiptModal: React.FC<{
                           setSelectedSupplier(res.id);
                           setShowSupplierModal(false);
                         } catch {
-                          // mutation hook �� show toast
+                          // mutation hook ï¿½ï¿½ show toast
                         }
                       }}
                       className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
                       disabled={createSupplier.isPending}
                     >
-                      {createSupplier.isPending ? "ang l�u..." : "L�u"}
+                      {createSupplier.isPending ? "ang lï¿½u..." : "Lï¿½u"}
                     </button>
                   </div>
                 </div>
@@ -750,11 +750,11 @@ const GoodsReceiptModal: React.FC<{
                     />
                   </svg>
                   <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    Gi� h�ng nh�p
+                    Giï¿½ hï¿½ng nhï¿½p
                   </h3>
                 </div>
                 <span className="text-xs text-white bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 rounded-full font-semibold shadow-lg">
-                  {receiptItems.length} s�n ph�m
+                  {receiptItems.length} sï¿½n phï¿½m
                 </span>
               </div>
 
@@ -776,10 +776,10 @@ const GoodsReceiptModal: React.FC<{
                     </svg>
                   </div>
                   <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    Gi� h�ng tr�ng
+                    Giï¿½ hï¿½ng trï¿½ng
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    Ch�n s�n ph�m b�n tr�i �� th�m v�o
+                    Chï¿½n sï¿½n phï¿½m bï¿½n trï¿½i ï¿½ï¿½ thï¿½m vï¿½o
                   </p>
                 </div>
               ) : (
@@ -807,9 +807,9 @@ const GoodsReceiptModal: React.FC<{
                         <button
                           onClick={() => removeReceiptItem(item.partId)}
                           className="w-6 h-6 flex items-center justify-center bg-red-100 dark:bg-red-900/30 rounded text-red-600 dark:text-red-400 hover:bg-red-200 flex-shrink-0"
-                          title="X�a"
+                          title="Xï¿½a"
                         >
-                          �
+                          ï¿½
                         </button>
                       </div>
 
@@ -887,7 +887,7 @@ const GoodsReceiptModal: React.FC<{
                             );
                           }}
                           className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-blue-500"
-                          placeholder="Gi� nh�p"
+                          placeholder="Giï¿½ nhï¿½p"
                         />
 
                         {/* Selling price */}
@@ -901,7 +901,7 @@ const GoodsReceiptModal: React.FC<{
                             )
                           }
                           className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-emerald-500"
-                          placeholder="Gi� b�n"
+                          placeholder="Giï¿½ bï¿½n"
                         />
 
                         {/* Total amount */}
@@ -923,7 +923,7 @@ const GoodsReceiptModal: React.FC<{
               <div className="mb-3 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white uppercase">
-                    T�"ng thanh to�n
+                    Tï¿½"ng thanh toï¿½n
                   </span>
                   <div className="text-right">
                     <div className="text-xl font-black text-white">
@@ -939,7 +939,7 @@ const GoodsReceiptModal: React.FC<{
               {/* Payment Method - Compact buttons */}
               <div className="mb-3">
                 <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Ph��ng th�c thanh to�n <span className="text-red-500">*</span>
+                  Phï¿½ï¿½ng thï¿½c thanh toï¿½n <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -950,7 +950,7 @@ const GoodsReceiptModal: React.FC<{
                         : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
                     }`}
                   >
-                    �x� Ti�n m�t
+                    ï¿½xï¿½ Tiï¿½n mï¿½t
                   </button>
                   <button
                     onClick={() => setPaymentMethod("bank")}
@@ -960,7 +960,7 @@ const GoodsReceiptModal: React.FC<{
                         : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
                     }`}
                   >
-                    �x�� Chuy�n kho�n
+                    ï¿½xï¿½ï¿½ Chuyï¿½n khoï¿½n
                   </button>
                 </div>
               </div>
@@ -971,7 +971,7 @@ const GoodsReceiptModal: React.FC<{
                   {/* Payment Type */}
                   <div className="mb-3">
                     <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      H�nh th�c thanh to�n
+                      Hï¿½nh thï¿½c thanh toï¿½n
                     </label>
                     <div className="grid grid-cols-3 gap-1.5">
                       <button
@@ -985,7 +985,7 @@ const GoodsReceiptModal: React.FC<{
                             : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
                         }`}
                       >
-                        �
+                        ï¿½
                       </button>
                       <button
                         onClick={() => setPaymentType("partial")}
@@ -995,7 +995,7 @@ const GoodsReceiptModal: React.FC<{
                             : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
                         }`}
                       >
-                        1 ph�n
+                        1 phï¿½n
                       </button>
                       <button
                         onClick={() => {
@@ -1008,7 +1008,7 @@ const GoodsReceiptModal: React.FC<{
                             : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
                         }`}
                       >
-                        C�ng n�
+                        Cï¿½ng nï¿½
                       </button>
                     </div>
                   </div>
@@ -1017,7 +1017,7 @@ const GoodsReceiptModal: React.FC<{
                   {paymentType === "partial" && (
                     <div className="mb-3">
                       <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        S� ti�n kh�ch tr�
+                        Sï¿½ tiï¿½n khï¿½ch trï¿½
                       </label>
                       <FormattedNumberInput
                         value={partialAmount}
@@ -1025,10 +1025,10 @@ const GoodsReceiptModal: React.FC<{
                           setPartialAmount(Math.max(0, Math.round(v)))
                         }
                         className="w-full px-3 py-2 border-2 border-orange-300 dark:border-orange-700 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-sm font-bold focus:border-orange-500"
-                        placeholder="Nh�p s� ti�n..."
+                        placeholder="Nhï¿½p sï¿½ tiï¿½n..."
                       />
                       <div className="mt-1.5 flex items-center justify-between text-[10px]">
-                        <span className="text-slate-500">C�n l�i:</span>
+                        <span className="text-slate-500">Cï¿½n lï¿½i:</span>
                         <span className="font-bold text-red-600 dark:text-red-400">
                           {formatCurrency(
                             Math.max(0, totalAmount - partialAmount)
@@ -1042,12 +1042,12 @@ const GoodsReceiptModal: React.FC<{
                   {paymentType && (
                     <div className="mb-3">
                       <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Lo�i h�ch to�n
+                        Loï¿½i hï¿½ch toï¿½n
                       </label>
                       <select className="w-full px-3 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:border-blue-500">
-                        <option>Mua h�ng/nh�p kho</option>
-                        <option>Nh�p tr� h�ng</option>
-                        <option>Kh�c</option>
+                        <option>Mua hï¿½ng/nhï¿½p kho</option>
+                        <option>Nhï¿½p trï¿½ hï¿½ng</option>
+                        <option>Khï¿½c</option>
                       </select>
                     </div>
                   )}
@@ -1074,21 +1074,21 @@ const GoodsReceiptModal: React.FC<{
                         d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
                       />
                     </svg>
-                    L�U NH�P
+                    Lï¿½U NHï¿½P
                   </div>
                 </button>
                 <button
                   onClick={() => {
                     if (!paymentMethod) {
-                      showToast.warning("Vui l�ng ch�n ph��ng th�c thanh to�n");
+                      showToast.warning("Vui lï¿½ng chï¿½n phï¿½ï¿½ng thï¿½c thanh toï¿½n");
                       return;
                     }
                     if (!paymentType) {
-                      showToast.warning("Vui l�ng ch�n h�nh th�c thanh to�n");
+                      showToast.warning("Vui lï¿½ng chï¿½n hï¿½nh thï¿½c thanh toï¿½n");
                       return;
                     }
                     if (paymentType === "partial" && partialAmount <= 0) {
-                      showToast.warning("Vui l�ng nh�p s� ti�n kh�ch tr�");
+                      showToast.warning("Vui lï¿½ng nhï¿½p sï¿½ tiï¿½n khï¿½ch trï¿½");
                       return;
                     }
                     handleSave();
@@ -1114,7 +1114,7 @@ const GoodsReceiptModal: React.FC<{
                         d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                       />
                     </svg>
-                    NH�P KHO
+                    NHï¿½P KHO
                   </div>
                 </button>
               </div>
@@ -1134,3 +1134,4 @@ const GoodsReceiptModal: React.FC<{
 };
 
 export default GoodsReceiptModal;
+
