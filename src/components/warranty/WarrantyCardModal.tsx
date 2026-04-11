@@ -3,6 +3,7 @@ import { X, Shield, Calendar, Package, Scan } from "lucide-react";
 import { useCreateWarrantyCard } from "../../hooks/useWarrantyRepository";
 import { showToast } from "../../utils/toast";
 import { ScannerModal } from "../common/ScannerModal";
+import { supabase } from "../../supabaseClient";
 
 interface WarrantyCardModalProps {
     isOpen: boolean;
@@ -15,6 +16,7 @@ interface WarrantyCardModalProps {
 }
 
 type WarrantyFormData = {
+    customerId?: string;
     customerName: string;
     customerPhone: string;
     deviceModel: string;
@@ -29,30 +31,72 @@ type WarrantyFormData = {
 const CustomerInfoSection: React.FC<{
     formData: WarrantyFormData;
     setFormData: React.Dispatch<React.SetStateAction<WarrantyFormData>>;
-}> = ({ formData, setFormData }) => (
+    customerSuggestions: Array<{ id: string; name: string; phone?: string | null }>;
+    showCustomerSuggestions: boolean;
+    isSearchingCustomer: boolean;
+    onSelectCustomer: (customer: { id: string; name: string; phone?: string | null }) => void;
+}> = ({
+    formData,
+    setFormData,
+    customerSuggestions,
+    showCustomerSuggestions,
+    isSearchingCustomer,
+    onSelectCustomer,
+}) => (
     <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
         <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">
             Thông tin khách hàng
         </h4>
-        <div className="space-y-2">
+        <div className="space-y-2 relative">
             <input
                 type="text"
                 value={formData.customerName}
                 onChange={(e) =>
-                    setFormData({ ...formData, customerName: e.target.value })
+                    setFormData({
+                        ...formData,
+                        customerId: undefined,
+                        customerName: e.target.value,
+                    })
                 }
-                placeholder="Tên khách hàng"
+                onFocus={() => setShowCustomerSuggestions(true)}
+                placeholder="Tên khách hàng *"
                 className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
             />
             <input
                 type="tel"
                 value={formData.customerPhone}
                 onChange={(e) =>
-                    setFormData({ ...formData, customerPhone: e.target.value })
+                    setFormData({
+                        ...formData,
+                        customerId: undefined,
+                        customerPhone: e.target.value,
+                    })
                 }
-                placeholder="Số điện thoại"
+                onFocus={() => setShowCustomerSuggestions(true)}
+                placeholder="Số điện thoại *"
                 className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
             />
+            {showCustomerSuggestions && (formData.customerName.trim() || formData.customerPhone.trim()) && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                    {isSearchingCustomer ? (
+                        <div className="px-3 py-2 text-xs text-slate-500">Đang tìm khách hàng...</div>
+                    ) : customerSuggestions.length > 0 ? (
+                        customerSuggestions.map((customer) => (
+                            <button
+                                key={customer.id}
+                                type="button"
+                                onClick={() => onSelectCustomer(customer)}
+                                className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 border-b last:border-b-0 border-slate-100 dark:border-slate-800"
+                            >
+                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{customer.name || "Khách hàng"}</div>
+                                <div className="text-xs text-slate-500">{customer.phone || "Không có SĐT"}</div>
+                            </button>
+                        ))
+                    ) : (
+                        <div className="px-3 py-2 text-xs text-slate-500">Không thấy khách hàng có sẵn trong danh sách.</div>
+                    )}
+                </div>
+            )}
         </div>
     </div>
 );
@@ -110,6 +154,7 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
     workOrderId,
 }) => {
     const [formData, setFormData] = useState<WarrantyFormData>({
+        customerId: undefined,
         customerName,
         customerPhone,
         deviceModel,
@@ -122,17 +167,59 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
     });
 
     const [showScanner, setShowScanner] = useState(false);
+    const [customerSuggestions, setCustomerSuggestions] = useState<Array<{ id: string; name: string; phone?: string | null }>>([]);
+    const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+    const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
 
     // Update state when props change
     useEffect(() => {
         setFormData(prev => ({
             ...prev,
+            customerId: undefined,
             customerName,
             customerPhone,
             deviceModel,
             imeiSerial,
         }));
     }, [customerName, customerPhone, deviceModel, imeiSerial]);
+
+    useEffect(() => {
+        const keyword = formData.customerPhone.trim() || formData.customerName.trim();
+        if (!keyword || formData.customerId) {
+            setCustomerSuggestions([]);
+            return;
+        }
+
+        let active = true;
+        const timer = setTimeout(async () => {
+            setIsSearchingCustomer(true);
+            const { data, error } = await supabase
+                .from("customers")
+                .select("id, name, phone")
+                .or(`phone.ilike.%${keyword}%,name.ilike.%${keyword}%`)
+                .limit(8);
+
+            if (!active) return;
+            if (error || !data) {
+                setCustomerSuggestions([]);
+            } else {
+                setCustomerSuggestions(data as Array<{ id: string; name: string; phone?: string | null }>);
+            }
+            setIsSearchingCustomer(false);
+        }, 250);
+
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [formData.customerName, formData.customerPhone, formData.customerId]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setShowCustomerSuggestions(false);
+            setCustomerSuggestions([]);
+        }
+    }, [isOpen]);
 
     const createWarrantyMutation = useCreateWarrantyCard();
 
@@ -144,6 +231,7 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
 
         try {
             await createWarrantyMutation.mutateAsync({
+                customer_id: formData.customerId,
                 customer_name: formData.customerName,
                 customer_phone: formData.customerPhone,
                 device_model: formData.deviceModel,
@@ -160,7 +248,14 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
             onClose();
         } catch (error) {
             console.error("Error creating warranty:", error);
-            showToast.error("Lỗi khi tạo phiếu bảo hành");
+            const rawError = error as any;
+            const errorMessage =
+                (error instanceof Error && error.message) ||
+                rawError?.message ||
+                rawError?.details ||
+                rawError?.hint ||
+                "Lỗi khi tạo phiếu bảo hành";
+            showToast.error(errorMessage);
         }
     };
 
@@ -190,6 +285,18 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
                     <CustomerInfoSection
                         formData={formData}
                         setFormData={setFormData}
+                        customerSuggestions={customerSuggestions}
+                        showCustomerSuggestions={showCustomerSuggestions}
+                        isSearchingCustomer={isSearchingCustomer}
+                        onSelectCustomer={(customer) => {
+                            setFormData((prev) => ({
+                                ...prev,
+                                customerId: customer.id,
+                                customerName: customer.name || prev.customerName,
+                                customerPhone: customer.phone || prev.customerPhone,
+                            }));
+                            setShowCustomerSuggestions(false);
+                        }}
                     />
 
                     <DeviceInfoSection
@@ -284,7 +391,11 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={!formData.deviceModel || createWarrantyMutation.isPending}
+                        disabled={
+                            !formData.deviceModel ||
+                            (!formData.customerName.trim() && !formData.customerPhone.trim()) ||
+                            createWarrantyMutation.isPending
+                        }
                         className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-blue-500/20"
                     >
                         {createWarrantyMutation.isPending ? "Đang tạo..." : "✓ Cấp Phiếu BH"}

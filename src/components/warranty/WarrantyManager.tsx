@@ -5,6 +5,7 @@ import {
     useWarrantyClaims,
     useCreateWarrantyClaim,
     useUpdateWarrantyStatus,
+    useDeleteWarrantyCard,
     useUpdateWarrantyClaimStatus,
     type WarrantyCard,
     type WarrantyClaim,
@@ -22,6 +23,7 @@ export const WarrantyManager: React.FC = () => {
     const { data: warrantyClaims, isLoading: claimsLoading } = useWarrantyClaims();
     const createClaimMutation = useCreateWarrantyClaim();
     const updateWarrantyStatusMutation = useUpdateWarrantyStatus();
+    const deleteWarrantyCardMutation = useDeleteWarrantyCard();
     const updateWarrantyClaimStatusMutation = useUpdateWarrantyClaimStatus();
 
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -32,6 +34,7 @@ export const WarrantyManager: React.FC = () => {
     const [claimIssueText, setClaimIssueText] = useState("");
     const canCreateClaim = canDo(profile, "warranty.claim.create");
     const canManageClaim = canDo(profile, "warranty.claim.manage");
+    const canDeleteCard = canDo(profile, "warranty.card.delete");
 
     const actorName =
         profile?.name ||
@@ -344,6 +347,25 @@ export const WarrantyManager: React.FC = () => {
                                             className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 dark:border-rose-500/40 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                                         >
                                             Vô hiệu
+                                        </button>
+                                    )}
+                                    {canDeleteCard && (
+                                        <button
+                                            onClick={async () => {
+                                                const confirmed = window.confirm("Xóa vĩnh viễn phiếu bảo hành này?");
+                                                if (!confirmed) return;
+                                                try {
+                                                    await deleteWarrantyCardMutation.mutateAsync(card.id);
+                                                    showToast.success("Đã xóa phiếu bảo hành.");
+                                                } catch (error) {
+                                                    console.error("Delete warranty card failed", error);
+                                                    showToast.error("Không thể xóa phiếu bảo hành.");
+                                                }
+                                            }}
+                                            disabled={deleteWarrantyCardMutation.isPending}
+                                            className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-red-500 text-red-600 dark:text-red-300 dark:border-red-500/60 hover:bg-red-50 dark:hover:bg-red-500/10"
+                                        >
+                                            Xóa
                                         </button>
                                     )}
                                 </div>

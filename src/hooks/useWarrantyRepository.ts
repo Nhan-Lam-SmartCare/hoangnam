@@ -45,6 +45,7 @@ export interface WarrantyClaim {
 }
 
 export interface CreateWarrantyCardInput {
+    customer_id?: string;
     customer_name?: string;
     customer_phone?: string;
     device_model: string;
@@ -56,6 +57,156 @@ export interface CreateWarrantyCardInput {
     work_order_id?: string;
     notes?: string;
 }
+
+const WARRANTY_CARD_TABLE_CANDIDATES = [
+    "warranty_cards",
+    "warrantycards",
+    "warrantyCards",
+] as const;
+
+const WARRANTY_CLAIM_TABLE_CANDIDATES = [
+    "warranty_claims",
+    "warrantyclaims",
+    "warrantyClaims",
+] as const;
+
+const isMissingTableError = (error: any, tableName?: string): boolean => {
+    const code = String(error?.code || "").toUpperCase();
+    const message = String(error?.message || "").toLowerCase();
+    if (code !== "PGRST205") return false;
+    if (!tableName) return true;
+    return message.includes(String(tableName).toLowerCase());
+};
+
+const withPreferredTable = (
+    candidates: readonly string[],
+    preferredTable?: string | null
+): string[] => {
+    if (!preferredTable) return [...candidates];
+    const filtered = candidates.filter((name) => name !== preferredTable);
+    return [preferredTable, ...filtered];
+};
+
+const selectWarrantyCardsRows = async (preferredTable?: string | null) => {
+    const tableNames = withPreferredTable(WARRANTY_CARD_TABLE_CANDIDATES, preferredTable);
+    let lastMissingTableError: any = null;
+
+    for (const tableName of tableNames) {
+        const result = await supabase
+            .from(tableName)
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (!result.error) {
+            return { data: (result.data || []) as WarrantyCard[], error: null, tableName };
+        }
+
+        if (isMissingTableError(result.error, tableName)) {
+            lastMissingTableError = result.error;
+            continue;
+        }
+
+        return { data: null as WarrantyCard[] | null, error: result.error, tableName };
+    }
+
+    return {
+        data: null as WarrantyCard[] | null,
+        error: lastMissingTableError,
+        tableName: tableNames[0] || "warranty_cards",
+    };
+};
+
+const insertWarrantyCardRow = async (
+    payload: Record<string, any>,
+    preferredTable?: string | null
+) => {
+    const tableNames = withPreferredTable(WARRANTY_CARD_TABLE_CANDIDATES, preferredTable);
+    let lastMissingTableError: any = null;
+
+    for (const tableName of tableNames) {
+        const result = await supabase
+            .from(tableName)
+            .insert(payload)
+            .select()
+            .single();
+
+        if (!result.error) {
+            return { data: result.data as WarrantyCard, error: null, tableName };
+        }
+
+        if (isMissingTableError(result.error, tableName)) {
+            lastMissingTableError = result.error;
+            continue;
+        }
+
+        return { data: null as WarrantyCard | null, error: result.error, tableName };
+    }
+
+    return {
+        data: null as WarrantyCard | null,
+        error: lastMissingTableError,
+        tableName: tableNames[0] || "warranty_cards",
+    };
+};
+
+const updateWarrantyCardRow = async (
+    id: string,
+    patch: Record<string, any>,
+    preferredTable?: string | null
+) => {
+    const tableNames = withPreferredTable(WARRANTY_CARD_TABLE_CANDIDATES, preferredTable);
+    let lastMissingTableError: any = null;
+
+    for (const tableName of tableNames) {
+        const result = await supabase
+            .from(tableName)
+            .update(patch)
+            .eq("id", id)
+            .select()
+            .single();
+
+        if (!result.error) {
+            return { data: result.data, error: null, tableName };
+        }
+
+        if (isMissingTableError(result.error, tableName)) {
+            lastMissingTableError = result.error;
+            continue;
+        }
+
+        return { data: null, error: result.error, tableName };
+    }
+
+    return { data: null, error: lastMissingTableError, tableName: tableNames[0] || "warranty_cards" };
+};
+
+const deleteWarrantyCardRow = async (
+    id: string,
+    preferredTable?: string | null
+) => {
+    const tableNames = withPreferredTable(WARRANTY_CARD_TABLE_CANDIDATES, preferredTable);
+    let lastMissingTableError: any = null;
+
+    for (const tableName of tableNames) {
+        const result = await supabase
+            .from(tableName)
+            .delete()
+            .eq("id", id);
+
+        if (!result.error) {
+            return { ok: true, error: null, tableName };
+        }
+
+        if (isMissingTableError(result.error, tableName)) {
+            lastMissingTableError = result.error;
+            continue;
+        }
+
+        return { ok: false, error: result.error, tableName };
+    }
+
+    return { ok: false, error: lastMissingTableError, tableName: tableNames[0] || "warranty_cards" };
+};
 
 const parseWarrantyMonths = (raw: unknown): number => {
     const text = String(raw || "").trim().toLowerCase();
@@ -186,11 +337,7 @@ export const useWarrantyCards = () => {
     return useQuery({
         queryKey: ["warranty_cards", profileBranchId || "all"],
         queryFn: async () => {
-            const query = supabase
-                .from("warranty_cards")
-                .select("*")
-                .order("created_at", { ascending: false });
-            const { data, error } = await query;
+            const { data, error, tableName } = await selectWarrantyCardsRows();
 
             if (error) {
                 const fallbackRows = await deriveWarrantyCardsFromWorkOrders(profileBranchId ? String(profileBranchId) : null);
@@ -203,10 +350,7 @@ export const useWarrantyCards = () => {
                 if (rows.length === 0) {
                     const refill = await backfillWarrantyCardsForExistingWorkOrders();
                     if (refill.ok && refill.data.created > 0) {
-                        const retry = await supabase
-                            .from("warranty_cards")
-                            .select("*")
-                            .order("created_at", { ascending: false });
+                        const retry = await selectWarrantyCardsRows(tableName);
                         if (!retry.error && retry.data) {
                             return retry.data as WarrantyCard[];
                         }
@@ -236,10 +380,7 @@ export const useWarrantyCards = () => {
                     refill = await backfillWarrantyCardsForExistingWorkOrders();
                 }
                 if (refill.ok && refill.data.created > 0) {
-                    const retry = await supabase
-                        .from("warranty_cards")
-                        .select("*")
-                        .order("created_at", { ascending: false });
+                    const retry = await selectWarrantyCardsRows(tableName);
                     if (!retry.error && retry.data) {
                         return (retry.data as WarrantyCard[]).filter((row: any) => {
                             const rowBranchId =
@@ -289,38 +430,269 @@ export const useCreateWarrantyCard = () => {
     const { profile } = useAuth();
     const queryClient = useQueryClient();
 
+    const getMissingColumnNameFromError = (error: any): string | null => {
+        const code = String(error?.code || "").toUpperCase();
+        const message = String(error?.message || "");
+        if (code !== "PGRST204" && !message.toLowerCase().includes("column")) {
+            return null;
+        }
+
+        const quoted = message.match(/column\s+["']?([a-zA-Z0-9_]+)["']?/i);
+        if (quoted?.[1]) return quoted[1];
+        const direct = message.match(/'([a-zA-Z0-9_]+)'/);
+        if (direct?.[1]) return direct[1];
+        return null;
+    };
+
+    const getNotNullColumnNameFromError = (error: any): string | null => {
+        const code = String(error?.code || "").toUpperCase();
+        const message = String(error?.message || "");
+        if (code !== "23502" && !message.toLowerCase().includes("null value in column")) {
+            return null;
+        }
+        const match = message.match(/column\s+"([a-zA-Z0-9_]+)"/i);
+        return match?.[1] || null;
+    };
+
+    const removeMissingColumnKeys = (record: Record<string, any>, missingColumn: string): number => {
+        const target = String(missingColumn || "").toLowerCase();
+        if (!target) return 0;
+        let removed = 0;
+        for (const key of Object.keys(record)) {
+            if (key.toLowerCase() === target) {
+                delete record[key];
+                removed += 1;
+            }
+        }
+        return removed;
+    };
+
+    const applyNotNullFallback = (
+        payload: Record<string, any>,
+        columnName: string,
+        customerId: string
+    ): boolean => {
+        const col = String(columnName || "").toLowerCase();
+        if (!col) return false;
+
+        if (col === "customer_id" || col === "customerid") {
+            payload[columnName] = customerId;
+            return true;
+        }
+        if (col === "status") {
+            payload[columnName] = "active";
+            return true;
+        }
+        if (col === "branch_id" || col === "branchid") {
+            payload[columnName] = profile?.branch_id || "CN1";
+            return true;
+        }
+        return false;
+    };
+
+    const formatBackendError = (error: any): string => {
+        const code = String(error?.code || "").trim();
+        const message = String(error?.message || "").trim();
+        const details = String(error?.details || "").trim();
+        const hint = String(error?.hint || "").trim();
+
+                if (code === "PGRST205") {
+                    return "Thiếu bảng bảo hành trên Supabase (warranty_cards). Vui lòng chạy script sql/2026-04-11_create_warranty_tables.sql trong SQL Editor.";
+                }
+
+        const parts = [message, details, hint].filter(Boolean);
+        if (parts.length === 0 && code) {
+            return `Lỗi tạo phiếu bảo hành (${code}).`;
+        }
+        if (code) {
+            return `${parts.join(" | ")} (${code})`;
+        }
+        return parts.join(" | ") || "Không thể tạo phiếu bảo hành.";
+    };
+
+    const resolveCustomerId = async (input: CreateWarrantyCardInput): Promise<string | null> => {
+        if (input.customer_id) {
+            return input.customer_id;
+        }
+
+        const rawName = String(input.customer_name || "").trim();
+        const rawPhone = String(input.customer_phone || "").trim();
+        if (!rawName && !rawPhone) {
+            return null;
+        }
+
+        if (rawPhone) {
+            const byPhone = await supabase
+                .from("customers")
+                .select("id, name, branch_id")
+                .eq("phone", rawPhone)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (!byPhone.error && byPhone.data?.id) {
+                const patch: Record<string, any> = {
+                    lastvisit: new Date().toISOString(),
+                };
+                if (rawName && String(byPhone.data.name || "").trim() !== rawName) {
+                    patch.name = rawName;
+                }
+                if (!byPhone.data.branch_id && profile?.branch_id) {
+                    patch.branch_id = profile.branch_id;
+                }
+                await supabase.from("customers").update(patch).eq("id", byPhone.data.id);
+                return String(byPhone.data.id);
+            }
+        }
+
+        if (rawName) {
+            const byName = await supabase
+                .from("customers")
+                .select("id, phone, branch_id")
+                .ilike("name", rawName)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (!byName.error && byName.data?.id) {
+                const patch: Record<string, any> = {
+                    lastvisit: new Date().toISOString(),
+                };
+                if (rawPhone && !String(byName.data.phone || "").trim()) {
+                    patch.phone = rawPhone;
+                }
+                if (!byName.data.branch_id && profile?.branch_id) {
+                    patch.branch_id = profile.branch_id;
+                }
+                await supabase.from("customers").update(patch).eq("id", byName.data.id);
+                return String(byName.data.id);
+            }
+        }
+
+        const newCustomerId = `CUS-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+        const payloadCandidates: Array<Record<string, any>> = [
+            {
+                id: newCustomerId,
+                name: rawName || "Khách hàng",
+                phone: rawPhone || null,
+                branch_id: profile?.branch_id || null,
+                status: "active",
+                segment: "New",
+                lastvisit: new Date().toISOString(),
+            },
+            {
+                id: newCustomerId,
+                name: rawName || "Khách hàng",
+                phone: rawPhone || null,
+                branch_id: profile?.branch_id || null,
+            },
+            {
+                id: newCustomerId,
+                name: rawName || "Khách hàng",
+                phone: rawPhone || null,
+            },
+        ];
+
+        for (const payload of payloadCandidates) {
+            const created = await supabase
+                .from("customers")
+                .insert([payload])
+                .select("id")
+                .maybeSingle();
+
+            if (!created.error && created.data?.id) {
+                return String(created.data.id);
+            }
+
+            if (String(created.error?.code || "") === "23505" && rawPhone) {
+                const conflict = await supabase
+                    .from("customers")
+                    .select("id")
+                    .eq("phone", rawPhone)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                if (!conflict.error && conflict.data?.id) {
+                    return String(conflict.data.id);
+                }
+            }
+        }
+
+        return null;
+    };
+
     return useMutation({
         mutationFn: async (input: CreateWarrantyCardInput) => {
+            if (!String(input.customer_name || "").trim() && !String(input.customer_phone || "").trim()) {
+                throw new Error("Vui lòng nhập tên hoặc số điện thoại để liên kết khách hàng trước khi cấp phiếu bảo hành.");
+            }
+
+            const customerId = await resolveCustomerId(input);
+            if (!customerId) {
+                throw new Error("Không thể liên kết khách hàng. Vui lòng kiểm tra lại tên/số điện thoại và thử lại.");
+            }
+
             const warrantyStartDate = new Date();
             const warrantyEndDate = new Date();
             warrantyEndDate.setMonth(warrantyEndDate.getMonth() + input.warranty_period_months);
 
-            const { data, error } = await supabase
-                .from("warranty_cards")
-                .insert({
-                    customer_name: input.customer_name,
-                    customer_phone: input.customer_phone,
-                    device_model: input.device_model,
-                    imei_serial: input.imei_serial,
-                    warranty_start_date: warrantyStartDate.toISOString().split('T')[0],
-                    warranty_end_date: warrantyEndDate.toISOString().split('T')[0],
-                    warranty_period_months: input.warranty_period_months,
-                    warranty_type: input.warranty_type || 'standard',
-                    covered_parts: input.covered_parts || ['screen', 'battery', 'mainboard'],
-                    coverage_terms: input.coverage_terms,
-                    work_order_id: input.work_order_id,
-                    issued_by: profile?.email,
-                    branch_id: profile?.branch_id,
-                    notes: input.notes,
-                })
-                .select()
-                .single();
+            const insertPayload: Record<string, any> = {
+                customer_id: customerId,
+                customer_name: input.customer_name,
+                customer_phone: input.customer_phone,
+                device_model: input.device_model,
+                imei_serial: input.imei_serial,
+                warranty_start_date: warrantyStartDate.toISOString().split('T')[0],
+                warranty_end_date: warrantyEndDate.toISOString().split('T')[0],
+                warranty_period_months: input.warranty_period_months,
+                warranty_type: input.warranty_type || 'standard',
+                covered_parts: input.covered_parts || ['screen', 'battery', 'mainboard'],
+                coverage_terms: input.coverage_terms,
+                work_order_id: input.work_order_id,
+                issued_by: profile?.email,
+                branch_id: profile?.branch_id || 'CN1',
+                status: 'active',
+                notes: input.notes,
+            };
 
-            if (error) throw error;
-            return data as WarrantyCard;
+            for (const key of Object.keys(insertPayload)) {
+                if (insertPayload[key] === undefined) {
+                    delete insertPayload[key];
+                }
+            }
+
+            const workingPayload = { ...insertPayload };
+            let result = await insertWarrantyCardRow(workingPayload);
+            const activeTable = result.tableName;
+
+            for (let i = 0; i < 20 && result.error; i += 1) {
+                const missingColumn = getMissingColumnNameFromError(result.error);
+                if (missingColumn) {
+                    const removed = removeMissingColumnKeys(workingPayload, missingColumn);
+                    if (removed > 0) {
+                        result = await insertWarrantyCardRow(workingPayload, activeTable);
+                        continue;
+                    }
+                }
+
+                const notNullColumn = getNotNullColumnNameFromError(result.error);
+                if (notNullColumn) {
+                    const patched = applyNotNullFallback(workingPayload, notNullColumn, customerId);
+                    if (patched) {
+                        result = await insertWarrantyCardRow(workingPayload, activeTable);
+                        continue;
+                    }
+                }
+
+                break;
+            }
+
+            if (result.error) {
+                throw new Error(formatBackendError(result.error));
+            }
+            return result.data as WarrantyCard;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["warranty_cards"] });
+            queryClient.invalidateQueries({ queryKey: ["customers"] });
         },
     });
 };
@@ -387,18 +759,30 @@ export const useWarrantyClaims = (warrantyCardId?: string) => {
     return useQuery({
         queryKey: ["warranty_claims", warrantyCardId],
         queryFn: async () => {
-            let query = supabase
-                .from("warranty_claims")
-                .select("*, warranty_cards(*), work_orders(*)")
-                .order("created_at", { ascending: false });
+            let lastMissingTableError: any = null;
+            for (const tableName of WARRANTY_CLAIM_TABLE_CANDIDATES) {
+                let query = supabase
+                    .from(tableName)
+                    .select("*, warranty_cards(*), work_orders(*)")
+                    .order("created_at", { ascending: false });
 
-            if (warrantyCardId) {
-                query = query.eq("warranty_card_id", warrantyCardId);
+                if (warrantyCardId) {
+                    query = query.eq("warranty_card_id", warrantyCardId);
+                }
+
+                const { data, error } = await query;
+                if (!error) return data;
+
+                if (isMissingTableError(error, tableName)) {
+                    lastMissingTableError = error;
+                    continue;
+                }
+
+                throw error;
             }
 
-            const { data, error } = await query;
-            if (error) throw error;
-            return data;
+            if (lastMissingTableError) return [];
+            return [];
         },
         enabled: true,
     });
@@ -418,18 +802,45 @@ export const useUpdateWarrantyStatus = () => {
             status: 'active' | 'expired' | 'voided' | 'claimed';
             notes?: string;
         }) => {
-            const { data, error } = await supabase
-                .from("warranty_cards")
-                .update({ status, notes, updated_at: new Date().toISOString() })
-                .eq("id", id)
-                .select()
-                .single();
+            const { data, error } = await updateWarrantyCardRow(
+                id,
+                { status, notes, updated_at: new Date().toISOString() }
+            );
 
             if (error) throw error;
             return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["warranty_cards"] });
+        },
+    });
+};
+
+export const useDeleteWarrantyCard = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            // Best effort: clear related claims first for schemas without ON DELETE CASCADE.
+            for (const tableName of WARRANTY_CLAIM_TABLE_CANDIDATES) {
+                const claimDelete = await supabase
+                    .from(tableName)
+                    .delete()
+                    .eq("warranty_card_id", id);
+
+                if (!claimDelete.error) break;
+                if (isMissingTableError(claimDelete.error, tableName)) continue;
+            }
+
+            const result = await deleteWarrantyCardRow(id);
+            if (!result.ok) {
+                throw result.error || new Error("Không thể xóa phiếu bảo hành.");
+            }
+            return true;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["warranty_cards"] });
+            queryClient.invalidateQueries({ queryKey: ["warranty_claims"] });
         },
     });
 };

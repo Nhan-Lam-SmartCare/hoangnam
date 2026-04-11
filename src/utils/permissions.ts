@@ -3,6 +3,7 @@ export type UserRole = "owner" | "manager" | "staff";
 export type AppAction =
   | "sale.create"
   | "sale.delete"
+  | "warranty.card.delete"
   | "warranty.claim.create"
   | "warranty.claim.manage"
   | "work_order.create"
@@ -50,6 +51,11 @@ export const APP_ACTION_OPTIONS: Array<{
 }> = [
   { key: "sale.create", label: "Tạo phiếu bán hàng", group: "sales" },
   { key: "sale.delete", label: "Xóa phiếu bán hàng", group: "sales" },
+  {
+    key: "warranty.card.delete",
+    label: "Xóa phiếu bảo hành",
+    group: "service",
+  },
   {
     key: "warranty.claim.create",
     label: "Tiếp nhận yêu cầu bảo hành",
@@ -101,6 +107,7 @@ const POLICIES: Record<AppAction, UserRole[]> = {
   // Staff có thể tạo sale và work order
   "sale.create": ["owner", "manager", "staff"],
   "sale.delete": ["owner", "manager"],
+  "warranty.card.delete": ["owner"],
   "warranty.claim.create": ["owner", "manager", "staff"],
   "warranty.claim.manage": ["owner", "manager"],
   "work_order.create": ["owner", "manager", "staff"],
