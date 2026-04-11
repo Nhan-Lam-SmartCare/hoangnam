@@ -31,6 +31,7 @@ type WarrantyFormData = {
 const CustomerInfoSection: React.FC<{
     formData: WarrantyFormData;
     setFormData: React.Dispatch<React.SetStateAction<WarrantyFormData>>;
+    setShowCustomerSuggestions: React.Dispatch<React.SetStateAction<boolean>>;
     customerSuggestions: Array<{ id: string; name: string; phone?: string | null }>;
     showCustomerSuggestions: boolean;
     isSearchingCustomer: boolean;
@@ -38,6 +39,7 @@ const CustomerInfoSection: React.FC<{
 }> = ({
     formData,
     setFormData,
+    setShowCustomerSuggestions,
     customerSuggestions,
     showCustomerSuggestions,
     isSearchingCustomer,
@@ -285,6 +287,7 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
                     <CustomerInfoSection
                         formData={formData}
                         setFormData={setFormData}
+                        setShowCustomerSuggestions={setShowCustomerSuggestions}
                         customerSuggestions={customerSuggestions}
                         showCustomerSuggestions={showCustomerSuggestions}
                         isSearchingCustomer={isSearchingCustomer}
