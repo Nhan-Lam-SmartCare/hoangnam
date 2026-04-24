@@ -21,15 +21,47 @@ export const useStoreSettings = () => {
     return useQuery({
         queryKey: ["store_settings"],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data: defaultData, error: defaultError } = await supabase
                 .from("store_settings")
                 .select("*")
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .single();
+                .eq("id", "default")
+                .maybeSingle();
 
-            if (error) throw error;
-            return data as StoreSettings;
+            if (defaultError) {
+                console.warn("[useStoreSettings] Could not read default row:", defaultError);
+            }
+
+            let data = defaultData;
+            if (!data) {
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from("store_settings")
+                    .select("*")
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (fallbackError) {
+                    console.warn("[useStoreSettings] Could not read fallback row:", fallbackError);
+                }
+                data = fallbackData;
+            }
+
+            if (!data) {
+                return {
+                    id: "default",
+                    store_name: "MotoCare",
+                } as StoreSettings;
+            }
+
+            const normalized: any = { ...data };
+            if (!normalized.store_name && normalized.storeName) normalized.store_name = normalized.storeName;
+            if (!normalized.address && normalized.storeAddress) normalized.address = normalized.storeAddress;
+            if (!normalized.phone && normalized.storePhone) normalized.phone = normalized.storePhone;
+            if (!normalized.email && normalized.storeEmail) normalized.email = normalized.storeEmail;
+            if (!normalized.logo_url && normalized.logoUrl) normalized.logo_url = normalized.logoUrl;
+            if (!normalized.bank_qr_url && normalized.bankQrUrl) normalized.bank_qr_url = normalized.bankQrUrl;
+
+            return normalized as StoreSettings;
         },
         staleTime: 1000 * 60 * 10, // Cache for 10 minutes
     });
