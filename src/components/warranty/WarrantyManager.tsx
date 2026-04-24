@@ -335,13 +335,13 @@ export const WarrantyManager: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-[#151521] pb-20">
             {/* Header */}
             <div className="sticky top-0 z-10 bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 text-white px-4 py-4 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
                             <Shield className="w-6 h-6" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold">Quản Lý Bảo Hành</h1>
+                            <h1 className="text-lg sm:text-xl font-bold leading-tight">Quản Lý Bảo Hành</h1>
                             <p className="text-xs text-emerald-100">
                                 {activeTab === "cards"
                                     ? `${filteredCards?.length || 0} phiếu bảo hành`
@@ -352,7 +352,7 @@ export const WarrantyManager: React.FC = () => {
                     {activeTab === "cards" && (
                         <button
                             onClick={() => setShowCreateModal(true)}
-                            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-bold text-sm flex items-center gap-2 transition-all"
+                            className="shrink-0 px-3 py-2 bg-white/20 hover:bg-white/30 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all"
                         >
                             <Plus className="w-4 h-4" />
                             Tạo mới
@@ -397,7 +397,7 @@ export const WarrantyManager: React.FC = () => {
 
                 {/* Status Filter */}
                 {activeTab === "cards" && (
-                <div className="flex gap-2 mt-3">
+                <div className="flex flex-wrap gap-2 mt-3">
                     {[
                         { value: "all", label: "Tất cả" },
                         { value: "active", label: "Còn hạn" },
@@ -434,22 +434,24 @@ export const WarrantyManager: React.FC = () => {
                             className="bg-white dark:bg-[#1e1e2d] rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700"
                         >
                             {/* Header */}
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-bold text-slate-900 dark:text-white">
+                            <div className="mb-3 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                    <div className="flex items-start gap-2 mb-1">
+                                        <h3 className="font-bold text-slate-900 dark:text-white leading-tight break-words">
                                             {card.device_model}
                                         </h3>
                                         {getStatusBadge(card.status, card.warranty_end_date)}
                                     </div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 break-all">
                                         IMEI: {card.imei_serial || "N/A"}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                </div>
+                                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5">
                                     <button
                                         onClick={() => handlePrintWarrantyReceipt(card)}
-                                        className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-cyan-300 text-cyan-700 dark:text-cyan-300 dark:border-cyan-500/40 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 inline-flex items-center gap-1"
+                                        className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-cyan-300 text-cyan-700 dark:text-cyan-300 dark:border-cyan-500/40 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 inline-flex items-center justify-center gap-1"
                                     >
                                         <Printer className="w-3.5 h-3.5" /> In phiếu
                                     </button>
@@ -463,7 +465,7 @@ export const WarrantyManager: React.FC = () => {
                                             setClaimIssueText("");
                                         }}
                                         disabled={!canCreateClaim}
-                                        className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                                        className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-500/10"
                                     >
                                         Tiếp nhận BH
                                     </button>
@@ -478,7 +480,7 @@ export const WarrantyManager: React.FC = () => {
                                                 }
                                             }}
                                             disabled={!canManageClaim}
-                                            className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 dark:border-rose-500/40 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                                            className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 dark:border-rose-500/40 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                                         >
                                             Vô hiệu
                                         </button>
@@ -497,7 +499,7 @@ export const WarrantyManager: React.FC = () => {
                                                 }
                                             }}
                                             disabled={deleteWarrantyCardMutation.isPending}
-                                            className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-red-500 text-red-600 dark:text-red-300 dark:border-red-500/60 hover:bg-red-50 dark:hover:bg-red-500/10"
+                                            className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-red-500 text-red-600 dark:text-red-300 dark:border-red-500/60 hover:bg-red-50 dark:hover:bg-red-500/10"
                                         >
                                             Xóa
                                         </button>
@@ -506,13 +508,13 @@ export const WarrantyManager: React.FC = () => {
                             </div>
 
                             {/* Customer Info */}
-                            <div className="flex items-center gap-2 mb-3 text-sm">
+                            <div className="flex items-center gap-2 mb-3 text-sm min-w-0">
                                 <span className="text-slate-500 dark:text-slate-400">👤</span>
-                                <span className="text-slate-900 dark:text-white font-medium">
+                                <span className="text-slate-900 dark:text-white font-medium truncate">
                                     {card.customer_name || "N/A"}
                                 </span>
                                 <span className="text-slate-400">•</span>
-                                <span className="text-slate-600 dark:text-slate-300">
+                                <span className="text-slate-600 dark:text-slate-300 truncate">
                                     {card.customer_phone || "N/A"}
                                 </span>
                             </div>
@@ -563,7 +565,7 @@ export const WarrantyManager: React.FC = () => {
                                         {card.covered_parts.map((part: string, idx: number) => (
                                             <span
                                                 key={idx}
-                                                className="px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg text-xs"
+                                                className="px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg text-xs break-words"
                                             >
                                                 {part}
                                             </span>
