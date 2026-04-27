@@ -195,6 +195,45 @@ export default function ServiceManager() {
   const displayEmployees =
     fetchedEmployees && fetchedEmployees.length > 0 ? fetchedEmployees : employees;
   const displayWorkOrders = fetchedWorkOrders || workOrders;
+  const defaultStaffTechnicianName = useMemo(() => {
+    if (profile?.role !== USER_ROLES.STAFF) return "";
+
+    const normalizedProfileEmail = String(profile?.email || "")
+      .trim()
+      .toLowerCase();
+    const normalizedProfileName = String(profile?.name || profile?.full_name || "")
+      .trim()
+      .toLowerCase();
+
+    if (!normalizedProfileEmail && !normalizedProfileName) return "";
+
+    const activeEmployees = (displayEmployees || []).filter(
+      (emp) => String(emp?.status || "").trim().toLowerCase() !== "inactive"
+    );
+
+    const matchedByEmail = activeEmployees.find(
+      (emp) =>
+        String(emp?.email || "")
+          .trim()
+          .toLowerCase() === normalizedProfileEmail
+    );
+    if (matchedByEmail?.name) return matchedByEmail.name;
+
+    const matchedByName = activeEmployees.find(
+      (emp) =>
+        String(emp?.name || "")
+          .trim()
+          .toLowerCase() === normalizedProfileName
+    );
+
+    return matchedByName?.name || "";
+  }, [
+    displayEmployees,
+    profile?.email,
+    profile?.full_name,
+    profile?.name,
+    profile?.role,
+  ]);
 
   // Sync fetched work orders to context
   useEffect(() => {
@@ -277,6 +316,15 @@ export default function ServiceManager() {
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [searchQuery, activeTab, dateFilter, technicianFilter, paymentFilter]);
+
+  useEffect(() => {
+    if (profile?.role !== USER_ROLES.STAFF) return;
+    if (!defaultStaffTechnicianName) return;
+
+    setTechnicianFilter((prev) =>
+      prev === "all" ? defaultStaffTechnicianName : prev
+    );
+  }, [defaultStaffTechnicianName, profile?.role]);
 
   useEffect(() => {
     // Increase limit when searching to find older records
@@ -1508,7 +1556,11 @@ export default function ServiceManager() {
   const clearFilters = () => {
     setSearchQuery("");
     setActiveTab("all");
-    setTechnicianFilter("all");
+    setTechnicianFilter(
+      profile?.role === USER_ROLES.STAFF && defaultStaffTechnicianName
+        ? defaultStaffTechnicianName
+        : "all"
+    );
     setPaymentFilter("all");
     setDateFilter("week");
   };

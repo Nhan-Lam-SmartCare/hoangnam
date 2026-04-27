@@ -83,6 +83,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
       scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
+      allowTaint: true,
       logging: false,
       width: element.scrollWidth,
       height: element.scrollHeight,
@@ -90,8 +91,15 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
       windowHeight: element.scrollHeight,
     });
 
-    return new Promise<Blob>((resolve) => {
-      canvas.toBlob((value) => resolve(value!), "image/png", 1.0);
+    return new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (value) => {
+          if (value) resolve(value);
+          else reject(new Error("Canvas toBlob returned null"));
+        },
+        "image/png",
+        1.0
+      );
     });
   };
 
@@ -145,6 +153,56 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
     }
   };
 
+  const printViaIframe = async (blob: Blob) => {
+    try {
+      const url = URL.createObjectURL(blob);
+      // Remove any existing print iframe
+      const existingIframe = document.getElementById("mobile-print-iframe");
+      if (existingIframe) existingIframe.remove();
+
+      const iframe = document.createElement("iframe");
+      iframe.id = "mobile-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.top = "-9999px";
+      iframe.style.left = "-9999px";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) {
+        URL.revokeObjectURL(url);
+        return false;
+      }
+
+      iframeDoc.open();
+      iframeDoc.write(`<!doctype html><html><head><title>Print</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body { margin: 0; padding: 0; display: flex; justify-content: center; }
+          img { max-width: 100%; height: auto; }
+          @media print {
+            body { margin: 0; padding: 0; }
+            img { max-width: 80mm; }
+          }
+        </style>
+      </head><body><img src="${url}" onload="setTimeout(function(){ window.print(); }, 300);" /></body></html>`);
+      iframeDoc.close();
+
+      // Cleanup after printing
+      setTimeout(() => {
+        iframe.remove();
+        URL.revokeObjectURL(url);
+      }, 10000);
+
+      return true;
+    } catch (err) {
+      console.error("printViaIframe failed:", err);
+      return false;
+    }
+  };
+
   const handleMobilePrint = async () => {
     if (!isMobileDevice) {
       onPrint();
@@ -157,11 +215,28 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
       if (!blob) return;
 
       const fileName = getReceiptFileName();
-      if (await shareReceiptImage(blob, fileName)) {
-        showToast.info("Chon ung dung may in Bluetooth/LAN de in.");
-        return;
+
+      // Strategy 1: Try Web Share API (best for mobile - opens print apps directly)
+      try {
+        if (await shareReceiptImage(blob, fileName)) {
+          showToast.info("Chon ung dung may in Bluetooth/LAN de in.");
+          return;
+        }
+      } catch (shareErr) {
+        console.warn("Share API failed, trying iframe print:", shareErr);
       }
 
+      // Strategy 2: Try printing via hidden iframe (works on most mobile browsers)
+      try {
+        if (await printViaIframe(blob)) {
+          showToast.info("Dang mo hop thoai in...");
+          return;
+        }
+      } catch (iframeErr) {
+        console.warn("Iframe print failed, downloading:", iframeErr);
+      }
+
+      // Strategy 3: Fallback - just download the image
       downloadReceiptImage(blob, fileName);
       showToast.info("Da tai anh phieu. Mo anh bang ung dung may in de in.");
     } catch (error) {

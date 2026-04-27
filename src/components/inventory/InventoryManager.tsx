@@ -130,6 +130,7 @@ const InventoryManagerNew: React.FC = () => {
   const [reservedInfoPartId, setReservedInfoPartId] = useState<string | null>(null);
   const [showExternalImport, setShowExternalImport] = useState(false);
   const [showBatchPrintModal, setShowBatchPrintModal] = useState(false);
+  const [batchPrintInitialQuantities, setBatchPrintInitialQuantities] = useState<Record<string, number> | undefined>(undefined);
   const [mobileMenuOpenIndex, setMobileMenuOpenIndex] = useState<number | null>(
     null
   );
@@ -1000,6 +1001,29 @@ const InventoryManagerNew: React.FC = () => {
     }
   };
 
+  const handleOpenBatchPrintModal = (onlySelected: boolean) => {
+    if (!onlySelected || selectedItems.length === 0) {
+      setBatchPrintInitialQuantities(undefined);
+      setShowBatchPrintModal(true);
+      return;
+    }
+
+    const initialQuantities = selectedItems.reduce<Record<string, number>>(
+      (acc, partId) => {
+        acc[partId] = 1;
+        return acc;
+      },
+      {}
+    );
+    setBatchPrintInitialQuantities(initialQuantities);
+    setShowBatchPrintModal(true);
+  };
+
+  const handleCloseBatchPrintModal = () => {
+    setShowBatchPrintModal(false);
+    setBatchPrintInitialQuantities(undefined);
+  };
+
   // Handle delete single item
   const handleDeleteItem = async (id: string) => {
     if (!canDeletePart) {
@@ -1460,9 +1484,9 @@ const InventoryManagerNew: React.FC = () => {
           <div className="flex items-center gap-2">
             {canPrintBarcode && (
               <button
-                onClick={() => setShowBatchPrintModal(true)}
+                onClick={() => handleOpenBatchPrintModal(selectedItems.length > 0)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition"
-                title="In mã vạch hàng loạt"
+                title={selectedItems.length > 0 ? `In mã vạch ${selectedItems.length} sản phẩm đã chọn` : "In mã vạch hàng loạt"}
               >
                 <svg
                   className="w-3.5 h-3.5"
@@ -1842,6 +1866,27 @@ const InventoryManagerNew: React.FC = () => {
                     Đã chọn {selectedItems.length} sản phẩm
                   </div>
                   <div className="flex items-center gap-2">
+                    {canPrintBarcode && (
+                      <button
+                        onClick={() => handleOpenBatchPrintModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                          />
+                        </svg>
+                        In mã vạch ({selectedItems.length})
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setShowCreatePO(true);
@@ -2537,7 +2582,8 @@ const InventoryManagerNew: React.FC = () => {
         <BatchPrintBarcodeModal
           parts={allPartsData || []}
           currentBranchId={currentBranchId}
-          onClose={() => setShowBatchPrintModal(false)}
+          onClose={handleCloseBatchPrintModal}
+          initialQuantities={batchPrintInitialQuantities}
         />
       )}
 
