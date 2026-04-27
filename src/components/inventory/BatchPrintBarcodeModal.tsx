@@ -177,9 +177,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
   const [barcodeFormat] = useState<BarcodeFormat>("CODE128");
   const [showPrice, setShowPrice] = useState(true);
   const [showName, setShowName] = useState(true);
-  const [quantityMode, setQuantityMode] = useState<QuantityMode>(
-    initialQuantities ? "custom" : "stock"
-  );
+  const [quantityMode, setQuantityMode] = useState<QuantityMode>("custom");
   const [fixedQuantity, setFixedQuantity] = useState(1);
   const [rotateLabel, setRotateLabel] = useState(false); // Xoay 90° cho cuộn giấy nằm ngang
 
@@ -896,25 +894,20 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
                               {part.name}
                             </p>
                           </div>
-                          {quantityMode === "custom" ? (
-                            <input
-                              type="number"
-                              value={quantity}
-                              onChange={(e) =>
-                                updateQuantity(
-                                  part.id,
-                                  parseInt(e.target.value) || 1
-                                )
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-14 px-1 py-0.5 text-xs text-center border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700"
-                              min="1"
-                            />
-                          ) : (
-                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                              ×{quantity}
-                            </span>
-                          )}
+                          <input
+                            type="number"
+                            value={quantity}
+                            onChange={(e) =>
+                              updateQuantity(
+                                part.id,
+                                parseInt(e.target.value) || 1
+                              )
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-14 px-1 py-0.5 text-xs text-center border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700"
+                            min="1"
+                            aria-label={`So luong tem ${part.name}`}
+                          />
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
