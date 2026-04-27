@@ -60,59 +60,113 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
     0
   );
 
+  const isMobileDevice =
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    window.matchMedia?.("(pointer: coarse)").matches;
+
+  const getReceiptFileName = () =>
+    `Phieu_${formatWorkOrderId(
+      printOrder.id,
+      storeSettings?.work_order_prefix
+    )}.png`;
+
+  const createReceiptImageBlob = async (): Promise<Blob | null> => {
+    const html2canvas = (await import("html2canvas")).default;
+    const element = document.getElementById("mobile-print-preview-content");
+
+    if (!element) {
+      showToast.error("Khong tim thay noi dung phieu!");
+      return null;
+    }
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      width: element.scrollWidth,
+      height: element.scrollHeight,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+    });
+
+    return new Promise<Blob>((resolve) => {
+      canvas.toBlob((value) => resolve(value!), "image/png", 1.0);
+    });
+  };
+
+  const shareReceiptImage = async (blob: Blob, fileName: string) => {
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], fileName, { type: "image/png" });
+      const shareData = {
+        files: [file],
+        title: `Phieu ${formatWorkOrderId(
+          printOrder.id,
+          storeSettings?.work_order_prefix
+        )}`,
+        text: "In phieu qua ung dung may in Bluetooth/LAN",
+      };
+
+      if (navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const downloadReceiptImage = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleShare = async () => {
     try {
-      showToast.info("Đang tạo hình ảnh...");
+      showToast.info("Dang tao hinh anh...");
+      const blob = await createReceiptImageBlob();
+      if (!blob) return;
 
-      const html2canvas = (await import("html2canvas")).default;
-      const element = document.getElementById("mobile-print-preview-content");
-
-      if (!element) {
-        showToast.error("Không tìm thấy nội dung phiếu!");
+      const fileName = getReceiptFileName();
+      if (await shareReceiptImage(blob, fileName)) {
+        showToast.success("Da mo chia se phieu!");
         return;
       }
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-        width: element.scrollWidth,
-        height: element.scrollHeight,
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
-      });
-
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((value) => resolve(value!), "image/png", 1.0);
-      });
-
-      const fileName = `Phieu_${formatWorkOrderId(
-        printOrder.id,
-        storeSettings?.work_order_prefix
-      )}.png`;
-
-      if (navigator.share && navigator.canShare) {
-        const file = new File([blob], fileName, { type: "image/png" });
-        const shareData = { files: [file] };
-
-        if (navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          showToast.success("Chia sẻ thành công!");
-          return;
-        }
-      }
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast.success("Đã tải hình ảnh!");
+      downloadReceiptImage(blob, fileName);
+      showToast.success("Da tai hinh anh!");
     } catch (error) {
       console.error("Share failed:", error);
-      showToast.error("Không thể chia sẻ. Vui lòng thử lại!");
+      showToast.error("Khong the chia se. Vui long thu lai!");
+    }
+  };
+
+  const handleMobilePrint = async () => {
+    if (!isMobileDevice) {
+      onPrint();
+      return;
+    }
+
+    try {
+      showToast.info("Dang chuan bi phieu cho may in...");
+      const blob = await createReceiptImageBlob();
+      if (!blob) return;
+
+      const fileName = getReceiptFileName();
+      if (await shareReceiptImage(blob, fileName)) {
+        showToast.info("Chon ung dung may in Bluetooth/LAN de in.");
+        return;
+      }
+
+      downloadReceiptImage(blob, fileName);
+      showToast.info("Da tai anh phieu. Mo anh bang ung dung may in de in.");
+    } catch (error) {
+      console.error("Mobile print failed:", error);
+      showToast.error("Khong the in tren dien thoai. Thu nut Chia se hoac In he thong.");
     }
   };
 
@@ -134,12 +188,23 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
             </button>
 
             <button
-              onClick={onPrint}
+              onClick={handleMobilePrint}
               className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700"
             >
               <Printer className="h-4 w-4" />
-              In phiếu
+              {isMobileDevice ? "In DT" : "In phieu"}
             </button>
+
+            {isMobileDevice && (
+              <button
+                onClick={onPrint}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-sm text-white transition hover:bg-slate-700"
+                title="Dung hop thoai in cua trinh duyet neu dien thoai ho tro"
+              >
+                <Printer className="h-4 w-4" />
+                In he thong
+              </button>
+            )}
 
             <button
               onClick={onClose}

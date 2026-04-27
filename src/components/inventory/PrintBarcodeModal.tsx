@@ -31,7 +31,7 @@ const LABEL_PRESETS: Record<
     height: 22,
     name: "22x35mm (giay doi)",
     barcodeHeight: 24,
-    fontSize: 8,
+    fontSize: 10,
     columns: 2,
   },
   "30x20": {
@@ -258,7 +258,7 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
             }
             
             .product-name {
-              font-size: ${Math.max(8, currentSize.fontSize)}px;
+              font-size: ${Math.max(10, currentSize.fontSize + 1)}px;
               font-weight: bold;
               text-align: center;
               line-height: 1.1;
@@ -270,7 +270,7 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
             }
             
             .product-price {
-              font-size: ${Math.max(10, currentSize.fontSize + 2)}px;
+              font-size: ${Math.max(11, currentSize.fontSize + 2)}px;
               font-weight: bold;
               line-height: 1;
               margin-top: 1mm;
