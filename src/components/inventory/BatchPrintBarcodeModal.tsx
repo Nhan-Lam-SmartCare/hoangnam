@@ -22,7 +22,7 @@ interface BatchPrintBarcodeModalProps {
 }
 
 type BarcodeFormat = "CODE128" | "CODE39";
-type LabelPreset = "30x20" | "40x30" | "50x30" | "60x40" | "80x50" | "100x80";
+type LabelPreset = "20x35-dual" | "30x20" | "37x20" | "40x30" | "50x30" | "60x40" | "80x50" | "100x80";
 type QuantityMode = "stock" | "fixed" | "custom";
 type ViewMode = "select" | "preview";
 
@@ -34,14 +34,30 @@ const LABEL_PRESETS: Record<
     name: string;
     barcodeHeight: number;
     fontSize: number;
+    columns?: number;
   }
 > = {
+  "20x35-dual": {
+    width: 35,
+    height: 22,
+    name: "22x35mm (giay doi)",
+    barcodeHeight: 24,
+    fontSize: 8,
+    columns: 2,
+  },
   "30x20": {
     width: 30,
     height: 20,
     name: "30×20mm",
     barcodeHeight: 22,
     fontSize: 10, // Increased from 7
+  },
+  "37x20": {
+    width: 37,
+    height: 20,
+    name: "37×20mm",
+    barcodeHeight: 22,
+    fontSize: 10,
   },
   "40x30": {
     width: 40,
@@ -84,7 +100,7 @@ const LABEL_PRESETS: Record<
 const BarcodePreview: React.FC<{
   value: string;
   format: BarcodeFormat;
-  size: (typeof LABEL_PRESETS)["40x30"];
+  size: (typeof LABEL_PRESETS)[LabelPreset];
 }> = ({ value, format, size }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -157,7 +173,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
   // Print settings
-  const [labelPreset, setLabelPreset] = useState<LabelPreset>("40x30");
+  const [labelPreset, setLabelPreset] = useState<LabelPreset>("20x35-dual");
   const [barcodeFormat] = useState<BarcodeFormat>("CODE128");
   const [showPrice, setShowPrice] = useState(true);
   const [showName, setShowName] = useState(true);
@@ -341,15 +357,21 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
       return;
     }
 
+    const labelColumns = currentSize.columns || 1;
+    const sheetWidth = currentSize.width * labelColumns;
+    const sheetHeight = currentSize.height;
+    const pageWidth = rotateLabel ? sheetHeight : sheetWidth;
+    const pageHeight = rotateLabel ? sheetWidth : sheetHeight;
+
     // Show confirmation with printer settings reminder FIRST
     const confirmed = confirm(
       `⚠️ HƯỚNG DẪN IN MÁY IN NHIỆT XPRINTER\n\n` +
       `📌 QUAN TRỌNG: Khi hộp thoại in xuất hiện:\n` +
       `→ Nhấn Ctrl+Shift+P để mở System Dialog\n` +
       `→ Hoặc bấm "Print using system dialog..."\n\n` +
-      `Kích thước nhãn: ${currentSize.width}×${currentSize.height}mm\n\n` +
+      `Kích thước nhãn: ${currentSize.width}×${currentSize.height}mm${labelColumns > 1 ? `, giấy đôi ${labelColumns} cột` : ""}\n\n` +
       `Cài đặt Xprinter (đã cấu hình):\n` +
-      `→ Stock: ${currentSize.width}mm × ${currentSize.height}mm\n` +
+      `→ Stock: ${pageWidth}mm × ${pageHeight}mm\n` +
       `→ Orientation: Portrait/Landscape tùy cuộn giấy\n\n` +
       `Bấm OK để tiếp tục.`
     );
@@ -364,7 +386,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
     }
 
     // Generate all labels
-    let labelsHTML = "";
+    const labelItems: string[] = [];
     selectedParts.forEach(({ part, quantity }) => {
       const barcodeValue = part.barcode || part.sku || part.id.slice(0, 12);
       const barcodeSVG = generateBarcodeSVG(barcodeValue);
@@ -374,7 +396,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
         // because the printer will handle the orientation
         // The page size is already swapped (30x40 instead of 40x30)
 
-        labelsHTML += `
+        labelItems.push(`
           <div class="label">
             <div class="label-content">
               ${showName ? `<div class="label-name">${part.name}</div>` : ""}
@@ -382,13 +404,25 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
               ${showPrice ? `<div class="label-price">${formatCurrency(part.retailPrice[currentBranchId] || 0)}</div>` : ""}
             </div>
           </div>
-        `;
+        `);
       }
     });
 
-    // Calculate dimensions based on rotation
-    const pageWidth = rotateLabel ? currentSize.height : currentSize.width;
-    const pageHeight = rotateLabel ? currentSize.width : currentSize.height;
+    // Group labels by paper columns.
+    const labelsHTML =
+      labelColumns === 1
+        ? labelItems.join("")
+        : Array.from(
+          { length: Math.ceil(labelItems.length / labelColumns) },
+          (_, rowIndex) => {
+            const start = rowIndex * labelColumns;
+            const rowLabels = labelItems.slice(start, start + labelColumns);
+            while (rowLabels.length < labelColumns) {
+              rowLabels.push('<div class="label label-empty"></div>');
+            }
+            return `<div class="label-sheet">${rowLabels.join("")}</div>`;
+          }
+        ).join("");
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -414,11 +448,12 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
             body {
               font-family: Arial, sans-serif;
             }
-            .label {
+            .label-sheet {
               width: ${pageWidth}mm;
               height: ${pageHeight}mm;
               padding: 0;
-              display: flex;
+              display: grid;
+              grid-template-columns: repeat(${labelColumns}, ${currentSize.width}mm);
               align-items: center;
               justify-content: center;
               box-sizing: border-box;
@@ -426,6 +461,27 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
               page-break-after: always;
               page-break-inside: avoid;
             }
+            .label-sheet:last-child {
+              page-break-after: avoid;
+            }
+            .label {
+              width: ${currentSize.width}mm;
+              height: ${currentSize.height}mm;
+              padding: 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-sizing: border-box;
+              overflow: hidden;
+              page-break-after: ${labelColumns === 1 ? "always" : "auto"};
+              page-break-inside: avoid;
+              ${labelColumns > 1 ? "outline: 0.2mm dashed #111; outline-offset: -0.2mm;" : ""}
+            }
+            ${labelColumns > 1 ? `
+            .label + .label {
+              border-left: 0.3mm solid #111;
+            }
+            ` : ""}
             .label:last-child {
               page-break-after: avoid;
             }
@@ -508,9 +564,11 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
         <body>
           <div class="print-info">
             <h3>⚠️ Trước khi in, kiểm tra cài đặt:</h3>
-            <p><strong>Khổ giấy:</strong> <code>${currentSize.width}×${currentSize.height}mm</code></p>
+            <p><strong>Khổ giấy:</strong> <code>${pageWidth}×${pageHeight}mm</code></p>
             <p><strong>Lề:</strong> Không</p>
             <p><strong>Tỷ lệ:</strong> 100%</p>
+            <p><strong>Headers/footers:</strong> Tắt</p>
+            ${labelColumns > 1 ? `<p><strong>Canh lề:</strong> Có khung nét đứt và vạch giữa 2 tem.</p>` : ""}
             <p style="margin-top:8px">Phần này sẽ không được in ra.</p>
           </div>
           ${labelsHTML}

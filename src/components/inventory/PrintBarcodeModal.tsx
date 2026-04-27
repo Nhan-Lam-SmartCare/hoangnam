@@ -13,7 +13,7 @@ interface PrintBarcodeModalProps {
 type BarcodeFormat = "CODE128" | "EAN13" | "CODE39";
 
 // Preset sizes phù hợp với Xprinter XP-360B (20-82mm width)
-type LabelPreset = "30x20" | "40x30" | "50x30" | "60x40" | "80x50" | "100x80";
+type LabelPreset = "20x35-dual" | "30x20" | "40x30" | "50x30" | "60x40" | "80x50" | "100x80";
 
 const LABEL_PRESETS: Record<
   LabelPreset,
@@ -23,8 +23,17 @@ const LABEL_PRESETS: Record<
     name: string;
     barcodeHeight: number;
     fontSize: number;
+    columns?: number;
   }
 > = {
+  "20x35-dual": {
+    width: 35,
+    height: 22,
+    name: "22x35mm (giay doi)",
+    barcodeHeight: 24,
+    fontSize: 8,
+    columns: 2,
+  },
   "30x20": {
     width: 30,
     height: 20,
@@ -81,13 +90,16 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [showPrice, setShowPrice] = useState(true);
   const [showName, setShowName] = useState(true);
-  const [labelPreset, setLabelPreset] = useState<LabelPreset>("40x30");
+  const [labelPreset, setLabelPreset] = useState<LabelPreset>("20x35-dual");
   const [barcodeFormat, setBarcodeFormat] = useState<BarcodeFormat>("CODE128");
 
   // Sử dụng barcode field nếu có, nếu không dùng SKU
   const barcodeValue = part.barcode || part.sku || part.id.slice(0, 12);
 
   const currentSize = LABEL_PRESETS[labelPreset];
+  const labelColumns = currentSize.columns || 1;
+  const pageWidth = currentSize.width * labelColumns;
+  const pageHeight = currentSize.height;
 
   // Generate barcode
   useEffect(() => {
@@ -140,7 +152,7 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
         : part.name;
 
     // Generate labels HTML - tối ưu cho máy in nhiệt
-    const labels = Array(quantity)
+    const labelItems = Array(quantity)
       .fill(null)
       .map(
         () => `
@@ -158,8 +170,21 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
           }
         </div>
       `
-      )
-      .join("");
+      );
+    const labels =
+      labelColumns === 1
+        ? labelItems.join("")
+        : Array.from(
+          { length: Math.ceil(labelItems.length / labelColumns) },
+          (_, rowIndex) => {
+            const start = rowIndex * labelColumns;
+            const rowLabels = labelItems.slice(start, start + labelColumns);
+            while (rowLabels.length < labelColumns) {
+              rowLabels.push('<div class="label label-empty"></div>');
+            }
+            return `<div class="label-sheet">${rowLabels.join("")}</div>`;
+          }
+        ).join("");
 
     // CSS tối ưu cho máy in nhiệt XP-360B - với hướng dẫn rõ ràng
     printWindow.document.write(`
@@ -170,7 +195,7 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
           <style>
             /* === QUAN TRỌNG: Cài đặt @page cho máy in nhiệt === */
             @page {
-              size: ${currentSize.width}mm ${currentSize.height}mm;
+              size: ${pageWidth}mm ${pageHeight}mm;
               margin: 0 !important;
               padding: 0 !important;
             }
@@ -182,8 +207,8 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
             }
             
             html, body {
-              width: ${currentSize.width}mm;
-              height: ${currentSize.height * quantity}mm;
+              width: ${pageWidth}mm;
+              height: ${pageHeight * Math.ceil(quantity / labelColumns)}mm;
               margin: 0 !important;
               padding: 0 !important;
             }
@@ -193,19 +218,40 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
               background: white;
             }
             
+            .label-sheet {
+              width: ${pageWidth}mm;
+              height: ${pageHeight}mm;
+              display: grid;
+              grid-template-columns: repeat(${labelColumns}, ${currentSize.width}mm);
+              page-break-after: always;
+              page-break-inside: avoid;
+              background: white;
+            }
+
+            .label-sheet:last-child {
+              page-break-after: avoid;
+            }
+            
             .label {
               width: ${currentSize.width}mm;
               height: ${currentSize.height}mm;
-              padding: 1.5mm 2mm;
+              padding: 1mm 1.2mm;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              page-break-after: always;
+              page-break-after: ${labelColumns === 1 ? "always" : "auto"};
               page-break-inside: avoid;
               box-sizing: border-box;
               background: white;
+              ${labelColumns > 1 ? "outline: 0.2mm dashed #111; outline-offset: -0.2mm;" : ""}
             }
+
+            ${labelColumns > 1 ? `
+            .label + .label {
+              border-left: 0.3mm solid #111;
+            }
+            ` : ""}
             
             .label:last-child {
               page-break-after: avoid;
@@ -281,7 +327,7 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
               body { 
                 margin: 0 !important; 
                 padding: 0 !important;
-                width: ${currentSize.width}mm !important;
+                width: ${pageWidth}mm !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
               }
@@ -294,13 +340,13 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
             <h3>⚙️ Hướng dẫn in nhãn:</h3>
             <ol>
               <li>Bấm <code>More settings</code> (Cài đặt khác) trong hộp thoại in</li>
-              <li>Chọn <code>Paper size</code> (Khổ giấy) → <strong>${currentSize.width}×${currentSize.height}mm</strong></li>
+              <li>Chọn <code>Paper size</code> (Khổ giấy) → <strong>${pageWidth}×${pageHeight}mm</strong></li>
               <li>Đặt <code>Margins</code> (Lề) → <strong>None</strong> (Không)</li>
               <li>Tắt <code>Headers and footers</code> (Đầu trang &amp; chân trang)</li>
               <li>Bấm <strong>Print</strong> (In)</li>
             </ol>
             <p style="margin-top: 12px; color: #666; font-size: 11px;">
-              💡 Nếu không có size ${currentSize.width}×${currentSize.height}mm, vào Control Panel → Devices and Printers → Xprinter → Printing Preferences để thêm khổ giấy tùy chỉnh.
+              💡 Nếu không có size ${pageWidth}×${pageHeight}mm, vào Control Panel → Devices and Printers → Xprinter → Printing Preferences để thêm khổ giấy tùy chỉnh.
             </p>
           </div>
           
