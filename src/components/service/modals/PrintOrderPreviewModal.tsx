@@ -179,10 +179,12 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
       iframeDoc.open();
       iframeDoc.write(`<!doctype html><html><head><title>Print</title>
         <style>
-          @page { size: 80mm auto; margin: 0; }
+          @page { size: 80mm 200mm; margin: 0; }
+          html, body { width: 80mm; }
           body { margin: 0; padding: 0; display: flex; justify-content: center; }
           img { max-width: 100%; height: auto; }
           @media print {
+            html, body { width: 80mm; }
             body { margin: 0; padding: 0; }
             img { max-width: 80mm; }
           }

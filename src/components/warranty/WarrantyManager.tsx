@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Shield, Plus, Search, Calendar, Wrench, CheckCircle2, XCircle, Clock3, Printer } from "lucide-react";
+import PrintWarrantyPreviewModal from "./PrintWarrantyPreviewModal";
 import {
     useWarrantyCards,
     useWarrantyClaims,
@@ -34,6 +35,7 @@ export const WarrantyManager: React.FC = () => {
     const [activeTab, setActiveTab] = useState<"cards" | "claims">("cards");
     const [claimingCard, setClaimingCard] = useState<WarrantyCard | null>(null);
     const [claimIssueText, setClaimIssueText] = useState("");
+    const [printPreviewCard, setPrintPreviewCard] = useState<WarrantyCard | null>(null);
     const canCreateClaim = canDo(profile, "warranty.claim.create");
     const canManageClaim = canDo(profile, "warranty.claim.manage");
     const canDeleteCard = canDo(profile, "warranty.card.delete");
@@ -53,121 +55,7 @@ export const WarrantyManager: React.FC = () => {
                         .replace(/'/g, "&#39;");
 
         const handlePrintWarrantyReceipt = (card: WarrantyCard) => {
-                const issueDate = formatDate(card.created_at || card.warranty_start_date);
-                const startDate = formatDate(card.warranty_start_date);
-                const endDate = formatDate(card.warranty_end_date);
-            const compactCode = (() => {
-                const raw = String(card.id || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                const tail = raw.slice(-8) || "UNKNOWN";
-                const d = new Date(card.created_at || card.warranty_start_date || Date.now());
-                const yy = String(d.getFullYear()).slice(-2);
-                const mm = String(d.getMonth() + 1).padStart(2, "0");
-                return `BH-${yy}${mm}-${tail}`;
-            })();
-                const coveredParts = Array.isArray(card.covered_parts) && card.covered_parts.length > 0
-                        ? card.covered_parts.map((part) => `<li>${escapeHtml(part)}</li>`).join("")
-                        : "<li>Toàn bộ sản phẩm theo chính sách cửa hàng</li>";
-
-                const printWindow = window.open("", "_blank", "width=900,height=700");
-                if (!printWindow) {
-                        showToast.error("Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup.");
-                        return;
-                }
-
-                const html = `
-<!doctype html>
-<html lang="vi">
-<head>
-    <meta charset="utf-8" />
-    <title>Phiếu bảo hành - ${escapeHtml(compactCode)}</title>
-    <style>
-        @page { size: A5 portrait; margin: 10mm; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #0f172a; }
-        .sheet { border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px; }
-        .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f766e; padding-bottom: 10px; margin-bottom: 12px; }
-        .store { font-size: 12px; color: #334155; line-height: 1.5; }
-        .title { text-align: right; }
-        .title h1 { margin: 0; font-size: 18px; letter-spacing: 0.4px; color: #0f766e; }
-        .title .code { margin-top: 6px; font-size: 11px; color: #64748b; }
-        .box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
-        .box h2 { margin: 0 0 8px; font-size: 13px; color: #0f172a; }
-        .row { display: flex; margin-bottom: 6px; font-size: 12px; }
-        .label { width: 120px; color: #475569; }
-        .value { flex: 1; font-weight: 600; }
-        ul { margin: 0; padding-left: 18px; }
-        li { margin-bottom: 4px; font-size: 12px; }
-        .note { font-size: 11px; color: #334155; line-height: 1.5; white-space: pre-wrap; }
-        .sign { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: center; }
-        .sign p { margin: 0; font-size: 11px; color: #475569; }
-        .sign .space { height: 56px; }
-        @media print { .sheet { border: none; border-radius: 0; padding: 0; } }
-    </style>
-</head>
-<body>
-    <div class="sheet">
-        <div class="head">
-            <div class="store">
-                <strong>${escapeHtml(storeSettings?.store_name || "MotoCare")}</strong><br/>
-                Địa chỉ: ${escapeHtml(storeSettings?.address || "-")}<br/>
-                Hotline: ${escapeHtml(storeSettings?.phone || "-")}
-            </div>
-            <div class="title">
-                <h1>PHIẾU BẢO HÀNH</h1>
-                <div class="code">Mã phiếu: ${escapeHtml(compactCode)}<br/>Ngày cấp: ${escapeHtml(issueDate)}</div>
-            </div>
-        </div>
-
-        <div class="box">
-            <h2>Thông tin khách hàng</h2>
-            <div class="row"><div class="label">Khách hàng</div><div class="value">${escapeHtml(card.customer_name || "Khách lẻ")}</div></div>
-            <div class="row"><div class="label">Số điện thoại</div><div class="value">${escapeHtml(card.customer_phone || "-")}</div></div>
-        </div>
-
-        <div class="box">
-            <h2>Thông tin sản phẩm</h2>
-            <div class="row"><div class="label">Thiết bị/Model</div><div class="value">${escapeHtml(card.device_model)}</div></div>
-            <div class="row"><div class="label">IMEI/Serial</div><div class="value">${escapeHtml(card.imei_serial || "-")}</div></div>
-            <div class="row"><div class="label">Thời hạn</div><div class="value">${escapeHtml(String(card.warranty_period_months))} tháng</div></div>
-            <div class="row"><div class="label">Hiệu lực</div><div class="value">Từ ${escapeHtml(startDate)} đến ${escapeHtml(endDate)}</div></div>
-        </div>
-
-        <div class="box">
-            <h2>Phạm vi bảo hành</h2>
-            <ul>${coveredParts}</ul>
-        </div>
-
-        <div class="box">
-            <h2>Điều kiện bảo hành</h2>
-            <div class="note">${escapeHtml(card.coverage_terms || "Không áp dụng với hư hỏng do rơi vỡ, ngấm nước, cháy nổ, hoặc tự ý can thiệp sửa chữa.")}</div>
-        </div>
-
-        <div class="sign">
-            <div>
-                <p><strong>Khách hàng</strong></p>
-                <div class="space"></div>
-                <p>(Ký, ghi rõ họ tên)</p>
-            </div>
-            <div>
-                <p><strong>Cửa hàng</strong></p>
-                <div class="space"></div>
-                <p>(Ký, đóng dấu)</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        window.onload = function () {
-            window.print();
-            window.onafterprint = function () { window.close(); };
-        };
-    </script>
-</body>
-</html>`;
-
-                printWindow.document.open();
-                printWindow.document.write(html);
-                printWindow.document.close();
+                setPrintPreviewCard(card);
         };
 
     // Filter warranty cards
@@ -677,6 +565,14 @@ export const WarrantyManager: React.FC = () => {
             <WarrantyCardModal
                 isOpen={showCreateModal}
                 onClose={() => setShowCreateModal(false)}
+            />
+
+            {/* Print Preview Modal */}
+            <PrintWarrantyPreviewModal
+                isOpen={!!printPreviewCard}
+                onClose={() => setPrintPreviewCard(null)}
+                warrantyCard={printPreviewCard}
+                storeSettings={storeSettings}
             />
 
             {claimingCard && (
