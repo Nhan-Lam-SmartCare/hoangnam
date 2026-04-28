@@ -13,6 +13,7 @@ import {
 import JsBarcode from "jsbarcode";
 import { Part } from "../../types";
 import { formatCurrency } from "../../utils/format";
+import { useStoreSettings } from "../../hooks/useStoreSettings";
 
 interface BatchPrintBarcodeModalProps {
   parts: Part[];
@@ -146,6 +147,14 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
 }) => {
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>("select");
+  const { data: storeSettings } = useStoreSettings();
+
+  // Resolve default label preset from store settings
+  const defaultPreset = (() => {
+    const saved = storeSettings?.print_label_size_default;
+    if (saved && saved in LABEL_PRESETS) return saved as LabelPreset;
+    return "20x35-dual" as LabelPreset;
+  })();
 
   // Selection state
   const [selectedParts, setSelectedParts] = useState<Map<string, SelectedPart>>(
@@ -173,7 +182,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
   // Print settings
-  const [labelPreset, setLabelPreset] = useState<LabelPreset>("20x35-dual");
+  const [labelPreset, setLabelPreset] = useState<LabelPreset>(defaultPreset);
   const [barcodeFormat] = useState<BarcodeFormat>("CODE128");
   const [showPrice, setShowPrice] = useState(true);
   const [showName, setShowName] = useState(true);

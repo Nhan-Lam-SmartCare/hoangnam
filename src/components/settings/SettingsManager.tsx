@@ -70,6 +70,9 @@ interface StoreSettings {
   date_format?: string;
   timezone?: string;
   facebook?: string;
+  print_paper_size_receipt?: string;
+  print_paper_size_warranty?: string;
+  print_label_size_default?: string;
 }
 
 interface StaffMember {
@@ -2516,6 +2519,220 @@ export const SettingsManager = ({
                   <option value="Asia/Bangkok">Bangkok (GMT+7)</option>
                   <option value="Asia/Singapore">Singapore (GMT+8)</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Paper Size Settings */}
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-4 md:pt-6">
+              <h3 className="text-sm md:text-base font-semibold text-slate-900 dark:text-white mb-1">
+                Khổ giấy in
+              </h3>
+              <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mb-3 md:mb-4">
+                Chọn khổ giấy phù hợp với máy in của cửa hàng. Nếu không có khổ phù hợp, chọn "Tùy chỉnh" để nhập kích thước riêng.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                {/* Receipt paper size */}
+                <div>
+                  <label className="block text-xs md:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 md:mb-2">
+                    🧾 Phiếu sửa chữa / Hóa đơn bán
+                  </label>
+                  {(() => {
+                    const PRESET_RECEIPT = ["58mm", "80mm", "A5", "A4"];
+                    const currentVal = settings.print_paper_size_receipt || "80mm";
+                    const isCustom = !PRESET_RECEIPT.includes(currentVal);
+                    const selectVal = isCustom ? "__custom__" : currentVal;
+                    return (
+                      <>
+                        <select
+                          value={selectVal}
+                          onChange={(e) => {
+                            if (e.target.value === "__custom__") {
+                              updateField("print_paper_size_receipt", "100mm");
+                            } else {
+                              updateField("print_paper_size_receipt", e.target.value);
+                            }
+                          }}
+                          disabled={!isOwner}
+                          className="w-full px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
+                        >
+                          <option value="58mm">58mm — Máy in bill nhỏ</option>
+                          <option value="80mm">80mm — Máy in bill (mặc định)</option>
+                          <option value="A5">A5 (148mm) — Giấy A5</option>
+                          <option value="A4">A4 (210mm) — Giấy A4</option>
+                          <option value="__custom__">✏️ Tùy chỉnh...</option>
+                        </select>
+                        {isCustom && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={30}
+                              max={300}
+                              value={parseInt(currentVal) || 100}
+                              onChange={(e) => {
+                                const v = Math.max(30, Math.min(300, Number(e.target.value) || 30));
+                                updateField("print_paper_size_receipt", `${v}mm`);
+                              }}
+                              disabled={!isOwner}
+                              className="w-24 px-3 py-2 text-sm border border-blue-400 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50 font-mono"
+                            />
+                            <span className="text-xs text-slate-500 dark:text-slate-400">mm (chiều rộng)</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Áp dụng cho phiếu dịch vụ sửa chữa và hóa đơn bán hàng
+                  </p>
+                </div>
+
+                {/* Warranty paper size */}
+                <div>
+                  <label className="block text-xs md:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 md:mb-2">
+                    🛡️ Phiếu bảo hành
+                  </label>
+                  {(() => {
+                    const PRESET_WARRANTY = ["58mm", "80mm", "A5", "A4"];
+                    const currentVal = settings.print_paper_size_warranty || "A5";
+                    const isCustom = !PRESET_WARRANTY.includes(currentVal);
+                    const selectVal = isCustom ? "__custom__" : currentVal;
+                    return (
+                      <>
+                        <select
+                          value={selectVal}
+                          onChange={(e) => {
+                            if (e.target.value === "__custom__") {
+                              updateField("print_paper_size_warranty", "100mm");
+                            } else {
+                              updateField("print_paper_size_warranty", e.target.value);
+                            }
+                          }}
+                          disabled={!isOwner}
+                          className="w-full px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
+                        >
+                          <option value="58mm">58mm — Máy in bill nhỏ</option>
+                          <option value="80mm">80mm — Máy in bill</option>
+                          <option value="A5">A5 (148mm) — Giấy A5 (mặc định)</option>
+                          <option value="A4">A4 (210mm) — Giấy A4</option>
+                          <option value="__custom__">✏️ Tùy chỉnh...</option>
+                        </select>
+                        {isCustom && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={30}
+                              max={300}
+                              value={parseInt(currentVal) || 100}
+                              onChange={(e) => {
+                                const v = Math.max(30, Math.min(300, Number(e.target.value) || 30));
+                                updateField("print_paper_size_warranty", `${v}mm`);
+                              }}
+                              disabled={!isOwner}
+                              className="w-24 px-3 py-2 text-sm border border-blue-400 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50 font-mono"
+                            />
+                            <span className="text-xs text-slate-500 dark:text-slate-400">mm (chiều rộng)</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Áp dụng cho phiếu bảo hành sản phẩm
+                  </p>
+                </div>
+              </div>
+
+              {/* Label / barcode size */}
+              <div className="mt-4">
+                <label className="block text-xs md:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 md:mb-2">
+                  🏷️ Kích thước tem mã vạch (mặc định)
+                </label>
+                {(() => {
+                  const PRESET_LABELS = [
+                    "20x35-dual", "30x20", "37x20", "40x30",
+                    "50x30", "60x40", "80x50", "100x80",
+                  ];
+                  const PRESET_LABEL_NAMES: Record<string, string> = {
+                    "20x35-dual": "22×35mm (giấy đôi)",
+                    "30x20": "30×20mm (nhỏ)",
+                    "37x20": "37×20mm",
+                    "40x30": "40×30mm (phổ biến)",
+                    "50x30": "50×30mm (vừa)",
+                    "60x40": "60×40mm (lớn)",
+                    "80x50": "80×50mm (max)",
+                    "100x80": "100×80mm (rất lớn)",
+                  };
+                  const currentVal = settings.print_label_size_default || "40x30";
+                  const isCustom = !PRESET_LABELS.includes(currentVal);
+                  const selectVal = isCustom ? "__custom__" : currentVal;
+                  return (
+                    <>
+                      <select
+                        value={selectVal}
+                        onChange={(e) => {
+                          if (e.target.value === "__custom__") {
+                            updateField("print_label_size_default", "45x25");
+                          } else {
+                            updateField("print_label_size_default", e.target.value);
+                          }
+                        }}
+                        disabled={!isOwner}
+                        className="w-full md:w-1/2 px-3 py-2 md:px-4 md:py-2.5 text-sm md:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
+                      >
+                        {PRESET_LABELS.map((key) => (
+                          <option key={key} value={key}>
+                            {PRESET_LABEL_NAMES[key] || key}
+                          </option>
+                        ))}
+                        <option value="__custom__">✏️ Tùy chỉnh...</option>
+                      </select>
+                      {isCustom && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={currentVal}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/[^0-9x×]/gi, "").toLowerCase();
+                              updateField("print_label_size_default", v);
+                            }}
+                            disabled={!isOwner}
+                            placeholder="VD: 45x25"
+                            className="w-32 px-3 py-2 text-sm border border-blue-400 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50 font-mono"
+                          />
+                          <span className="text-xs text-slate-500 dark:text-slate-400">Rộng×Cao (mm)</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+                <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Kích thước mặc định khi mở cửa sổ in tem mã vạch. Có thể thay đổi khi in.
+                </p>
+              </div>
+
+              <div className="mt-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <div className="flex gap-2">
+                  <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-[10px] md:text-xs text-amber-800 dark:text-amber-300">
+                    <p className="font-medium mb-0.5">Hướng dẫn chọn khổ giấy</p>
+                    <p>
+                      <strong>58mm / 80mm:</strong> Dùng cho máy in hóa đơn nhiệt (POS). 80mm là phổ biến nhất.
+                    </p>
+                    <p>
+                      <strong>A5:</strong> Khổ giấy nhỏ, phù hợp in phiếu bảo hành chuyên nghiệp.
+                    </p>
+                    <p>
+                      <strong>A4:</strong> Khổ giấy tiêu chuẩn, dùng khi cần in chi tiết đầy đủ.
+                    </p>
+                    <p>
+                      <strong>Tem mã vạch:</strong> Chọn theo khổ cuộn tem của máy in nhiệt (XP-360B, Godex, v.v.). 40×30mm phổ biến nhất.
+                    </p>
+                    <p>
+                      <strong>Tùy chỉnh:</strong> Nhập kích thước riêng nếu không có khổ phù hợp.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

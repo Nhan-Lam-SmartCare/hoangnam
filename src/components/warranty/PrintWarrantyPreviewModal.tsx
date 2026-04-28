@@ -10,7 +10,25 @@ interface StoreSettings {
   phone?: string;
   email?: string;
   logo_url?: string;
+  print_paper_size_warranty?: string;
 }
+
+const PAPER_SIZE_MAP: Record<string, { width: string; pageSize: string }> = {
+  "58mm": { width: "58mm", pageSize: "58mm auto" },
+  "80mm": { width: "80mm", pageSize: "80mm auto" },
+  "A5":   { width: "148mm", pageSize: "A5 portrait" },
+  "A4":   { width: "210mm", pageSize: "A4 portrait" },
+};
+
+const resolvePaperSize = (key: string, fallback = "A5") => {
+  if (PAPER_SIZE_MAP[key]) return PAPER_SIZE_MAP[key];
+  const match = key.match(/^(\d+)mm$/i);
+  if (match) {
+    const w = `${match[1]}mm`;
+    return { width: w, pageSize: `${w} auto` };
+  }
+  return PAPER_SIZE_MAP[fallback] || PAPER_SIZE_MAP["A5"];
+};
 
 interface PrintWarrantyPreviewModalProps {
   isOpen: boolean;
@@ -81,6 +99,9 @@ const PrintWarrantyPreviewModal: React.FC<PrintWarrantyPreviewModalProps> = ({
   const isMobileDevice =
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
     window.matchMedia?.("(pointer: coarse)").matches;
+
+  const paperSizeKey = storeSettings?.print_paper_size_warranty || "A5";
+  const paperSize = resolvePaperSize(paperSizeKey, "A5");
 
   const getReceiptFileName = () =>
     `Phieu_${compactCode}.png`;
@@ -190,12 +211,12 @@ const PrintWarrantyPreviewModal: React.FC<PrintWarrantyPreviewModalProps> = ({
       iframeDoc.open();
       iframeDoc.write(`<!doctype html><html><head><title>Print</title>
         <style>
-          @page { size: A5 portrait; margin: 10mm; }
+          @page { size: ${paperSize.pageSize}; margin: 10mm; }
           body { margin: 0; padding: 0; display: flex; justify-content: center; }
           img { max-width: 100%; height: auto; }
           @media print {
             body { margin: 0; padding: 0; }
-            img { max-width: 148mm; }
+            img { max-width: ${paperSize.width}; }
           }
         </style>
       </head><body><img src="${url}" onload="setTimeout(function(){ window.print(); }, 300);" /></body></html>`);
@@ -226,7 +247,7 @@ const PrintWarrantyPreviewModal: React.FC<PrintWarrantyPreviewModalProps> = ({
     printWindow.document.open();
     printWindow.document.write(`<!doctype html><html><head><title>Phiếu bảo hành - ${compactCode}</title>
       <style>
-        @page { size: A5 portrait; margin: 10mm; }
+        @page { size: ${paperSize.pageSize}; margin: 10mm; }
         body { margin: 20px; font-family: Arial, Helvetica, sans-serif; }
       </style>
     </head><body>${element.innerHTML}
@@ -331,7 +352,7 @@ const PrintWarrantyPreviewModal: React.FC<PrintWarrantyPreviewModalProps> = ({
               id="warranty-print-preview-content"
               className="relative flex-shrink-0 bg-white shadow-lg"
               style={{
-                width: "148mm",
+                width: paperSize.width,
                 minHeight: "auto",
                 color: "#000000",
                 backgroundColor: "#ffffff",

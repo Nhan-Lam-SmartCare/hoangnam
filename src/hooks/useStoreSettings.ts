@@ -15,6 +15,9 @@ export interface StoreSettings {
     bank_qr_url?: string;
     primary_color?: string;
     business_hours?: string;
+    print_paper_size_receipt?: string;
+    print_paper_size_warranty?: string;
+    print_label_size_default?: string;
 }
 
 export const useStoreSettings = () => {

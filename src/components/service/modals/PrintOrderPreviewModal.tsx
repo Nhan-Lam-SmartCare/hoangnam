@@ -17,7 +17,25 @@ interface StoreSettings {
   bank_account_holder?: string;
   bank_branch?: string;
   work_order_prefix?: string;
+  print_paper_size_receipt?: string;
 }
+
+const PAPER_SIZE_MAP: Record<string, { width: string; pageSize: string }> = {
+  "58mm": { width: "58mm", pageSize: "58mm auto" },
+  "80mm": { width: "80mm", pageSize: "80mm auto" },
+  "A5":   { width: "148mm", pageSize: "A5 portrait" },
+  "A4":   { width: "210mm", pageSize: "A4 portrait" },
+};
+
+const resolvePaperSize = (key: string, fallback = "80mm") => {
+  if (PAPER_SIZE_MAP[key]) return PAPER_SIZE_MAP[key];
+  const match = key.match(/^(\d+)mm$/i);
+  if (match) {
+    const w = `${match[1]}mm`;
+    return { width: w, pageSize: `${w} auto` };
+  }
+  return PAPER_SIZE_MAP[fallback] || PAPER_SIZE_MAP["80mm"];
+};
 
 interface PrintOrderPreviewModalProps {
   isOpen: boolean;
@@ -63,6 +81,9 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
   const isMobileDevice =
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
     window.matchMedia?.("(pointer: coarse)").matches;
+
+  const paperSizeKey = storeSettings?.print_paper_size_receipt || "80mm";
+  const paperSize = resolvePaperSize(paperSizeKey, "80mm");
 
   const getReceiptFileName = () =>
     `Phieu_${formatWorkOrderId(
@@ -179,14 +200,12 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
       iframeDoc.open();
       iframeDoc.write(`<!doctype html><html><head><title>Print</title>
         <style>
-          @page { size: 80mm 200mm; margin: 0; }
-          html, body { width: 80mm; }
+          @page { size: ${paperSize.pageSize}; margin: 0; }
           body { margin: 0; padding: 0; display: flex; justify-content: center; }
           img { max-width: 100%; height: auto; }
           @media print {
-            html, body { width: 80mm; }
             body { margin: 0; padding: 0; }
-            img { max-width: 80mm; }
+            img { max-width: ${paperSize.width}; }
           }
         </style>
       </head><body><img src="${url}" onload="setTimeout(function(){ window.print(); }, 300);" /></body></html>`);
@@ -299,7 +318,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
               id="mobile-print-preview-content"
               className="relative flex-shrink-0 bg-white shadow-lg"
               style={{
-                width: "80mm",
+                width: paperSize.width,
                 minHeight: "auto",
                 color: "#000000",
                 backgroundColor: "#ffffff",

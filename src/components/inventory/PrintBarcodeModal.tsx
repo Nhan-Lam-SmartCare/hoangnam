@@ -3,6 +3,7 @@ import { X, Printer, Plus, Minus } from "lucide-react";
 import JsBarcode from "jsbarcode";
 import { Part } from "../../types";
 import { formatCurrency } from "../../utils/format";
+import { useStoreSettings } from "../../hooks/useStoreSettings";
 
 interface PrintBarcodeModalProps {
   part: Part;
@@ -85,12 +86,20 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
 }) => {
   const barcodeRef = useRef<SVGSVGElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const { data: storeSettings } = useStoreSettings();
+
+  // Resolve default label preset from store settings
+  const defaultPreset = (() => {
+    const saved = storeSettings?.print_label_size_default;
+    if (saved && saved in LABEL_PRESETS) return saved as LabelPreset;
+    return "20x35-dual" as LabelPreset;
+  })();
 
   // Settings
   const [quantity, setQuantity] = useState(1);
   const [showPrice, setShowPrice] = useState(true);
   const [showName, setShowName] = useState(true);
-  const [labelPreset, setLabelPreset] = useState<LabelPreset>("20x35-dual");
+  const [labelPreset, setLabelPreset] = useState<LabelPreset>(defaultPreset);
   const [barcodeFormat, setBarcodeFormat] = useState<BarcodeFormat>("CODE128");
 
   // Sử dụng barcode field nếu có, nếu không dùng SKU
