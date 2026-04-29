@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Shield, Plus, Search, Calendar, Wrench, CheckCircle2, XCircle, Clock3, Printer } from "lucide-react";
+import { Shield, Plus, Search, Calendar, Wrench, CheckCircle2, XCircle, Clock3, Printer, Smartphone, MoreVertical } from "lucide-react";
 import PrintWarrantyPreviewModal from "./PrintWarrantyPreviewModal";
 import {
     useWarrantyCards,
@@ -36,6 +36,9 @@ export const WarrantyManager: React.FC = () => {
     const [claimingCard, setClaimingCard] = useState<WarrantyCard | null>(null);
     const [claimIssueText, setClaimIssueText] = useState("");
     const [printPreviewCard, setPrintPreviewCard] = useState<WarrantyCard | null>(null);
+    const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+    const [visibleCount, setVisibleCount] = useState(20);
+    const [visibleClaimsCount, setVisibleClaimsCount] = useState(20);
     const canCreateClaim = canDo(profile, "warranty.claim.create");
     const canManageClaim = canDo(profile, "warranty.claim.manage");
     const canDeleteCard = canDo(profile, "warranty.card.delete");
@@ -87,6 +90,9 @@ export const WarrantyManager: React.FC = () => {
             String(claim?.id || "").toLowerCase().includes(keyword)
         );
     });
+
+    const displayedCards = filteredCards?.slice(0, visibleCount);
+    const displayedClaims = filteredClaims?.slice(0, visibleClaimsCount);
 
     const getStatusBadge = (status: string, endDate: string) => {
         const isExpired = new Date(endDate) < new Date();
@@ -315,31 +321,98 @@ export const WarrantyManager: React.FC = () => {
                         <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-3"></div>
                         Đang tải...
                     </div>
-                ) : filteredCards && filteredCards.length > 0 ? (
-                    filteredCards.map((card) => (
+                ) : displayedCards && displayedCards.length > 0 ? (
+                    <>
+                    {displayedCards.map((card) => (
                         <div
                             key={card.id}
                             className="bg-white dark:bg-[#1e1e2d] rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700"
                         >
                             {/* Header */}
-                            <div className="mb-3 space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-2 mb-1">
-                                        <h3 className="font-bold text-slate-900 dark:text-white leading-tight break-words">
-                                            {card.device_model}
-                                        </h3>
-                                        {getStatusBadge(card.status, card.warranty_end_date)}
+                            <div className="mb-3 space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className="w-10 h-10 shrink-0 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                            <Smartphone className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                                <h3 className="font-bold text-slate-900 dark:text-white leading-tight break-words">
+                                                    {card.device_model}
+                                                </h3>
+                                                {getStatusBadge(card.status, card.warranty_end_date)}
+                                            </div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 break-all">
+                                                IMEI: {card.imei_serial || "N/A"}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 break-all">
-                                        IMEI: {card.imei_serial || "N/A"}
+                                    
+                                    <div className="relative shrink-0">
+                                        <button
+                                            onClick={() => setActiveDropdownId(activeDropdownId === card.id ? null : card.id)}
+                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                        >
+                                            <MoreVertical className="w-4 h-4" />
+                                        </button>
+                                        
+                                        {activeDropdownId === card.id && (
+                                            <>
+                                                <div 
+                                                    className="fixed inset-0 z-40" 
+                                                    onClick={() => setActiveDropdownId(null)} 
+                                                />
+                                                <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
+                                                    {card.status !== "voided" && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                setActiveDropdownId(null);
+                                                                try {
+                                                                    await updateWarrantyStatusMutation.mutateAsync({ id: card.id, status: "voided" });
+                                                                    showToast.success("Đã vô hiệu phiếu bảo hành.");
+                                                                } catch {
+                                                                    showToast.error("Không thể cập nhật trạng thái phiếu.");
+                                                                }
+                                                            }}
+                                                            disabled={!canManageClaim}
+                                                            className="w-full text-left px-4 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                                                        >
+                                                            Vô hiệu phiếu
+                                                        </button>
+                                                    )}
+                                                    {canDeleteCard && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                setActiveDropdownId(null);
+                                                                const confirmed = window.confirm("Xóa vĩnh viễn phiếu bảo hành này?");
+                                                                if (!confirmed) return;
+                                                                try {
+                                                                    await deleteWarrantyCardMutation.mutateAsync(card.id);
+                                                                    showToast.success("Đã xóa phiếu bảo hành.");
+                                                                } catch (error) {
+                                                                    console.error("Delete warranty card failed", error);
+                                                                    showToast.error("Không thể xóa phiếu bảo hành.");
+                                                                }
+                                                            }}
+                                                            disabled={deleteWarrantyCardMutation.isPending}
+                                                            className="w-full text-left px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                        >
+                                                            Xóa phiếu
+                                                        </button>
+                                                    )}
+                                                    {(card.status === "voided" && !canDeleteCard) && (
+                                                        <div className="px-4 py-2.5 text-xs text-slate-400">Không có quyền thao tác</div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
-                                </div>
-                                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5">
+
+                                <div className="flex flex-wrap gap-2">
                                     <button
                                         onClick={() => handlePrintWarrantyReceipt(card)}
-                                        className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-cyan-300 text-cyan-700 dark:text-cyan-300 dark:border-cyan-500/40 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 inline-flex items-center justify-center gap-1"
+                                        className="h-8 px-3 py-1 text-[11px] font-semibold rounded-lg border border-cyan-300 text-cyan-700 dark:text-cyan-300 dark:border-cyan-500/40 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 inline-flex items-center justify-center gap-1.5 transition-colors"
                                     >
                                         <Printer className="w-3.5 h-3.5" /> In phiếu
                                     </button>
@@ -353,45 +426,10 @@ export const WarrantyManager: React.FC = () => {
                                             setClaimIssueText("");
                                         }}
                                         disabled={!canCreateClaim}
-                                        className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-500/10"
+                                        className="h-8 px-3 py-1 text-[11px] font-semibold rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
                                     >
                                         Tiếp nhận BH
                                     </button>
-                                    {card.status !== "voided" && (
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    await updateWarrantyStatusMutation.mutateAsync({ id: card.id, status: "voided" });
-                                                    showToast.success("Đã vô hiệu phiếu bảo hành.");
-                                                } catch {
-                                                    showToast.error("Không thể cập nhật trạng thái phiếu.");
-                                                }
-                                            }}
-                                            disabled={!canManageClaim}
-                                            className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-rose-300 text-rose-700 dark:text-rose-300 dark:border-rose-500/40 hover:bg-rose-50 dark:hover:bg-rose-500/10"
-                                        >
-                                            Vô hiệu
-                                        </button>
-                                    )}
-                                    {canDeleteCard && (
-                                        <button
-                                            onClick={async () => {
-                                                const confirmed = window.confirm("Xóa vĩnh viễn phiếu bảo hành này?");
-                                                if (!confirmed) return;
-                                                try {
-                                                    await deleteWarrantyCardMutation.mutateAsync(card.id);
-                                                    showToast.success("Đã xóa phiếu bảo hành.");
-                                                } catch (error) {
-                                                    console.error("Delete warranty card failed", error);
-                                                    showToast.error("Không thể xóa phiếu bảo hành.");
-                                                }
-                                            }}
-                                            disabled={deleteWarrantyCardMutation.isPending}
-                                            className="h-8 px-2 py-1 text-[11px] font-semibold rounded-lg border border-red-500 text-red-600 dark:text-red-300 dark:border-red-500/60 hover:bg-red-50 dark:hover:bg-red-500/10"
-                                        >
-                                            Xóa
-                                        </button>
-                                    )}
                                 </div>
                             </div>
 
@@ -462,18 +500,32 @@ export const WarrantyManager: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                    ))
+                    ))}
+                    {filteredCards && visibleCount < filteredCards.length && (
+                        <div className="pt-2 pb-4 text-center">
+                            <button
+                                onClick={() => setVisibleCount(v => v + 20)}
+                                className="px-4 py-2 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 text-sm font-semibold rounded-xl border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors shadow-sm"
+                            >
+                                Hiển thị thêm
+                            </button>
+                        </div>
+                    )}
+                    </>
                 ) : (
-                    <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <div className="text-center py-16 px-4 bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 border-8 border-white dark:border-[#151521] shadow-sm">
                             <Shield className="w-8 h-8 text-slate-400" />
                         </div>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">
-                            Chưa có phiếu bảo hành nào
+                        <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-1">
+                            Chưa có dữ liệu
+                        </h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 max-w-[250px] mx-auto">
+                            Hiện chưa có phiếu bảo hành nào trong hệ thống. Hãy tạo phiếu mới để bắt đầu.
                         </p>
                         <button
                             onClick={() => setShowCreateModal(true)}
-                            className="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold"
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-emerald-500/20 transition-all active:scale-95"
                         >
                             Tạo phiếu đầu tiên
                         </button>
@@ -486,8 +538,9 @@ export const WarrantyManager: React.FC = () => {
                             <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-3"></div>
                             Đang tải yêu cầu...
                         </div>
-                    ) : filteredClaims && filteredClaims.length > 0 ? (
-                        filteredClaims.map((claim: any) => (
+                    ) : displayedClaims && displayedClaims.length > 0 ? (
+                        <>
+                        {displayedClaims.map((claim: any) => (
                             <div
                                 key={claim.id}
                                 className="bg-white dark:bg-[#1e1e2d] rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700"
@@ -547,14 +600,28 @@ export const WarrantyManager: React.FC = () => {
                                     ))}
                                 </div>
                             </div>
-                        ))
+                        ))}
+                        {filteredClaims && visibleClaimsCount < filteredClaims.length && (
+                            <div className="pt-2 pb-4 text-center">
+                                <button
+                                    onClick={() => setVisibleClaimsCount(v => v + 20)}
+                                    className="px-4 py-2 bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 text-sm font-semibold rounded-xl border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors shadow-sm"
+                                >
+                                    Hiển thị thêm
+                                </button>
+                            </div>
+                        )}
+                        </>
                     ) : (
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <div className="text-center py-16 px-4 bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 border-8 border-white dark:border-[#151521] shadow-sm">
                                 <Wrench className="w-8 h-8 text-slate-400" />
                             </div>
-                            <p className="text-slate-500 dark:text-slate-400 text-sm">
-                                Chưa có yêu cầu bảo hành nào
+                            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-1">
+                                Chưa có yêu cầu
+                            </h3>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm max-w-[250px] mx-auto">
+                                Hiện chưa có yêu cầu tiếp nhận bảo hành nào cần xử lý.
                             </p>
                         </div>
                     )
