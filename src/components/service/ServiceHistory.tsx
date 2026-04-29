@@ -336,8 +336,8 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
       "Mã Phiếu",
       "Ngày tạo",
       "Khách hàng",
-      "Xe",
-      "Biển số",
+      "Thiết bị",
+      "Serial/IMEI",
       "Trạng thái",
       "Tổng chi phí",
     ];
@@ -488,7 +488,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
         <div className="relative mb-3">
           <input
             type="text"
-            placeholder="Tìm theo mã, tên, SĐT, xe,..."
+            placeholder="Tìm theo mã, tên, SĐT, thiết bị,..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400"
@@ -1417,10 +1417,10 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
               <span style={{ fontWeight: "bold" }}>SĐT:</span> {printOrder.customerPhone}
             </div>
             <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
-              <span style={{ fontWeight: "bold" }}>Loại xe:</span> {printOrder.vehicleModel}
+              <span style={{ fontWeight: "bold" }}>Thiết bị:</span> {printOrder.vehicleModel}
             </div>
             <div style={{ wordBreak: "break-word" }}>
-              <span style={{ fontWeight: "bold" }}>Biển số:</span> {printOrder.licensePlate}
+              <span style={{ fontWeight: "bold" }}>Serial/IMEI:</span> {printOrder.licensePlate}
             </div>
           </div>
 

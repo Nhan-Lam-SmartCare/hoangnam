@@ -111,7 +111,7 @@ export const StaffDashboard: React.FC = () => {
             to="/service-history"
             icon={<History className="w-6 h-6" />}
             label="Lịch sử sửa chữa"
-            description="Xem lịch sử sửa chữa xe khách hàng"
+            description="Xem lịch sử sửa chữa thiết bị khách hàng"
             color="amber"
           />
         </div>

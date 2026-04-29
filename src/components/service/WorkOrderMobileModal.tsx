@@ -56,6 +56,11 @@ import {
   calculateLabor,
   splitWorkerAmount,
 } from "../../lib/services/repairLaborService";
+import CustomerModal from "../customer/CustomerModal";
+import { POPULAR_DEVICES } from "../../constants/devices";
+import { DevicePhotoGallery } from "../common/DevicePhotoGallery";
+import { compressImage } from "../../utils/imageCompressor";
+import { uploadDevicePhoto, deleteDevicePhoto } from "../../lib/storage/devicePhotosStorage";
 
 interface WorkOrderMobileModalProps {
   isOpen: boolean;
@@ -154,69 +159,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const { data: serviceConfigs = [] } = useServiceConfigs();
   const showLegacyRepairSection =
     import.meta.env.VITE_ENABLE_MOBILE_REPAIR_SECTION === "1";
-  // Popular electronic devices for repair
-  const POPULAR_DEVICES = [
-    // === ĐIỆN THOẠI (PHONES) ===
-    "iPhone 15 Pro Max",
-    "iPhone 15 Pro",
-    "iPhone 15",
-    "iPhone 14 Pro Max",
-    "iPhone 14 Pro",
-    "iPhone 14",
-    "iPhone 13 Pro Max",
-    "iPhone 13",
-    "iPhone 12",
-    "iPhone 11",
-    "Samsung Galaxy S24 Ultra",
-    "Samsung Galaxy S23 Ultra",
-    "Samsung Galaxy S22 Ultra",
-    "Samsung Galaxy Z Fold 5",
-    "Samsung Galaxy Z Flip 5",
-    "Samsung Galaxy A54",
-    "Samsung Galaxy A34",
-    "OPPO Reno 10",
-    "OPPO Find N3",
-    "Xiaomi 13 Pro",
-    "Xiaomi Redmi Note 13 Pro",
-    "Vivo V29",
-    "Realme 11 Pro",
-
-    // === LAPTOP ===
-    "MacBook Pro 16-inch",
-    "MacBook Pro 14-inch",
-    "MacBook Air M2",
-    "MacBook Air M1",
-    "Dell XPS 15",
-    "Dell XPS 13",
-    "HP Pavilion 15",
-    "HP Envy 13",
-    "Lenovo ThinkPad X1 Carbon",
-    "Lenovo IdeaPad 3",
-    "Asus VivoBook",
-    "Asus ROG Zephyrus",
-    "Acer Aspire 5",
-    "MSI Gaming GF63",
-
-    // === MÁY TÍNH BẢNG (TABLETS) ===
-    "iPad Pro 12.9-inch",
-    "iPad Pro 11-inch",
-    "iPad Air",
-    "iPad Gen 10",
-    "Samsung Galaxy Tab S9",
-    "Samsung Galaxy Tab A8",
-
-    // === THIẾT BỊ KHÁC ===
-    "Apple Watch Series 9",
-    "Apple Watch SE",
-    "AirPods Pro",
-    "AirPods",
-    "Tai nghe Bluetooth",
-    "Loa Bluetooth",
-    "Camera hành trình",
-    "Máy ảnh Canon",
-    "Máy ảnh Sony",
-    "Thiết bị khác",
-  ];
+  // POPULAR_DEVICES is imported from ../../constants/devices
 
   const [isPatternMode, setIsPatternMode] = useState(false);
 
@@ -450,6 +393,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   const [issueDescription, setIssueDescription] = useState(
     workOrder?.issueDescription || ""
   );
+  
+  const [devicePhotos, setDevicePhotos] = useState<string[]>(
+    workOrder?.devicePhotos || []
+  );
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
   const [selectedParts, setSelectedParts] = useState<
     Array<{
       partId: string;
@@ -1213,6 +1162,32 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     setCustomerSearchTerm("");
   };
 
+  const handleAddDevicePhoto = async (file: File) => {
+    try {
+      setIsUploadingPhoto(true);
+      const compressedBlob = await compressImage(file);
+      const tempId = workOrder?.id || `temp_${Date.now()}`;
+      const photoUrl = await uploadDevicePhoto(tempId, compressedBlob);
+      
+      setDevicePhotos(prev => [...prev, photoUrl]);
+    } catch (error: any) {
+      showToast.error(error.message || "Không thể upload ảnh thiết bị");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleRemoveDevicePhoto = async (photoUrl: string) => {
+    try {
+      await deleteDevicePhoto(photoUrl);
+      setDevicePhotos(prev => prev.filter(url => url !== photoUrl));
+    } catch (error: any) {
+      // Still remove from UI even if backend delete fails
+      setDevicePhotos(prev => prev.filter(url => url !== photoUrl));
+      showToast.error("Không thể xóa ảnh từ hệ thống, đã gỡ khỏi phiếu hiện tại.");
+    }
+  };
+
   const handleSave = async (forceFullPayment = false) => {
     // Prevent duplicate submissions
     if (isSubmitting) return;
@@ -1461,6 +1436,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       issueDescription: currentKm
         ? issueDescription + `\n\n[Mật khẩu/Pattern]: ${currentKm}`
         : issueDescription,
+      devicePhotos: devicePhotos,
       parts: transformedParts,
       additionalServices: transformedServices,
       repairServices: transformedRepairServices,
@@ -2680,6 +2656,16 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                         />
                       </div>
                     </div>
+
+                    <div className="pt-2">
+                      <DevicePhotoGallery
+                        photos={devicePhotos}
+                        onAddPhoto={handleAddDevicePhoto}
+                        onRemovePhoto={handleRemoveDevicePhoto}
+                        isUploading={isUploadingPhoto}
+                      />
+                    </div>
+
                     <button
                       onClick={() => setActiveSection("parts")}
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 mt-4 shadow-lg shadow-blue-500/20"
@@ -4004,179 +3990,57 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
         </div>
       )}
 
-      {/* Add Customer Modal - Premium Redesign */}
+      {/* Add Customer Modal - Unified */}
       {showAddCustomer && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white dark:bg-[#1e1e2d] rounded-3xl p-6 border border-slate-200 dark:border-slate-700/50 shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-hide transition-colors">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <UserPlus className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-                <h3 className="text-slate-900 dark:text-white font-bold text-base">Thêm khách hàng mới</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAddCustomer(false);
-                  setNewCustomerName("");
-                  setNewCustomerPhone("");
-                  setNewCustomerVehicleModel("");
-                  setNewCustomerLicensePlate("");
-                }}
+        <CustomerModal
+          customer={{} as any}
+          existingCustomers={customers}
+          onSave={(savedCustomer) => {
+            const customerId = savedCustomer.id || `CUST-${Date.now()}`;
+            const primaryVehicle = savedCustomer.vehicles?.find((v: any) => v.isPrimary) || savedCustomer.vehicles?.[0];
 
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 active:scale-95 transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            const vehicles: Vehicle[] = savedCustomer.vehicles || [];
+            if (vehicles.length === 0 && (savedCustomer.vehicleModel || savedCustomer.licensePlate)) {
+              vehicles.push({
+                id: `VEH-${Date.now()}`,
+                model: savedCustomer.vehicleModel || "",
+                licensePlate: savedCustomer.licensePlate || "",
+                isPrimary: true,
+              } as Vehicle);
+            }
 
-            <div className="space-y-5">
-              {/* Customer Info Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 ml-1">
-                  <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Thông tin khách hàng
-                  </h4>
-                </div>
+            const newCustomerObj: Customer = {
+              id: customerId,
+              name: savedCustomer.name || "",
+              phone: savedCustomer.phone || "",
+              vehicles: vehicles,
+              vehicleModel: primaryVehicle?.model || savedCustomer.vehicleModel || "",
+              licensePlate: primaryVehicle?.licensePlate || savedCustomer.licensePlate || "",
+              status: "active",
+              segment: "New",
+              loyaltyPoints: 0,
+              totalSpent: 0,
+              visitCount: 1,
+              lastVisit: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            };
 
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
-                    Tên khách hàng <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newCustomerName}
-                    onChange={(e) => setNewCustomerName(e.target.value)}
-                    placeholder="Nguyễn Văn A"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-blue-500 transition-all"
-                    autoFocus
-                  />
-                </div>
+            if (upsertCustomer) {
+              upsertCustomer(newCustomerObj);
+            }
 
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
-                    Số điện thoại <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={newCustomerPhone}
-                    onChange={(e) => setNewCustomerPhone(e.target.value)}
-                    placeholder="0901234567"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-blue-500 transition-all"
-                  />
-                </div>
-              </div>
+            setSelectedCustomer(newCustomerObj);
+            if (vehicles.length > 0) {
+              setSelectedVehicle(vehicles[0]);
+            }
 
-              {/* Vehicle Info Section */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center gap-2 ml-1">
-                  <div className="w-1 h-3 bg-green-500 rounded-full"></div>
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    Thông tin thiết bị
-                  </h4>
-                </div>
-
-                <div className="space-y-1.5 relative">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
-                    Tên thiết bị / Model <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newCustomerVehicleModel}
-                    onChange={(e) => {
-                      setNewCustomerVehicleModel(e.target.value);
-                      setShowCustomerVehicleDropdown(true);
-                    }}
-                    onFocus={() => setShowCustomerVehicleDropdown(true)}
-                    placeholder="Chọn hoặc nhập tên thiết bị..."
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:border-blue-500 transition-all"
-                  />
-                  {/* Vehicle Model Dropdown for New Customer */}
-                  {showCustomerVehicleDropdown && (
-                    <div className="absolute z-20 w-full mt-1 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-[200px] overflow-y-auto scrollbar-hide">
-                      {POPULAR_DEVICES.filter((model) =>
-                        model
-                          .toLowerCase()
-                          .includes(newCustomerVehicleModel.toLowerCase())
-                      )
-                        .slice(0, 10)
-                        .map((model) => (
-                          <button
-                            key={model}
-                            type="button"
-                            onClick={() => {
-                              setNewCustomerVehicleModel(model);
-                              setShowCustomerVehicleDropdown(false);
-                            }}
-                            className="w-full text-left px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700/50 last:border-0 transition-colors"
-                          >
-                            {model}
-                          </button>
-                        ))}
-                      {POPULAR_DEVICES.filter((model) =>
-                        model
-                          .toLowerCase()
-                          .includes(newCustomerVehicleModel.toLowerCase())
-                      ).length === 0 && (
-                          <div className="px-4 py-3 text-xs text-slate-500 text-center italic">
-                            Không tìm thấy - nhập tên thiết bị mới
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
-                    Serial / IMEI
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newCustomerLicensePlate}
-                      onChange={(e) =>
-                        setNewCustomerLicensePlate(e.target.value.toUpperCase())
-                      }
-                      placeholder="VD: 123456789012345"
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm font-bold uppercase focus:border-blue-500 transition-all font-mono"
-                    />
-                    <button
-                      onClick={() => setActiveScanField("customer")}
-                      className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl active:scale-95 transition-all"
-                    >
-                      <ScanBarcode className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setShowAddCustomer(false);
-                    setNewCustomerName("");
-                    setNewCustomerPhone("");
-                    setNewCustomerVehicleModel("");
-                    setNewCustomerLicensePlate("");
-                  }}
-                  className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-bold text-xs active:scale-95 transition-all"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleAddNewCustomer}
-                  disabled={!newCustomerName || !newCustomerPhone || !newCustomerVehicleModel}
-                  className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-green-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Lưu khách hàng
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-      }
+            setShowCustomerSearch(false);
+            setShowAddCustomer(false);
+            setCustomerSearchTerm("");
+          }}
+          onClose={() => setShowAddCustomer(false)}
+        />
+      )}
 
       {/* Barcode Scanner Overlay - Global for Part/Vehicle/Customer */}
       <ScannerModal

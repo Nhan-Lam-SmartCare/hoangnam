@@ -596,7 +596,7 @@ export function ServiceManagerMobile({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input
                       type="text"
-                      placeholder="Tìm tên, SĐT, biển số, dòng xe..."
+                      placeholder="Tìm tên, SĐT, Serial/IMEI, thiết bị..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#334968] bg-[#141a28] text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#4a8bd1]"

@@ -122,7 +122,7 @@ export const WorkOrderVehicleSection: React.FC<WorkOrderVehicleSectionProps> = (
                   >
                     <div className="flex items-center gap-2">
                       {isPrimary && (
-                        <span className="text-yellow-500" title="Xe chính">
+                        <span className="text-yellow-500" title="Thiết bị chính">
                           ⭐
                         </span>
                       )}
@@ -142,7 +142,7 @@ export const WorkOrderVehicleSection: React.FC<WorkOrderVehicleSectionProps> = (
                             onStartEditVehicle(vehicle);
                           }}
                           className="text-slate-400 hover:text-blue-500 p-1"
-                          title="Sửa thông tin xe"
+                          title="Sửa thông tin thiết bị"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"

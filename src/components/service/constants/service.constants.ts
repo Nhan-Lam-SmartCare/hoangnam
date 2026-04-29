@@ -4,69 +4,12 @@
  */
 
 /**
- * Popular motorcycle models in Vietnam
- * Used for vehicle model autocomplete/suggestions
+ * Danh sách thiết bị phổ biến — re-export từ file dùng chung.
+ * Chỉnh sửa tại src/constants/devices.ts
  */
-export const POPULAR_MOTORCYCLES = [
-    // Honda
-    "Honda Wave RSX",
-    "Honda Wave Alpha",
-    "Honda Blade",
-    "Honda Future",
-    "Honda Winner X",
-    "Honda Vision",
-    "Honda Air Blade",
-    "Honda SH Mode",
-    "Honda SH 125i",
-    "Honda SH 150i",
-    "Honda SH 160i",
-    "Honda SH 350i",
-    "Honda Vario",
-    "Honda Lead",
-    "Honda PCX",
-    "Honda ADV",
-    // Yamaha
-    "Yamaha Exciter",
-    "Yamaha Sirius",
-    "Yamaha Jupiter",
-    "Yamaha Grande",
-    "Yamaha Janus",
-    "Yamaha FreeGo",
-    "Yamaha Latte",
-    "Yamaha NVX",
-    "Yamaha XSR",
-    // Suzuki
-    "Suzuki Raider",
-    "Suzuki Axelo",
-    "Suzuki Satria",
-    "Suzuki GD110",
-    "Suzuki Impulse",
-    "Suzuki Address",
-    "Suzuki Revo",
-    // SYM
-    "SYM Elite",
-    "SYM Galaxy",
-    "SYM Star",
-    "SYM Attila",
-    "SYM Angela",
-    "SYM Passing",
-    // Piaggio & Vespa
-    "Piaggio Liberty",
-    "Piaggio Medley",
-    "Vespa Sprint",
-    "Vespa Primavera",
-    "Vespa GTS",
-    // VinFast
-    "VinFast Klara",
-    "VinFast Evo200",
-    "VinFast Ludo",
-    "VinFast Impes",
-    "VinFast Theon",
-    // Khác
-    "Khác",
-] as const;
+export { POPULAR_DEVICES as POPULAR_MOTORCYCLES, POPULAR_DEVICES } from "../../../constants/devices";
 
-export type MotorcycleModel = (typeof POPULAR_MOTORCYCLES)[number];
+export type DeviceModel = string;
 
 /**
  * Filter input CSS class

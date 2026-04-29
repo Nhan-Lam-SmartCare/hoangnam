@@ -229,6 +229,7 @@ export interface WorkOrder {
   vehicleId?: string; // NEW: Link to specific vehicle from customer.vehicles[]
   currentKm?: number; // Số km hiện tại tại thời điểm tạo phiếu
   issueDescription?: string;
+  devicePhotos?: string[]; // Danh sách các URL ảnh thiết bị khi nhận
   estimatedCompletion?: string;
   technicianName?: string;
   status: "Tiếp nhận" | "Đang sửa" | "Đã sửa xong" | "Trả máy" | "\u0110\u00E3 h\u1EE7y";

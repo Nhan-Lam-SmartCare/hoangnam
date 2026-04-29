@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
 import type {
@@ -43,6 +43,11 @@ import {
 } from "../../../lib/services/repairLaborService";
 import { WorkOrderCustomerSection } from "./WorkOrderCustomerSection";
 import { WorkOrderVehicleSection } from "./WorkOrderVehicleSection";
+import CustomerModal from "../../customer/CustomerModal";
+import { POPULAR_DEVICES } from "../../../constants/devices";
+import { DevicePhotoGallery } from "../../common/DevicePhotoGallery";
+import { compressImage } from "../../../utils/imageCompressor";
+import { uploadDevicePhoto, deleteDevicePhoto } from "../../../lib/storage/devicePhotosStorage";
 
 export interface StoreSettings {
   store_name?: string;
@@ -176,88 +181,7 @@ const WorkOrderModal: React.FC<{
   canUpdateWorkOrderOutsourceService = true,
   invalidateWorkOrders,
 }) => {
-    // Popular electronics devices
-    const POPULAR_DEVICES = [
-      // === APPLE ===
-      "iPhone 15 Pro Max",
-      "iPhone 15 Pro",
-      "iPhone 15 Plus",
-      "iPhone 15",
-      "iPhone 14 Pro Max",
-      "iPhone 14 Pro",
-      "iPhone 13 Pro Max",
-      "iPhone 13 Pro",
-      "iPhone 13",
-      "iPhone 12 Pro Max",
-      "iPhone 12",
-      "iPhone 11 Pro Max",
-      "iPhone 11",
-      "iPhone XS Max",
-      "iPhone X/XS",
-      "iPhone 8 Plus",
-      "iPad Pro 12.9",
-      "iPad Pro 11",
-      "iPad Air 5",
-      "iPad Gen 10",
-      "MacBook Pro 14 M1/M2/M3",
-      "MacBook Pro 16",
-      "MacBook Air M1/M2",
-
-      // === SAMSUNG ===
-      "Samsung S24 Ultra",
-      "Samsung S24 Plus",
-      "Samsung S23 Ultra",
-      "Samsung S22 Ultra",
-      "Samsung Z Fold 5",
-      "Samsung Z Flip 5",
-      "Samsung A55",
-      "Samsung A35",
-      "Samsung A25",
-      "Samsung A15",
-      "Samsung A05s",
-      "Samsung Tab S9",
-
-      // === XIAOMI / OPPO / VIVO ===
-      "Xiaomi 14 Ultra",
-      "Xiaomi 13T",
-      "Redmi Note 13 Pro",
-      "Redmi Note 12",
-      "Oppo Find N3",
-      "Oppo Reno 10",
-      "Vivo X100",
-      "Vivo V29",
-
-      // === LAPTOPS ===
-      "Dell XPS 13",
-      "Dell XPS 15",
-      "Dell Inspiron",
-      "Dell Latitude",
-      "HP Spectre",
-      "HP Envy",
-      "HP Pavilion",
-      "Asus ROG Strix",
-      "Asus TUF Gaming",
-      "Asus ZenBook",
-      "Asus VivoBook",
-      "Lenovo ThinkPad X1",
-      "Lenovo Legion",
-      "Lenovo IdeaPad",
-      "Acer Nitro 5",
-      "Acer Swift",
-      "MSI Katana",
-      "MSI Modern",
-
-      // === OTHER ===
-      "Apple Watch Series 9",
-      "Apple Watch Ultra",
-      "AirPods Pro 2",
-      "Sony WH-1000XM5",
-      "JBL Speaker",
-      "Máy tính để bàn (PC)",
-      "Màn hình máy tính",
-      "Máy in",
-      "Khác"
-    ];
+    // POPULAR_DEVICES is imported from ../../../constants/devices
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const queryClient = useQueryClient();
@@ -358,6 +282,8 @@ const WorkOrderModal: React.FC<{
       services: true,
       payment: true,
     });
+
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     // Manual parts entry state
     const [_showAddManualPart, _setShowAddManualPart] = useState(false);
@@ -776,10 +702,10 @@ const WorkOrderModal: React.FC<{
         setEditingVehicleId(null);
         setEditVehicleModel("");
         setEditVehicleLicensePlate("");
-        showToast.success("Đã cập nhật thông tin xe");
+        showToast.success("Đã cập nhật thông tin thiết bị");
       } catch (error) {
         console.error("Error updating vehicle:", error);
-        showToast.error("Có lỗi khi cập nhật thông tin xe");
+        showToast.error("Có lỗi khi cập nhật thông tin thiết bị");
       }
     };
 
@@ -1562,7 +1488,7 @@ const WorkOrderModal: React.FC<{
             created_at: new Date().toISOString(),
           });
         } else {
-          // Khách hàng đã tồn tại - chỉ cập nhật thông tin xe nếu cần
+          // Khách hàng đã tồn tại - chỉ cập nhật thông tin thiết bị nếu cần
 
           if (
             formData.vehicleModel &&
@@ -1901,7 +1827,7 @@ const WorkOrderModal: React.FC<{
               created_at: new Date().toISOString(),
             });
           } else {
-            // Khách hàng đã tồn tại - chỉ cập nhật thông tin xe nếu cần
+            // Khách hàng đã tồn tại - chỉ cập nhật thông tin thiết bị nếu cần
 
             if (
               formData.vehicleModel &&
@@ -2827,6 +2753,42 @@ const WorkOrderModal: React.FC<{
       }
     };
 
+    const handleAddDevicePhoto = async (file: File) => {
+      try {
+        setIsUploadingPhoto(true);
+        const compressedBlob = await compressImage(file);
+        // Use a temporary ID if the order is not yet created
+        const tempId = order?.id || `temp_${Date.now()}`;
+        const photoUrl = await uploadDevicePhoto(tempId, compressedBlob);
+        
+        setFormData(prev => ({
+          ...prev,
+          devicePhotos: [...(prev.devicePhotos || []), photoUrl]
+        }));
+      } catch (error: any) {
+        showToast.error(error.message || "Không thể upload ảnh thiết bị");
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    };
+
+    const handleRemoveDevicePhoto = async (photoUrl: string) => {
+      try {
+        await deleteDevicePhoto(photoUrl);
+        setFormData(prev => ({
+          ...prev,
+          devicePhotos: (prev.devicePhotos || []).filter(url => url !== photoUrl)
+        }));
+      } catch (error: any) {
+        // Still remove from UI even if backend delete fails to prevent being stuck
+        setFormData(prev => ({
+          ...prev,
+          devicePhotos: (prev.devicePhotos || []).filter(url => url !== photoUrl)
+        }));
+        showToast.error("Không thể xóa ảnh từ hệ thống, đã gỡ khỏi phiếu hiện tại.");
+      }
+    };
+
     const handlePayFull = async () => {
       const fullPayment = Math.max(0, total - totalDeposit);
       setShowPartialPayment(true);
@@ -3201,6 +3163,15 @@ const WorkOrderModal: React.FC<{
                       })
                     }
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none"
+                  />
+                </div>
+                
+                <div>
+                  <DevicePhotoGallery
+                    photos={formData.devicePhotos || []}
+                    onAddPhoto={handleAddDevicePhoto}
+                    onRemovePhoto={handleRemoveDevicePhoto}
+                    isUploading={isUploadingPhoto}
                   />
                 </div>
               </div>
@@ -4625,295 +4596,56 @@ const WorkOrderModal: React.FC<{
 
         {/* Add Customer Modal */}
         {showAddCustomerModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-            <div className="bg-white dark:bg-slate-800 rounded-xl w-full max-w-md p-6 m-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                  Thêm khách hàng
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowAddCustomerModal(false);
-                    setNewCustomer({
-                      name: "",
-                      phone: "",
-                      vehicleModel: "",
-                      licensePlate: "",
-                    });
-                  }}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                  aria-label="Đóng"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="w-5 h-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
+          <CustomerModal
+            customer={{} as any}
+            existingCustomers={customers}
+            onSave={(savedCustomer) => {
+              const customerId = savedCustomer.id || `CUST-${Date.now()}`;
+              const primaryVehicle = savedCustomer.vehicles?.find((v: any) => v.isPrimary) || savedCustomer.vehicles?.[0];
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Tên khách
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Nhập tên khách"
-                    value={newCustomer.name}
-                    onChange={(e) =>
-                      setNewCustomer({ ...newCustomer, name: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
+              // Check if customer already exists by phone
+              const existingCustomer = customers.find(
+                (c) => c.phone === savedCustomer.phone
+              );
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Số điện thoại
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="VD: 09xxxx"
-                    value={newCustomer.phone}
-                    onChange={(e) =>
-                      setNewCustomer({ ...newCustomer, phone: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
+              if (!existingCustomer) {
+                // Create new customer
+                upsertCustomer({
+                  id: customerId,
+                  name: savedCustomer.name || "",
+                  phone: savedCustomer.phone || "",
+                  vehicles: savedCustomer.vehicles,
+                  vehicleModel: primaryVehicle?.model || savedCustomer.vehicleModel || "",
+                  licensePlate: primaryVehicle?.licensePlate || savedCustomer.licensePlate || "",
+                  created_at: new Date().toISOString(),
+                });
+              } else {
+                // Update existing customer vehicles if needed
+                const updatedVehicles = savedCustomer.vehicles && savedCustomer.vehicles.length > 0
+                  ? savedCustomer.vehicles
+                  : existingCustomer.vehicles;
+                upsertCustomer({
+                  ...existingCustomer,
+                  vehicles: updatedVehicles,
+                  vehicleModel: primaryVehicle?.model || existingCustomer.vehicleModel,
+                  licensePlate: primaryVehicle?.licensePlate || existingCustomer.licensePlate,
+                });
+              }
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative vehicle-search-container">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Dòng xe
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Chọn hoặc nhập dòng xe"
-                      value={newCustomer.vehicleModel}
-                      onChange={(e) => {
-                        setNewCustomer({
-                          ...newCustomer,
-                          vehicleModel: e.target.value,
-                        });
-                        setShowVehicleDropdown(true);
-                      }}
-                      onFocus={() => setShowVehicleDropdown(true)}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
-                    />
-
-                    {/* Vehicle Model Dropdown */}
-                    {showVehicleDropdown && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-[200px] overflow-y-auto">
-                        {POPULAR_DEVICES.filter((model) =>
-                          model
-                            .toLowerCase()
-                            .includes(newCustomer.vehicleModel.toLowerCase())
-                        ).map((model: string) => (
-                          <button
-                            key={model}
-                            type="button"
-                            onClick={() => {
-                              setNewCustomer({
-                                ...newCustomer,
-                                vehicleModel: model,
-                              });
-                              setShowVehicleDropdown(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-600 text-sm border-b border-slate-200 dark:border-slate-600 last:border-0 text-slate-900 dark:text-slate-100"
-                          >
-                            {model}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Serial Number / IMEI
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="VD: SN12345678"
-                      value={newCustomer.licensePlate}
-                      onChange={(e) =>
-                        setNewCustomer({
-                          ...newCustomer,
-                          licensePlate: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowAddCustomerModal(false);
-                    setNewCustomer({
-                      name: "",
-                      phone: "",
-                      vehicleModel: "",
-                      licensePlate: "",
-                    });
-                  }}
-                  className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={() => {
-                    if (newCustomer.name && newCustomer.phone) {
-                      // Check if customer already exists
-                      const existingCustomer = customers.find(
-                        (c) => c.phone === newCustomer.phone
-                      );
-
-                      if (!existingCustomer) {
-                        // Customer doesn't exist - create new one
-
-                        const customerId = `CUST-${Date.now()}`;
-                        const vehicleId = `VEH-${Date.now()}`;
-                        const vehicles = [];
-                        if (
-                          newCustomer.vehicleModel ||
-                          newCustomer.licensePlate
-                        ) {
-                          vehicles.push({
-                            id: vehicleId,
-                            model: newCustomer.vehicleModel || "",
-                            licensePlate: newCustomer.licensePlate || "",
-                            isPrimary: true,
-                          });
-                        }
-
-                        upsertCustomer({
-                          id: customerId,
-                          name: newCustomer.name,
-                          phone: newCustomer.phone,
-                          vehicles: vehicles.length > 0 ? vehicles : undefined,
-                          vehicleModel: newCustomer.vehicleModel,
-                          licensePlate: newCustomer.licensePlate,
-                          created_at: new Date().toISOString(),
-                        });
-
-                        // Set the new customer to the form AND search field
-                        setFormData({
-                          ...formData,
-                          customerName: newCustomer.name,
-                          customerPhone: newCustomer.phone,
-                          vehicleId: vehicles.length > 0 ? vehicleId : undefined,
-                          vehicleModel: newCustomer.vehicleModel,
-                          licensePlate: newCustomer.licensePlate,
-                        });
-                      } else {
-                        // Customer exists - just use existing customer and optionally update vehicle
-
-                        const hasVehicleChange =
-                          (newCustomer.vehicleModel &&
-                            newCustomer.vehicleModel !==
-                            existingCustomer.vehicleModel) ||
-                          (newCustomer.licensePlate &&
-                            newCustomer.licensePlate !==
-                            existingCustomer.licensePlate);
-
-                        let vehicleIdToUse = existingCustomer.vehicles?.[0]?.id;
-
-                        if (hasVehicleChange) {
-                          const vehicleId = `VEH-${Date.now()}`;
-                          const vehicles = [...(existingCustomer.vehicles || [])];
-
-                          // Check if vehicle with this license plate already exists
-                          const existingVehicleIndex = vehicles.findIndex(
-                            (v) => v.licensePlate === newCustomer.licensePlate
-                          );
-
-                          if (
-                            existingVehicleIndex >= 0 &&
-                            newCustomer.licensePlate
-                          ) {
-                            // Update existing vehicle
-                            vehicles[existingVehicleIndex] = {
-                              ...vehicles[existingVehicleIndex],
-                              model:
-                                newCustomer.vehicleModel ||
-                                vehicles[existingVehicleIndex].model,
-                            };
-                            vehicleIdToUse = vehicles[existingVehicleIndex].id;
-                          } else if (
-                            newCustomer.vehicleModel ||
-                            newCustomer.licensePlate
-                          ) {
-                            // Add new vehicle
-                            vehicles.push({
-                              id: vehicleId,
-                              model: newCustomer.vehicleModel || "",
-                              licensePlate: newCustomer.licensePlate || "",
-                              isPrimary: vehicles.length === 0,
-                            });
-                            vehicleIdToUse = vehicleId;
-                          }
-
-                          upsertCustomer({
-                            ...existingCustomer,
-                            vehicles: vehicles.length > 0 ? vehicles : undefined,
-                            vehicleModel:
-                              newCustomer.vehicleModel ||
-                              existingCustomer.vehicleModel,
-                            licensePlate:
-                              newCustomer.licensePlate ||
-                              existingCustomer.licensePlate,
-                          });
-                        }
-
-                        // Set the existing customer to the form
-                        setFormData({
-                          ...formData,
-                          customerName: existingCustomer.name,
-                          customerPhone: existingCustomer.phone,
-                          vehicleId: vehicleIdToUse,
-                          vehicleModel:
-                            newCustomer.vehicleModel ||
-                            existingCustomer.vehicleModel,
-                          licensePlate:
-                            newCustomer.licensePlate ||
-                            existingCustomer.licensePlate,
-                        });
-                      }
-
-                      // Update customer search to show the name
-                      setCustomerSearch(newCustomer.name);
-
-                      // Close modal and reset
-                      setShowAddCustomerModal(false);
-                      setNewCustomer({
-                        name: "",
-                        phone: "",
-                        vehicleModel: "",
-                        licensePlate: "",
-                      });
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
-                  disabled={!newCustomer.name || !newCustomer.phone}
-                >
-                  Lưu
-                </button>
-              </div>
-            </div>
-          </div>
+              // Auto-select customer in the work order form
+              setFormData({
+                ...formData,
+                customerName: savedCustomer.name || "",
+                customerPhone: savedCustomer.phone || "",
+                vehicleId: primaryVehicle?.id,
+                vehicleModel: primaryVehicle?.model || savedCustomer.vehicleModel || "",
+                licensePlate: primaryVehicle?.licensePlate || savedCustomer.licensePlate || "",
+              });
+              setCustomerSearch(savedCustomer.name || "");
+              setShowAddCustomerModal(false);
+            }}
+            onClose={() => setShowAddCustomerModal(false)}
+          />
         )}
 
         {/* Add Vehicle Modal */}
@@ -5019,7 +4751,7 @@ const WorkOrderModal: React.FC<{
                     !newVehicle.model.trim() || !newVehicle.licensePlate.trim()
                   }
                 >
-                  Thêm xe
+                  Thêm thiết bị
                 </button>
               </div>
             </div>
