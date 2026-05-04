@@ -758,10 +758,25 @@ const SalesManager: React.FC = () => {
               Quay lại chọn sản phẩm
             </button>
           </div>
-          <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <ReceiptText className="w-5 h-5 text-emerald-500" />
-            Quản lý bán hàng
-          </h2>
+          <div className="rounded-2xl border border-emerald-200/60 dark:border-emerald-500/20 bg-gradient-to-br from-emerald-50/80 via-white/80 to-sky-50/70 dark:from-emerald-950/40 dark:via-slate-950/60 dark:to-slate-900/40 p-4 shadow-[0_18px_40px_-28px_rgba(16,185,129,0.55)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-200/70 font-semibold">
+                  Giao dich nhanh
+                </p>
+                <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-base">
+                  <ReceiptText className="w-5 h-5 text-emerald-500" />
+                  Quản lý bán hàng
+                </h2>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] text-slate-500 dark:text-slate-300">Giỏ hàng</div>
+                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-300">
+                  {cartItems.length}
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
@@ -769,8 +784,8 @@ const SalesManager: React.FC = () => {
               onClick={() => setRightTab("checkout")}
               className={`h-9 rounded-lg text-sm font-semibold border transition ${
                 rightTab === "checkout"
-                  ? "bg-emerald-600 text-white border-emerald-600"
-                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600"
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-[0_10px_30px_-20px_rgba(16,185,129,0.9)]"
+                  : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
               }`}
             >
               Thanh toán
@@ -781,7 +796,7 @@ const SalesManager: React.FC = () => {
               className={`h-9 rounded-lg text-sm font-semibold border transition ${
                 rightTab === "history"
                   ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-200 dark:text-slate-900 dark:border-slate-200"
-                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600"
+                  : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
               }`}
             >
               Lịch sử bán hàng
@@ -792,65 +807,86 @@ const SalesManager: React.FC = () => {
           <>
           <div className="space-y-2 max-h-64 overflow-auto pr-1 mt-3">
             {cartItems.map((item) => (
-              <div key={item.partId} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/70 dark:bg-slate-900/40">
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <p className="font-medium text-sm text-slate-900 dark:text-slate-100">{item.partName}</p>
-                    <p className="text-xs text-slate-500">{formatCurrency(item.sellingPrice)} x {item.quantity}</p>
+              <div
+                key={item.partId}
+                className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 p-3 bg-white/90 dark:bg-slate-950/40 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.6)]"
+              >
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                      {item.partName}
+                    </p>
+                    <p className="text-xs text-slate-500">{item.sku || ""}</p>
                   </div>
                   <button
                     onClick={() => removeItem(item.partId)}
-                    className="text-red-500 hover:text-red-600"
+                    className="text-slate-400 hover:text-rose-500 w-8 h-8 rounded-lg border border-slate-200/70 dark:border-slate-700 inline-flex items-center justify-center"
                     title="Xóa khỏi giỏ"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-3 flex items-center gap-2">
                   <button
                     onClick={() => updateQty(item.partId, item.quantity - 1)}
-                    className="w-7 h-7 rounded-md border border-slate-300 dark:border-slate-600 flex items-center justify-center"
+                    className="w-9 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="min-w-8 text-center text-sm font-medium">{item.quantity}</span>
+                  <span className="w-10 text-center text-sm font-semibold">
+                    {item.quantity}
+                  </span>
                   <button
                     onClick={() => updateQty(item.partId, item.quantity + 1)}
-                    className="w-7 h-7 rounded-md border border-slate-300 dark:border-slate-600 flex items-center justify-center"
+                    className="w-9 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
+                  <div className="flex-1 min-w-0">
+                    <input
+                      value={formatCurrency(item.sellingPrice)}
+                      readOnly
+                      className="w-full h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm font-semibold text-slate-700 dark:text-slate-200 px-3"
+                    />
+                  </div>
+                  <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-300 whitespace-nowrap">
+                    {formatCurrency(item.sellingPrice * item.quantity)}
+                  </div>
                 </div>
               </div>
             ))}
             {!cartItems.length && (
-              <p className="text-sm text-slate-500 text-center py-6">Chưa có sản phẩm trong giỏ hàng.</p>
+              <div className="rounded-2xl border border-dashed border-slate-300/70 dark:border-slate-700 p-6 text-center text-sm text-slate-500">
+                Chưa có sản phẩm trong giỏ hàng.
+              </div>
             )}
           </div>
 
-          <div className="space-y-3 border-t border-slate-200 dark:border-slate-700 pt-4">
-            <label className="block relative">
-              <span className="text-xs text-slate-500">Tên khách hàng</span>
-              <div className="relative mt-1">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  value={customerSearch}
-                  onFocus={() => setShowCustomerSuggestions(true)}
-                  onBlur={() => {
-                    setTimeout(() => setShowCustomerSuggestions(false), 120);
-                  }}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setCustomerSearch(next);
-                    setCustomerName(next);
-                    setShowCustomerSuggestions(true);
-                  }}
-                  placeholder="Nhập tên hoặc số điện thoại"
-                  className="w-full pl-9 pr-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
-                />
+          <div className="space-y-3 border-t border-slate-200/70 dark:border-slate-700 pt-4">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Khách hàng</div>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    value={customerSearch}
+                    onFocus={() => setShowCustomerSuggestions(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowCustomerSuggestions(false), 120);
+                    }}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setCustomerSearch(next);
+                      setCustomerName(next);
+                      setShowCustomerSuggestions(true);
+                    }}
+                    placeholder="Tìm khách hàng (tên, SDT, biển số)"
+                    className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                  />
+                </div>
               </div>
               {showCustomerSuggestions && customerSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 mt-1 max-h-52 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg z-20">
+                <div className="mt-1 max-h-52 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
                   {customerSuggestions.map((c) => (
                     <button
                       type="button"
@@ -869,92 +905,147 @@ const SalesManager: React.FC = () => {
                   ))}
                 </div>
               )}
-            </label>
 
-            <label className="block">
-              <span className="text-xs text-slate-500">Số điện thoại</span>
-              <input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                className="mt-1 w-full px-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
-              />
-            </label>
+              <label className="block">
+                <span className="text-xs text-slate-500">Số điện thoại</span>
+                <input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                />
+              </label>
+            </div>
 
-            <label className="block">
-              <span className="text-xs text-slate-500">Phương thức thanh toán</span>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as "cash" | "bank")}
-                className="mt-1 w-full px-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
-              >
-                <option value="cash">Tiền mặt</option>
-                <option value="bank">Chuyển khoản</option>
-              </select>
-            </label>
-
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <input
-                type="checkbox"
-                checked={autoPrintInvoice}
-                onChange={(e) => setAutoPrintInvoice(e.target.checked)}
-                className="rounded border-slate-300 dark:border-slate-600"
-              />
-              In hóa đơn nhanh sau khi xác nhận
-            </label>
-
-            <label className="block">
-              <span className="text-xs text-slate-500">Giảm giá đơn hàng</span>
-              <input
-                type="number"
-                min={0}
-                value={discount}
-                onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                className="mt-1 w-full px-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-xs text-slate-500">Khách thanh toán</span>
-              <input
-                type="number"
-                min={0}
-                max={total}
-                value={paidAmount === "full" ? total : paidAmount}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setPaidAmount(val === "" ? "full" : Number(val));
-                }}
-                className="mt-1 w-full px-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
-              />
-            </label>
-            {paidAmount !== "full" && total - paidAmount > 0 && (
-              <div className="text-sm font-semibold text-rose-500">
-                Ghi nhận khách nợ: {formatCurrency(total - paidAmount)}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Tổng kết đơn hàng
               </div>
-            )}
+              <div className="flex items-center justify-between text-sm text-slate-500">
+                <span>Tạm tính</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {formatCurrency(subtotal)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex-1">
+                  <span className="text-xs text-slate-500">Giảm giá</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={discount}
+                    onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                  />
+                </label>
+                <select
+                  aria-label="Don vi giam gia"
+                  className="mt-5 w-14 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-sm"
+                  defaultValue="vnd"
+                >
+                  <option value="vnd">đ</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-emerald-600/10 dark:bg-emerald-500/20 px-3 py-2">
+                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">Thành tiền</span>
+                <span className="text-lg font-bold text-emerald-700 dark:text-emerald-100">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+            </div>
 
-            <label className="block">
-              <span className="text-xs text-slate-500">Ghi chú</span>
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Phương thức thanh toán
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("cash")}
+                  className={`h-11 rounded-xl border text-sm font-semibold transition ${
+                    paymentMethod === "cash"
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                  }`}
+                >
+                  Tiền mặt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("bank")}
+                  className={`h-11 rounded-xl border text-sm font-semibold transition ${
+                    paymentMethod === "bank"
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                  }`}
+                >
+                  Chuyển khoản
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="h-11 rounded-xl border text-sm font-semibold text-slate-400 border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 cursor-not-allowed"
+                >
+                  Quẹt thẻ
+                </button>
+              </div>
+
+              <label className="block">
+                <span className="text-xs text-slate-500">Khách thanh toán</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={total}
+                  value={paidAmount === "full" ? total : paidAmount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPaidAmount(val === "" ? "full" : Number(val));
+                  }}
+                  className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                />
+              </label>
+              {paidAmount !== "full" && total - paidAmount > 0 && (
+                <div className="text-sm font-semibold text-rose-500">
+                  Ghi nhận khách nợ: {formatCurrency(total - paidAmount)}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ghi chú</div>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
-                className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
               />
-            </label>
 
-            <div className={ui.summary}>
-              <div className="flex justify-between"><span>Tạm tính</span><span>{formatCurrency(subtotal)}</span></div>
-              <div className="flex justify-between"><span>Giảm giá</span><span>- {formatCurrency(discount)}</span></div>
-              <div className="flex justify-between font-semibold text-base pt-1 border-t border-slate-200 dark:border-slate-700"><span>Thành tiền</span><span>{formatCurrency(total)}</span></div>
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={autoPrintInvoice}
+                  onChange={(e) => setAutoPrintInvoice(e.target.checked)}
+                  className="rounded border-slate-300 dark:border-slate-600"
+                />
+                In hóa đơn nhanh sau khi xác nhận
+              </label>
             </div>
 
-            <button
-              onClick={submitSale}
-              className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm hover:shadow transition"
-            >
-              Xác nhận bán hàng
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled
+                className="h-12 rounded-2xl border border-slate-300/80 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-50/60 dark:bg-slate-900/60 cursor-not-allowed"
+              >
+                Lưu nháp
+              </button>
+
+              <button
+                onClick={submitSale}
+                className="h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)] hover:shadow-[0_18px_35px_-18px_rgba(16,185,129,1)] transition"
+              >
+                Xuất bán
+              </button>
+            </div>
 
             <button
               onClick={() =>
@@ -972,11 +1063,11 @@ const SalesManager: React.FC = () => {
                 })
               }
               disabled={!cartItems.length}
-              className="w-full h-10 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              className="w-full h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 text-slate-700 dark:text-slate-200 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
             >
               <span className="inline-flex items-center gap-2">
                 <Printer className="w-4 h-4" />
-                In hóa đơn ngay
+                In hóa đơn
               </span>
             </button>
           </div>
