@@ -27,6 +27,7 @@ export const usePartsRepoPaged = (params: {
   pageSize: number;
   search?: string;
   category?: string;
+  enabled?: boolean;
 }) => {
   return useQuery({
     queryKey: [
@@ -42,6 +43,7 @@ export const usePartsRepoPaged = (params: {
       return res;
     },
     staleTime: 30_000,
+    enabled: params.enabled ?? true,
   });
 };
 

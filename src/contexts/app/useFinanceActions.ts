@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
 import { updatePaymentSourceBalance } from "../../lib/repository/paymentSourcesRepository";
+import { updatePart } from "../../lib/repository/partsRepository";
 import { showToast } from "../../utils/toast";
 import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { supabase } from "../../supabaseClient";
@@ -79,6 +80,7 @@ export function useFinanceActions(
       paymentMethod: "cash" | "bank";
       customer: { id?: string; name: string; phone?: string };
       note?: string;
+      paidAmount?: number;
     }) => {
       if (!data.items.length) return;
 
@@ -147,42 +149,120 @@ export function useFinanceActions(
           return;
         }
 
-        const cashRes = await createCashTransaction({
-          type: "income",
-          amount: total,
-          branchId: newSale.branchId,
-          paymentSourceId: newSale.paymentMethod,
-          date: newSale.date,
-          category: "sale_income",
-          notes: data.note || "Thu tiền bán hàng",
-          saleId: newSale.id,
-          recipient: newSale.customer?.name || "Khách lẻ",
-        });
+        const soldByPart = data.items.reduce<Record<string, number>>((acc, item) => {
+          acc[item.partId] = (acc[item.partId] || 0) + item.quantity;
+          return acc;
+        }, {});
 
-        if (!cashRes.ok) {
+        const stockUpdateErrors: string[] = [];
+        for (const [partId, soldQty] of Object.entries(soldByPart)) {
+          const part = parts.find((p) => p.id === partId);
+          if (!part) continue;
+
+          const currentStock = Number(part.stock?.[newSale.branchId] || 0);
+          const nextStock = Math.max(0, currentStock - soldQty);
+          const nextStockMap = {
+            ...(part.stock || {}),
+            [newSale.branchId]: nextStock,
+          };
+
+          const updateRes = await updatePart(partId, { stock: nextStockMap });
+          if (!updateRes.ok) {
+            stockUpdateErrors.push(part.name || partId);
+          }
+        }
+
+        if (stockUpdateErrors.length > 0) {
           showToast.warning(
-            `Đơn bán đã lưu nhưng chưa ghi sổ quỹ: ${mapRepoErrorForUser(cashRes.error)}`
+            `Đơn đã lưu nhưng chưa trừ kho CSDL cho: ${stockUpdateErrors.join(", ")}`
           );
-        } else {
-          const effectivePaymentSourceId =
-            cashRes.data.paymentSourceId || newSale.paymentMethod;
-          const balRes = await updatePaymentSourceBalance(
-            effectivePaymentSourceId,
-            newSale.branchId,
-            total
-          );
-          if (!balRes.ok) {
+        }
+
+        const actualPaidAmount = data.paidAmount !== undefined ? data.paidAmount : total;
+        
+        let cashResId: string | undefined = undefined;
+
+        if (actualPaidAmount > 0) {
+          const cashRes = await createCashTransaction({
+            type: "income",
+            amount: actualPaidAmount,
+            branchId: newSale.branchId,
+            paymentSourceId: newSale.paymentMethod,
+            date: newSale.date,
+            category: "sale_income",
+            notes: data.note || "Thu tiền bán hàng",
+            saleId: newSale.id,
+            recipient: newSale.customer?.name || "Khách lẻ",
+          });
+
+          if (!cashRes.ok) {
             showToast.warning(
-              `Đơn bán đã lưu nhưng chưa cập nhật số dư nguồn tiền: ${mapRepoErrorForUser(
-                balRes.error
-              )}`
+              `Đơn bán đã lưu nhưng chưa ghi sổ quỹ: ${mapRepoErrorForUser(cashRes.error)}`
             );
+          } else {
+            cashResId = cashRes.data.id;
+            const effectivePaymentSourceId =
+              cashRes.data.paymentSourceId || newSale.paymentMethod;
+            const balRes = await updatePaymentSourceBalance(
+              effectivePaymentSourceId,
+              newSale.branchId,
+              actualPaidAmount
+            );
+            if (!balRes.ok) {
+              showToast.warning(
+                `Đơn bán đã lưu nhưng chưa cập nhật số dư nguồn tiền: ${mapRepoErrorForUser(
+                  balRes.error
+                )}`
+              );
+            }
+
+            await supabase
+              .from("sales")
+              .update({ cashtransactionid: cashResId })
+              .eq("id", newSale.id);
+          }
+        }
+
+        const remainingAmount = total - actualPaidAmount;
+        if (remainingAmount > 0) {
+          const safeCustomerId =
+            newSale.customer.phone || newSale.customer.id || `CUST-ANON-${Date.now()}`;
+          const safeCustomerName =
+            newSale.customer.name?.trim() ||
+            newSale.customer.phone ||
+            "Khách lẻ";
+
+          let description = `Mua hàng (Hóa đơn #${newSale.id})`;
+          if (newSale.items.length > 0) {
+            description += "\n\nSản phẩm:";
+            newSale.items.forEach((item) => {
+              description += `\n  - ${item.quantity} x ${item.partName} - ${(item.sellingPrice * item.quantity).toLocaleString()}đ`;
+            });
           }
 
-          await supabase
-            .from("sales")
-            .update({ cashtransactionid: cashRes.data.id })
-            .eq("id", newSale.id);
+          const debtId = `DEBT-${Date.now()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+          const { error: debtError } = await supabase
+            .from("customer_debts")
+            .insert({
+              id: debtId,
+              customer_id: safeCustomerId,
+              customer_name: safeCustomerName,
+              phone: newSale.customer.phone || null,
+              description: description,
+              total_amount: total,
+              paid_amount: actualPaidAmount,
+              remaining_amount: remainingAmount,
+              created_date: new Date().toISOString().split("T")[0],
+              branch_id: newSale.branchId,
+              reference_id: newSale.id,
+            });
+
+          if (debtError) {
+            console.error("Error creating customer debt for sale:", debtError);
+            showToast.error("Đơn bán đã lưu nhưng không thể tạo công nợ tự động.");
+          } else {
+            showToast.success(`Đã tạo công nợ ${remainingAmount.toLocaleString()}đ cho ${safeCustomerName}`);
+          }
         }
 
         const warrantyRows: Array<Record<string, unknown>> = [];
@@ -230,6 +310,58 @@ export function useFinanceActions(
                 mappedWarrantyError
               )}`
             );
+          }
+        }
+
+        // Cập nhật thông tin khách hàng (Tổng chi tiêu, Số lần mua, Hạng)
+        if (newSale.customer.phone || newSale.customer.id) {
+          try {
+            let customerIdToUpdate = newSale.customer.id;
+            
+            if (!customerIdToUpdate && newSale.customer.phone) {
+              const { data: existingCustomers } = await supabase
+                .from("customers")
+                .select("id, totalspent, visitcount")
+                .eq("phone", newSale.customer.phone)
+                .limit(1);
+                
+              if (existingCustomers && existingCustomers.length > 0) {
+                customerIdToUpdate = existingCustomers[0].id;
+              }
+            }
+
+            if (customerIdToUpdate) {
+              // Get current stats to increment
+              const { data: currentStats } = await supabase
+                .from("customers")
+                .select("totalspent, visitcount")
+                .eq("id", customerIdToUpdate)
+                .single();
+
+              const currentTotalSpent = Number(currentStats?.totalspent || 0);
+              const currentVisitCount = Number(currentStats?.visitcount || 0);
+              
+              const newTotalSpent = currentTotalSpent + total;
+              const newVisitCount = currentVisitCount + 1;
+              
+              // Simple segmentation logic based on total spent
+              let newSegment = "New";
+              if (newTotalSpent > 10000000) newSegment = "VIP";
+              else if (newTotalSpent > 3000000) newSegment = "Loyal";
+              else if (newVisitCount > 1) newSegment = "Potential";
+
+              await supabase
+                .from("customers")
+                .update({
+                  totalspent: newTotalSpent,
+                  visitcount: newVisitCount,
+                  lastvisit: new Date().toISOString(),
+                  segment: newSegment
+                })
+                .eq("id", customerIdToUpdate);
+            }
+          } catch (e) {
+            console.error("Lỗi cập nhật số liệu khách hàng:", e);
           }
         }
       })();
@@ -311,6 +443,35 @@ export function useFinanceActions(
           return;
         }
 
+        const restockByPart = sale.items.reduce<Record<string, number>>((acc, item) => {
+          acc[item.partId] = (acc[item.partId] || 0) + item.quantity;
+          return acc;
+        }, {});
+
+        const stockUpdateErrors: string[] = [];
+        for (const [partId, qty] of Object.entries(restockByPart)) {
+          const part = parts.find((p) => p.id === partId);
+          if (!part) continue;
+
+          const currentStock = Number(part.stock?.[currentBranchId] || 0);
+          const nextStock = Math.max(0, currentStock + qty);
+          const nextStockMap = {
+            ...(part.stock || {}),
+            [currentBranchId]: nextStock,
+          };
+
+          const updateRes = await updatePart(partId, { stock: nextStockMap });
+          if (!updateRes.ok) {
+            stockUpdateErrors.push(part.name || partId);
+          }
+        }
+
+        if (stockUpdateErrors.length > 0) {
+          showToast.warning(
+            `Đã xóa đơn nhưng chưa hoàn kho CSDL cho: ${stockUpdateErrors.join(", ")}`
+          );
+        }
+
         setSales((prev) => prev.filter((s) => s.id !== saleId));
 
         setParts((prev) =>
@@ -349,7 +510,7 @@ export function useFinanceActions(
         showToast.success("Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công.");
       })();
     },
-    [currentBranchId, sales, setCashTransactions, setParts, setPaymentSources, setSales]
+    [currentBranchId, parts, sales, setCashTransactions, setParts, setPaymentSources, setSales]
   );
 
   const recordInventoryTransaction = useCallback(

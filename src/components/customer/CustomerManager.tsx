@@ -196,10 +196,10 @@ const CustomerHistoryModal: React.FC<CustomerHistoryModalProps> = ({
               const isCompleted = wo.status === "Trả máy" || wo.status === "Đã sửa xong";
               const isInProgress = wo.status === "Đang sửa";
               const statusClass = isCompleted
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50"
+                ? "bg-accent-green-bg text-accent-green-text border-accent-green-border"
                 : isInProgress
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800/50"
-                  : "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600";
+                  ? "bg-accent-blue-bg text-accent-blue-text border-accent-blue-border"
+                  : "bg-secondary-bg text-secondary-text border-secondary-border";
 
               return (
                 <div key={wo.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 md:p-5 shadow-sm">
@@ -615,7 +615,7 @@ const CustomerManager: React.FC = () => {
         count: stats.total,
         icon: "🌐",
         activeClasses:
-          "border-slate-300 bg-slate-100/80 text-slate-900 shadow-sm",
+          "border-secondary-border bg-secondary-bg text-primary-text shadow-sm",
       },
       {
         id: "vip",
@@ -624,7 +624,7 @@ const CustomerManager: React.FC = () => {
         count: stats.vip,
         icon: "👑",
         activeClasses:
-          "border-purple-200 bg-purple-50 text-purple-700 shadow-sm",
+          "border-accent-purple-border bg-accent-purple-bg text-accent-purple-text shadow-sm",
       },
       {
         id: "loyal",
@@ -632,7 +632,8 @@ const CustomerManager: React.FC = () => {
         hint: "10+ lượt",
         count: stats.loyal,
         icon: "💎",
-        activeClasses: "border-blue-200 bg-blue-50 text-blue-700 shadow-sm",
+        activeClasses:
+          "border-accent-blue-border bg-accent-blue-bg text-accent-blue-text shadow-sm",
       },
       {
         id: "potential",
@@ -640,7 +641,8 @@ const CustomerManager: React.FC = () => {
         hint: "2-9 lượt",
         count: stats.potential,
         icon: "⭐",
-        activeClasses: "border-green-200 bg-green-50 text-green-700 shadow-sm",
+        activeClasses:
+          "border-accent-green-border bg-accent-green-bg text-accent-green-text shadow-sm",
       },
       {
         id: "at-risk",
@@ -649,7 +651,7 @@ const CustomerManager: React.FC = () => {
         count: stats.atRisk,
         icon: "⚠️",
         activeClasses:
-          "border-orange-200 bg-orange-50 text-orange-700 shadow-sm",
+          "border-accent-orange-border bg-accent-orange-bg text-accent-orange-text shadow-sm",
       },
       {
         id: "lost",
@@ -657,7 +659,8 @@ const CustomerManager: React.FC = () => {
         hint: "Không quay lại",
         count: stats.lost,
         icon: "❌",
-        activeClasses: "border-red-200 bg-red-50 text-red-700 shadow-sm",
+        activeClasses:
+          "border-accent-red-border bg-accent-red-bg text-accent-red-text shadow-sm",
       },
       {
         id: "new",
@@ -665,7 +668,8 @@ const CustomerManager: React.FC = () => {
         hint: "Tháng này",
         count: stats.new,
         icon: "🆕",
-        activeClasses: "border-cyan-200 bg-cyan-50 text-cyan-700 shadow-sm",
+        activeClasses:
+          "border-accent-blue-border bg-accent-blue-bg text-accent-blue-text shadow-sm",
       },
     ],
     [stats]
@@ -679,10 +683,10 @@ const CustomerManager: React.FC = () => {
         value: stats.total.toLocaleString(),
         subLabel: `${stats.active} hoạt động`,
         gradient:
-          "from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20",
-        border: "border-blue-200 dark:border-blue-800",
-        labelClass: "text-blue-700 dark:text-blue-300",
-        valueClass: "text-blue-900 dark:text-blue-100",
+          "from-accent-blue-bg to-secondary-bg",
+        border: "border-accent-blue-border",
+        labelClass: "text-accent-blue-text",
+        valueClass: "text-primary-text",
       },
       {
         id: "new",
@@ -690,10 +694,10 @@ const CustomerManager: React.FC = () => {
         value: stats.newThisMonth.toLocaleString(),
         subLabel: "↑ 0% tháng này",
         gradient:
-          "from-green-50 to-emerald-100 dark:from-green-900/30 dark:to-emerald-800/20",
-        border: "border-green-200 dark:border-green-800",
-        labelClass: "text-green-700 dark:text-green-300",
-        valueClass: "text-green-900 dark:text-green-100",
+          "from-accent-green-bg to-secondary-bg",
+        border: "border-accent-green-border",
+        labelClass: "text-accent-green-text",
+        valueClass: "text-primary-text",
       },
       {
         id: "avg",
@@ -701,10 +705,10 @@ const CustomerManager: React.FC = () => {
         value: "0 đ",
         subLabel: "/ khách hàng",
         gradient:
-          "from-purple-50 to-violet-100 dark:from-purple-900/30 dark:to-violet-800/20",
-        border: "border-purple-200 dark:border-purple-800",
-        labelClass: "text-purple-700 dark:text-purple-300",
-        valueClass: "text-purple-900 dark:text-purple-100",
+          "from-accent-purple-bg to-secondary-bg",
+        border: "border-accent-purple-border",
+        labelClass: "text-accent-purple-text",
+        valueClass: "text-primary-text",
       },
       {
         id: "atRisk",
@@ -712,10 +716,10 @@ const CustomerManager: React.FC = () => {
         value: stats.atRisk.toLocaleString(),
         subLabel: "0đ tiềm năng",
         gradient:
-          "from-orange-50 to-amber-100 dark:from-orange-900/30 dark:to-amber-800/20",
-        border: "border-orange-200 dark:border-orange-800",
-        labelClass: "text-orange-700 dark:text-orange-300",
-        valueClass: "text-orange-900 dark:text-orange-100",
+          "from-accent-orange-bg to-secondary-bg",
+        border: "border-accent-orange-border",
+        labelClass: "text-accent-orange-text",
+        valueClass: "text-primary-text",
       },
     ],
     [stats]
@@ -733,50 +737,50 @@ const CustomerManager: React.FC = () => {
     VIP: {
       label: "VIP",
       badgeClass:
-        "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700",
-      avatarClass: "bg-purple-50 text-purple-700 dark:bg-purple-900/40",
+        "bg-accent-purple-bg text-accent-purple-text border border-accent-purple-border",
+      avatarClass: "bg-accent-purple-bg text-accent-purple-text",
       icon: "👑",
     },
     Loyal: {
       label: "Trung thành",
       badgeClass:
-        "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-700",
-      avatarClass: "bg-blue-50 text-blue-700 dark:bg-blue-900/40",
+        "bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border",
+      avatarClass: "bg-accent-blue-bg text-accent-blue-text",
       icon: "💎",
     },
     Potential: {
       label: "Tiềm năng",
       badgeClass:
-        "bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700",
-      avatarClass: "bg-green-50 text-green-700 dark:bg-green-900/40",
+        "bg-accent-green-bg text-accent-green-text border border-accent-green-border",
+      avatarClass: "bg-accent-green-bg text-accent-green-text",
       icon: "⭐",
     },
     "At Risk": {
       label: "Cần chăm sóc",
       badgeClass:
-        "bg-orange-100 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-200 dark:border-orange-700",
-      avatarClass: "bg-orange-50 text-orange-700 dark:bg-orange-900/40",
+        "bg-accent-orange-bg text-accent-orange-text border border-accent-orange-border",
+      avatarClass: "bg-accent-orange-bg text-accent-orange-text",
       icon: "⚠️",
     },
     Lost: {
       label: "Đã mất",
       badgeClass:
-        "bg-red-100 text-red-600 border border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-700",
-      avatarClass: "bg-red-50 text-red-600 dark:bg-red-900/40",
+        "bg-accent-red-bg text-accent-red-text border border-accent-red-border",
+      avatarClass: "bg-accent-red-bg text-accent-red-text",
       icon: "❌",
     },
     New: {
       label: "Khách mới",
       badgeClass:
-        "bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-200 dark:border-cyan-700",
-      avatarClass: "bg-cyan-50 text-cyan-700 dark:bg-cyan-900/40",
+        "bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border",
+      avatarClass: "bg-accent-blue-bg text-accent-blue-text",
       icon: "🆕",
     },
     default: {
       label: "Khách hàng",
       badgeClass:
-        "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600",
-      avatarClass: "bg-slate-100 text-slate-600 dark:bg-slate-800",
+        "bg-secondary-bg text-secondary-text border border-secondary-border",
+      avatarClass: "bg-secondary-bg text-secondary-text",
       icon: "👤",
     },
   };
@@ -957,8 +961,8 @@ const CustomerManager: React.FC = () => {
                     key={filter.id}
                     onClick={() => setActiveFilter(filter.id)}
                     className={`min-w-[160px] snap-start rounded-xl border px-3 py-2 text-left transition-all md:min-w-0 ${activeFilter === filter.id
-                      ? `${filter.activeClasses} dark:bg-slate-800/80 dark:border-slate-600 dark:text-white`
-                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300"
+                      ? `${filter.activeClasses}`
+                      : "bg-primary-bg text-secondary-text border-secondary-border hover:border-primary-border"
                       }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -999,7 +1003,7 @@ const CustomerManager: React.FC = () => {
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                 />
               </svg>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <h2 className="text-lg font-semibold text-primary-text">
                 Thống kê tổng quan
               </h2>
             </div>
@@ -1019,7 +1023,7 @@ const CustomerManager: React.FC = () => {
                   >
                     {card.value}
                   </div>
-                  <div className="text-[10px] md:text-xs mt-0.5 text-slate-600 dark:text-slate-300">
+                  <div className="text-[10px] md:text-xs mt-0.5 text-secondary-text">
                     {card.subLabel}
                   </div>
                 </div>

@@ -50,13 +50,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const FORCE_OWNER_EMAILS = ["hoangnam1583@gmail.com"];
+const DEFAULT_FORCE_OWNER_EMAILS = ["hoangnam1583@gmail.com"];
+const FORCE_OWNER_EMAILS = (
+  import.meta.env.VITE_FORCE_OWNER_EMAILS || ""
+)
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+const FORCE_OWNER_ENABLED =
+  (import.meta.env.VITE_FORCE_OWNER_ENABLED || "true").toLowerCase() !==
+  "false";
 
 const normalizeEmail = (email?: string | null) =>
   String(email || "").trim().toLowerCase();
 
-const isForcedOwnerEmail = (email?: string | null) =>
-  FORCE_OWNER_EMAILS.includes(normalizeEmail(email));
+const isForcedOwnerEmail = (email?: string | null) => {
+  if (!FORCE_OWNER_ENABLED) return false;
+  const candidates = FORCE_OWNER_EMAILS.length
+    ? FORCE_OWNER_EMAILS
+    : DEFAULT_FORCE_OWNER_EMAILS;
+  return candidates.includes(normalizeEmail(email));
+};
 
 const getPermissionMetadata = (rawUser: any): Record<string, boolean> => {
   const metadata = rawUser?.user_metadata || {};

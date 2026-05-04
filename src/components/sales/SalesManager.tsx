@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Search,
   ShoppingCart,
@@ -17,7 +17,8 @@ import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
 import type { CartItem, Part } from "../../types";
 import { useCustomers } from "../../hooks/useSupabase";
-import { usePartsRepo } from "../../hooks/usePartsRepository";
+import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 
 type UiMode = "enterprise" | "retail" | "dark";
 
@@ -57,8 +58,9 @@ const SalesManager: React.FC = () => {
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank">("cash");
   const [note, setNote] = useState("");
+  const [paidAmount, setPaidAmount] = useState<number | "full">("full");
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
-  const [autoPrintInvoice, setAutoPrintInvoice] = useState(true);
+  const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [historyQuery, setHistoryQuery] = useState("");
@@ -77,7 +79,19 @@ const SalesManager: React.FC = () => {
     }
   });
 
-  const inventoryParts = parts;
+  const enablePartsPaging =
+    (import.meta.env.VITE_SALES_PARTS_PAGED || "false").toLowerCase() === "true";
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const { data: pagedPartsResult } = usePartsRepoPaged({
+    page,
+    pageSize,
+    search: debouncedSearch,
+    category: "all",
+    enabled: enablePartsPaging,
+  });
+
+  const pagedPartsData = pagedPartsResult?.ok ? pagedPartsResult.data : [];
+  const inventoryParts = enablePartsPaging ? pagedPartsData : parts;
 
   const customerSource = useMemo(() => {
     if (customersFromRepo.length) return customersFromRepo;
@@ -98,12 +112,17 @@ const SalesManager: React.FC = () => {
 
   const filteredParts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    return inventoryParts
-      .filter((part) => {
-        const hasStock = getBranchStock(part, currentBranchId) > 0;
-        const hasWarranty = Boolean(String(part.warrantyPeriod || "").trim());
-        return hasStock || hasWarranty;
-      })
+    const base = inventoryParts.filter((part) => {
+      const hasStock = getBranchStock(part, currentBranchId) > 0;
+      const hasWarranty = Boolean(String(part.warrantyPeriod || "").trim());
+      return hasStock || hasWarranty;
+    });
+
+    if (enablePartsPaging) {
+      return base.sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    }
+
+    return base
       .filter((part) => {
         if (!keyword) return true;
         return (
@@ -113,9 +132,15 @@ const SalesManager: React.FC = () => {
         );
       })
       .sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  }, [inventoryParts, currentBranchId, search]);
+  }, [inventoryParts, currentBranchId, search, enablePartsPaging]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredParts.length / pageSize));
+  const totalPages = useMemo(() => {
+    if (enablePartsPaging && pagedPartsResult?.ok) {
+      const total = Number(pagedPartsResult.meta?.total || 0);
+      return Math.max(1, Math.ceil(total / pageSize));
+    }
+    return Math.max(1, Math.ceil(filteredParts.length / pageSize));
+  }, [enablePartsPaging, pagedPartsResult, pageSize, filteredParts.length]);
 
   useEffect(() => {
     setPage(1);
@@ -151,9 +176,10 @@ const SalesManager: React.FC = () => {
   }, [cartItems.length, mobileStep]);
 
   const pagedParts = useMemo(() => {
+    if (enablePartsPaging) return filteredParts;
     const start = (page - 1) * pageSize;
     return filteredParts.slice(start, start + pageSize);
-  }, [filteredParts, page, pageSize]);
+  }, [filteredParts, page, pageSize, enablePartsPaging]);
 
   const subtotal = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0),
@@ -161,6 +187,14 @@ const SalesManager: React.FC = () => {
   );
 
   const total = Math.max(0, subtotal - discount);
+
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 
   const printInvoice = (payload: {
     customer: { name: string; phone?: string };
@@ -181,7 +215,7 @@ const SalesManager: React.FC = () => {
       .map(
         (it) => `
           <tr>
-            <td>${it.partName}</td>
+            <td>${escapeHtml(it.partName)}</td>
             <td style="text-align:center">${it.quantity}</td>
             <td style="text-align:right">${formatCurrency(it.sellingPrice)}</td>
             <td style="text-align:right">${formatCurrency(it.sellingPrice * it.quantity)}</td>
@@ -209,7 +243,7 @@ const SalesManager: React.FC = () => {
 <body>
   <h1>Hóa đơn bán hàng</h1>
   <div class="meta">Ngày giờ: ${new Date().toLocaleString("vi-VN")}</div>
-  <div class="meta">Khách hàng: ${payload.customer.name}${payload.customer.phone ? ` - ${payload.customer.phone}` : ""}</div>
+  <div class="meta">Khách hàng: ${escapeHtml(payload.customer.name)}${payload.customer.phone ? ` - ${escapeHtml(payload.customer.phone)}` : ""}</div>
   <div class="meta">Thanh toán: ${payload.payment === "cash" ? "Tiền mặt" : "Chuyển khoản"}</div>
   <table>
     <thead>
@@ -317,13 +351,21 @@ const SalesManager: React.FC = () => {
       return;
     }
 
+    const stockSourceParts = enablePartsPaging ? parts : inventoryParts;
+
     for (const item of cartItems) {
-      const part = inventoryParts.find((p) => p.id === item.partId);
+      const part = stockSourceParts.find((p) => p.id === item.partId);
       const availableStock = part ? getBranchStock(part, currentBranchId) : 0;
       if (item.quantity > availableStock) {
         showToast.warning(`Sản phẩm ${item.partName} không đủ tồn (${availableStock}).`);
         return;
       }
+    }
+
+    const actualPaidAmount = paidAmount === "full" ? total : paidAmount;
+    if (actualPaidAmount < 0 || actualPaidAmount > total) {
+      showToast.warning("Số tiền khách trả không hợp lệ.");
+      return;
     }
 
     const payload = {
@@ -345,9 +387,11 @@ const SalesManager: React.FC = () => {
       paymentMethod,
       customer: payload.customer,
       note: note.trim() || undefined,
+      paidAmount: actualPaidAmount,
     });
 
     setDiscount(0);
+    setPaidAmount("full");
     setNote("");
     setMobileStep("products");
     if (autoPrintInvoice) {
@@ -868,6 +912,26 @@ const SalesManager: React.FC = () => {
                 className="mt-1 w-full px-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
               />
             </label>
+
+            <label className="block">
+              <span className="text-xs text-slate-500">Khách thanh toán</span>
+              <input
+                type="number"
+                min={0}
+                max={total}
+                value={paidAmount === "full" ? total : paidAmount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPaidAmount(val === "" ? "full" : Number(val));
+                }}
+                className="mt-1 w-full px-3 h-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+              />
+            </label>
+            {paidAmount !== "full" && total - paidAmount > 0 && (
+              <div className="text-sm font-semibold text-rose-500">
+                Ghi nhận khách nợ: {formatCurrency(total - paidAmount)}
+              </div>
+            )}
 
             <label className="block">
               <span className="text-xs text-slate-500">Ghi chú</span>

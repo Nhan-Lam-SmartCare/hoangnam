@@ -1,9 +1,14 @@
 // Supabase client cho Pin Factory Database
 import { createClient } from "@supabase/supabase-js";
 
-const PIN_SUPABASE_URL = "https://jvigqtcbtzaxmrdsbfru.supabase.co";
-const PIN_SUPABASE_ANON_KEY =
+const DEFAULT_PIN_SUPABASE_URL = "https://jvigqtcbtzaxmrdsbfru.supabase.co";
+const DEFAULT_PIN_SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2aWdxdGNidHpheG1yZHNiZnJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzNDk2NjksImV4cCI6MjA3NzkyNTY2OX0.6pKHKqzoayfmt4Dx_WwPc92Sx1YaFnFX_fFyHsPL2Zw";
+
+const PIN_SUPABASE_URL =
+  import.meta.env.VITE_PIN_SUPABASE_URL || DEFAULT_PIN_SUPABASE_URL;
+const PIN_SUPABASE_ANON_KEY =
+  import.meta.env.VITE_PIN_SUPABASE_ANON_KEY || DEFAULT_PIN_SUPABASE_ANON_KEY;
 
 export const pinSupabase = createClient(
   PIN_SUPABASE_URL,

@@ -3,6 +3,16 @@
 import { supabase } from "../supabaseClient";
 import { canonicalizeMotocareCashTxCategory } from "./finance/cashTxCategories";
 
+const normalizeCustomerRow = (customer: any) => ({
+  ...customer,
+  totalSpent: customer.totalSpent ?? customer.totalspent ?? 0,
+  visitCount: customer.visitCount ?? customer.visitcount ?? 0,
+  lastVisit: customer.lastVisit ?? customer.lastvisit ?? null,
+  vehicleModel: customer.vehicleModel ?? customer.vehiclemodel ?? null,
+  licensePlate: customer.licensePlate ?? customer.licenseplate ?? null,
+  loyaltyPoints: customer.loyaltyPoints ?? customer.loyaltypoints ?? 0,
+});
+
 // Helper functions for common operations
 export const supabaseHelpers = {
   // Customers
@@ -15,16 +25,40 @@ export const supabaseHelpers = {
     if (error) throw error;
 
     // Map database column names (lowercase) to TypeScript property names (camelCase)
-    return (data || []).map((customer: any) => ({
-      ...customer,
-      // Ensure camelCase properties are available
-      totalSpent: customer.totalSpent ?? customer.totalspent ?? 0,
-      visitCount: customer.visitCount ?? customer.visitcount ?? 0,
-      lastVisit: customer.lastVisit ?? customer.lastvisit ?? null,
-      vehicleModel: customer.vehicleModel ?? customer.vehiclemodel ?? null,
-      licensePlate: customer.licensePlate ?? customer.licenseplate ?? null,
-      loyaltyPoints: customer.loyaltyPoints ?? customer.loyaltypoints ?? 0,
-    }));
+    return (data || []).map((customer: any) => normalizeCustomerRow(customer));
+  },
+
+  async getCustomersPaged(params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  }) {
+    const pageSize = params?.pageSize && params.pageSize > 0 ? params.pageSize : 50;
+    const page = params?.page && params.page > 0 ? params.page : 1;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("customers")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (params?.search && params.search.trim()) {
+      const term = params.search.trim().replace(/["']/g, "");
+      query = query.or(
+        `name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`
+      );
+    }
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    return {
+      data: (data || []).map((customer: any) => normalizeCustomerRow(customer)),
+      total: count || 0,
+      page,
+      pageSize,
+    };
   },
 
   async createCustomer(customer: any) {
@@ -144,6 +178,44 @@ export const supabaseHelpers = {
     return data;
   },
 
+  async getPartsPaged(params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    category?: string;
+  }) {
+    const pageSize = params?.pageSize && params.pageSize > 0 ? params.pageSize : 50;
+    const page = params?.page && params.page > 0 ? params.page : 1;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    let query = supabase
+      .from("parts")
+      .select("*", { count: "exact" })
+      .order("name")
+      .range(from, to);
+
+    if (params?.category && params.category !== "all") {
+      query = query.eq("category", params.category);
+    }
+
+    if (params?.search && params.search.trim()) {
+      const term = params.search.trim().replace(/["']/g, "");
+      query = query.or(
+        `name.ilike.%${term}%,sku.ilike.%${term}%,barcode.ilike.%${term}%`
+      );
+    }
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    return {
+      data: data || [],
+      total: count || 0,
+      page,
+      pageSize,
+    };
+  },
+
   async createPart(part: any) {
     const { data, error } = await supabase
       .from("parts")
@@ -178,6 +250,26 @@ export const supabaseHelpers = {
     return data;
   },
 
+  async getWorkOrdersPaged(params?: { page?: number; pageSize?: number }) {
+    const pageSize = params?.pageSize && params.pageSize > 0 ? params.pageSize : 50;
+    const page = params?.page && params.page > 0 ? params.page : 1;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error, count } = await supabase
+      .from("work_orders")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return {
+      data: data || [],
+      total: count || 0,
+      page,
+      pageSize,
+    };
+  },
+
   async createWorkOrder(workOrder: any) {
     const { data, error } = await supabase
       .from("work_orders")
@@ -210,6 +302,26 @@ export const supabaseHelpers = {
 
     if (error) throw error;
     return data;
+  },
+
+  async getSalesPaged(params?: { page?: number; pageSize?: number }) {
+    const pageSize = params?.pageSize && params.pageSize > 0 ? params.pageSize : 50;
+    const page = params?.page && params.page > 0 ? params.page : 1;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error, count } = await supabase
+      .from("sales")
+      .select("*", { count: "exact" })
+      .order("date", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return {
+      data: data || [],
+      total: count || 0,
+      page,
+      pageSize,
+    };
   },
 
   async createSale(sale: any) {

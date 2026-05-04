@@ -14,6 +14,19 @@ export const useCustomers = () => {
   });
 };
 
+export const useCustomersPaged = (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}) => {
+  return useQuery({
+    queryKey: ["customersPaged", params.page, params.pageSize, params.search || ""],
+    queryFn: () => supabaseHelpers.getCustomersPaged(params),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+};
+
 export const useCreateCustomer = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -106,6 +119,26 @@ export const useParts = () => {
   });
 };
 
+export const usePartsPaged = (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  category?: string;
+}) => {
+  return useQuery({
+    queryKey: [
+      "partsPaged",
+      params.page,
+      params.pageSize,
+      params.search || "",
+      params.category || "all",
+    ],
+    queryFn: () => supabaseHelpers.getPartsPaged(params),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+};
+
 export const useCreatePart = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -134,6 +167,15 @@ export const useWorkOrders = () => {
     queryFn: supabaseHelpers.getWorkOrders,
     staleTime: 2 * 60 * 1000, // 2 minutes (fresher for work orders)
     gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useWorkOrdersPaged = (params: { page: number; pageSize: number }) => {
+  return useQuery({
+    queryKey: ["workOrdersPaged", params.page, params.pageSize],
+    queryFn: () => supabaseHelpers.getWorkOrdersPaged(params),
+    staleTime: 30 * 1000,
+    gcTime: 3 * 60 * 1000,
   });
 };
 
@@ -174,6 +216,15 @@ export const useSales = () => {
     queryFn: supabaseHelpers.getSales,
     staleTime: 3 * 60 * 1000, // 3 minutes
     gcTime: 8 * 60 * 1000, // 8 minutes
+  });
+};
+
+export const useSalesPaged = (params: { page: number; pageSize: number }) => {
+  return useQuery({
+    queryKey: ["salesPaged", params.page, params.pageSize],
+    queryFn: () => supabaseHelpers.getSalesPaged(params),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 };
 

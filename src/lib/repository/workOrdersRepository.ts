@@ -293,6 +293,79 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<nu
   return rowsToInsert.length;
 }
 
+async function updateCustomerMetricsOnPayment(
+  order: WorkOrder,
+  paymentAmount: number,
+  isFirstPayment: boolean
+): Promise<void> {
+  if (paymentAmount <= 0) return;
+  if (!order.customerPhone && !order.customerName) return;
+
+  try {
+    let customerIdToUpdate = null;
+    
+    // Find customer by phone
+    if (order.customerPhone) {
+      const { data: existingCustomers } = await supabase
+        .from("customers")
+        .select("id, totalspent, visitcount")
+        .eq("phone", order.customerPhone)
+        .limit(1);
+        
+      if (existingCustomers && existingCustomers.length > 0) {
+        customerIdToUpdate = existingCustomers[0].id;
+      }
+    }
+
+    if (customerIdToUpdate) {
+      const { data: currentStats } = await supabase
+        .from("customers")
+        .select("totalspent, visitcount")
+        .eq("id", customerIdToUpdate)
+        .single();
+
+      const currentTotalSpent = Number(currentStats?.totalspent || 0);
+      const currentVisitCount = Number(currentStats?.visitcount || 0);
+      
+      const newTotalSpent = currentTotalSpent + paymentAmount;
+      const newVisitCount = isFirstPayment ? currentVisitCount + 1 : currentVisitCount;
+      
+      let newSegment = "New";
+      if (newTotalSpent > 10000000) newSegment = "VIP";
+      else if (newTotalSpent > 3000000) newSegment = "Loyal";
+      else if (newVisitCount > 1) newSegment = "Potential";
+
+      await supabase
+        .from("customers")
+        .update({
+          totalspent: newTotalSpent,
+          visitcount: newVisitCount,
+          lastvisit: new Date().toISOString(),
+          segment: newSegment
+        })
+        .eq("id", customerIdToUpdate);
+    }
+    
+    // Also update Vehicle km if provided
+    if (order.vehicleId && order.currentKm && order.currentKm > 0) {
+       // Need to fetch customer's vehicles to update
+       if (customerIdToUpdate) {
+         const { data: custData } = await supabase.from("customers").select("vehicles").eq("id", customerIdToUpdate).single();
+         if (custData && custData.vehicles) {
+            const vehicles = custData.vehicles as any[];
+            const vIdx = vehicles.findIndex(v => v.id === order.vehicleId);
+            if (vIdx >= 0) {
+               vehicles[vIdx].currentKm = order.currentKm;
+               await supabase.from("customers").update({ vehicles }).eq("id", customerIdToUpdate);
+            }
+         }
+       }
+    }
+  } catch (e) {
+    console.warn("Lỗi cập nhật số liệu khách hàng:", e);
+  }
+}
+
 export async function backfillWarrantyCardsForExistingWorkOrders(
   branchId?: string
 ): Promise<RepoResult<{ processed: number; created: number }>> {
@@ -1977,6 +2050,7 @@ export async function completeWorkOrderPayment(
       if (nextStatus === "paid") {
         await ensureManualPartExpenseOnPayment(normalizedUpdatedOrder, paymentMethod);
       }
+      await updateCustomerMetricsOnPayment(normalizedUpdatedOrder, paymentAmount, currentPaid === 0);
       await autoCreateWarrantyCardsForWorkOrder(normalizedUpdatedOrder);
 
       return success({
@@ -2106,6 +2180,11 @@ export async function completeWorkOrderPayment(
     if (paidNow) {
       await ensureManualPartExpenseOnPayment(normalizedOrder, paymentMethod);
     }
+    
+    // Check if this was the first payment to increment visitCount
+    const currentPaidBeforeThis = Number(normalizedOrder.totalPaid || 0) - paymentAmount;
+    await updateCustomerMetricsOnPayment(normalizedOrder, paymentAmount, currentPaidBeforeThis <= 0);
+    
     await autoCreateWarrantyCardsForWorkOrder(normalizedOrder);
 
     return success({

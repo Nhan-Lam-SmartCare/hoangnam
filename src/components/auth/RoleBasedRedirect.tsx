@@ -5,6 +5,7 @@ import LoadingSpinner from "../common/LoadingSpinner";
 
 export const RoleBasedRedirect: React.FC = () => {
     const { profile, loading, user } = useAuth();
+    const redirectMode = (import.meta.env.VITE_ROLE_REDIRECT_MODE || "legacy").toLowerCase();
 
     if (loading) {
         return (
@@ -18,11 +19,13 @@ export const RoleBasedRedirect: React.FC = () => {
         return <Navigate to="/login" replace />;
     }
 
-    // Default landing page is Service
-    if (profile?.role === "staff") {
+    if (redirectMode === "role") {
+        if (profile?.role === "owner" || profile?.role === "manager") {
+            return <Navigate to="/dashboard" replace />;
+        }
         return <Navigate to="/service" replace />;
     }
 
-    // Default for owner, manager, and others
+    // Legacy default landing page
     return <Navigate to="/service" replace />;
 };

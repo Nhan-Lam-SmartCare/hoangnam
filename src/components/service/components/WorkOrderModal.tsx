@@ -34,6 +34,7 @@ import {
 } from "../../../utils/validation";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { useCreateCustomerDebtRepo } from "../../../hooks/useDebtsRepository";
+import { useWarrantyCards } from "../../../hooks/useWarrantyRepository";
 import { useServiceConfigs } from "../../../hooks/useRepairLabor";
 import { syncRepairOrderServices } from "../../../lib/repository/repairLaborRepository";
 import {
@@ -190,6 +191,7 @@ const WorkOrderModal: React.FC<{
       useCreateWorkOrderAtomicRepo();
     const { mutateAsync: updateWorkOrderAtomicAsync } =
       useUpdateWorkOrderAtomicRepo();
+    const { data: warrantyCards } = useWarrantyCards();
     const { data: serviceConfigs = [] } = useServiceConfigs();
     const employeeOptions = employees as Employee[];
     const defaultTechnicianName = useMemo(() => {
@@ -2797,11 +2799,28 @@ const WorkOrderModal: React.FC<{
     };
 
     const handleAddPart = (part: Part) => {
+      // Check for active warranty
+      const customerWarranties = (warrantyCards || []).filter(c => 
+        c.customer_phone === formData.customerPhone && 
+        c.status === 'active' &&
+        new Date(c.warranty_end_date) >= new Date()
+      );
+      
+      const isUnderWarranty = customerWarranties.some(c => 
+        c.device_model?.toLowerCase().trim() === part.name.toLowerCase().trim()
+      );
+      
+      const priceToApply = isUnderWarranty ? 0 : (part.retailPrice[currentBranchId] || 0);
+      
+      if (isUnderWarranty) {
+        showToast.info(`Phụ tùng "${part.name}" đang trong thời gian bảo hành. Đã tự động miễn phí!`);
+      }
+
       const existing = selectedParts.find((p) => p.partId === part.id);
       if (existing) {
         setSelectedParts(
           selectedParts.map((p) =>
-            p.partId === part.id ? { ...p, quantity: p.quantity + 1 } : p
+            p.partId === part.id ? { ...p, quantity: p.quantity + 1, price: priceToApply } : p
           )
         );
       } else {
@@ -2813,7 +2832,7 @@ const WorkOrderModal: React.FC<{
             sku: part.sku || "",
             category: part.category || "",
             quantity: 1,
-            price: part.retailPrice[currentBranchId] || 0,
+            price: priceToApply,
             costPrice: part.costPrice?.[currentBranchId] || 0,
           },
         ]);
