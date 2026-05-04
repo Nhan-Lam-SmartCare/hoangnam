@@ -616,12 +616,17 @@ const SalesManager: React.FC = () => {
               {pagedParts.map((part) => {
                 const stock = getBranchStock(part, currentBranchId);
                 const price = getBranchRetailPrice(part, currentBranchId);
+                const cartItem = cartItems.find((item) => item.partId === part.id);
                 return (
                   <button
                     type="button"
                     key={part.id}
                     onClick={() => addPartToCart(part)}
-                    className="w-full text-left rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 p-3 active:scale-[0.99] transition"
+                    className={`w-full text-left rounded-xl border p-3 active:scale-[0.99] transition ${
+                      cartItem
+                        ? "border-emerald-400/80 bg-emerald-50/40 dark:bg-emerald-500/10"
+                        : "border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -635,7 +640,14 @@ const SalesManager: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      <span className={ui.stockBadge}>{stock}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={ui.stockBadge}>{stock}</span>
+                        {cartItem && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                            Đã thêm x{cartItem.quantity}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-2">
@@ -1161,13 +1173,17 @@ const SalesManager: React.FC = () => {
       </div>
 
       {mobileStep === "products" && cartItems.length > 0 && (
-        <div className="md:hidden fixed left-3 right-3 bottom-3 z-30">
+        <div
+          className="md:hidden fixed left-3 right-3 bottom-20 z-[9999]"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
           <button
             onClick={() => {
+              if (!cartItems.length) return;
               setRightTab("checkout");
               setMobileStep("checkout");
             }}
-            className="w-full rounded-2xl bg-slate-900/95 dark:bg-emerald-700 text-white shadow-xl border border-white/10 px-4 py-3"
+            className="w-full rounded-2xl border px-4 py-3 transition bg-slate-900/95 dark:bg-emerald-700 text-white shadow-xl border-white/10"
           >
             <span className="flex items-center justify-between">
               <span className="flex items-center gap-2">
@@ -1176,7 +1192,7 @@ const SalesManager: React.FC = () => {
               </span>
               <span className="text-sm font-bold">{formatCurrency(total)}</span>
               <span className="inline-flex items-center gap-1 text-xs font-semibold bg-white/15 px-2 py-1 rounded-full">
-                Tiếp tục
+                Tiếp tục giỏ hàng
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
             </span>
