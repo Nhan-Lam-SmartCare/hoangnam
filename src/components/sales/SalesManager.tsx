@@ -20,8 +20,6 @@ import { useCustomers } from "../../hooks/useSupabase";
 import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 
-type UiMode = "enterprise" | "retail" | "dark";
-
 const getBranchStock = (part: Part, branchId: string): number => {
   const stock = Math.max(0, Number(part.stock?.[branchId] || 0));
   const reserved = Math.max(0, Number(part.reservedStock?.[branchId] || 0));
@@ -69,17 +67,7 @@ const SalesManager: React.FC = () => {
   const [mobileStep, setMobileStep] = useState<"products" | "checkout">(
     "products"
   );
-  const [uiMode, setUiMode] = useState<UiMode>(() => {
-    try {
-      const saved = localStorage.getItem("sales-ui-mode") as UiMode | null;
-      if (saved === "enterprise") return "retail";
-      return saved || "retail";
-    } catch {
-      return "retail";
-    }
-  });
-
-  const enablePartsPaging =
+    const enablePartsPaging =
     (import.meta.env.VITE_SALES_PARTS_PAGED || "false").toLowerCase() === "true";
   const debouncedSearch = useDebouncedValue(search, 300);
   const { data: pagedPartsResult } = usePartsRepoPaged({
@@ -151,15 +139,7 @@ const SalesManager: React.FC = () => {
     setParts(partsFromRepo);
   }, [partsLoaded, partsFromRepo, setParts]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("sales-ui-mode", uiMode);
-    } catch {
-      // ignore storage errors
-    }
-  }, [uiMode]);
-
-  useEffect(() => {
+    useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
@@ -449,138 +429,44 @@ const SalesManager: React.FC = () => {
     return filteredSalesHistory.slice(start, start + historyPageSize);
   }, [filteredSalesHistory, historyPage]);
 
-  const ui = useMemo(() => {
-    if (uiMode === "retail") {
-      return {
-        pageBg:
-          "w-full px-3 md:px-6 py-4 md:py-6 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.14),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(236,72,153,0.14),_transparent_34%),linear-gradient(180deg,#fff7ed_0%,#fff1f2_100%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(236,72,153,0.16),_transparent_34%),linear-gradient(180deg,#1f2937_0%,#111827_100%)]",
-        header:
-          "mb-4 md:mb-6 rounded-2xl border border-orange-200/60 dark:border-orange-500/30 bg-white/80 dark:bg-slate-900/70 backdrop-blur-md shadow-sm px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3",
-        leftPanel:
-          "xl:col-span-2 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl border border-orange-200/70 dark:border-orange-500/30 overflow-hidden shadow-sm",
-        rightPanel:
-          "bg-white/90 dark:bg-slate-900/85 rounded-2xl border border-orange-200/70 dark:border-orange-500/30 p-4 md:p-5 space-y-4 shadow-sm xl:sticky xl:top-24 h-fit",
-        panelHead:
-          "p-4 border-b border-orange-200/60 dark:border-orange-500/30 flex items-center justify-between gap-3 bg-gradient-to-r from-orange-50 to-pink-50 dark:from-slate-900 dark:to-slate-800",
-        rowHover: "border-t border-slate-100 dark:border-slate-700 hover:bg-orange-50/60 dark:hover:bg-slate-800/70 transition",
-        stockBadge:
-          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300",
-        addBtn:
-          "inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white shadow-sm hover:shadow transition",
-        syncBtn:
-          "h-10 px-3 rounded-xl border border-orange-300 dark:border-orange-500/40 text-orange-700 dark:text-orange-200 hover:bg-orange-50 dark:hover:bg-orange-500/10 disabled:opacity-50 transition",
-        summary: "rounded-xl bg-orange-50/70 dark:bg-orange-500/10 border border-orange-200/70 dark:border-orange-500/30 p-3 space-y-1 text-sm",
-      };
-    }
-
-    if (uiMode === "dark") {
-      return {
-        pageBg:
-          "w-full px-3 md:px-6 py-4 md:py-6 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.18),_transparent_34%),linear-gradient(180deg,#020617_0%,#0f172a_100%)]",
-        header:
-          "mb-4 md:mb-6 rounded-2xl border border-sky-500/20 bg-slate-900/60 backdrop-blur-xl shadow-[0_20px_45px_-25px_rgba(14,165,233,0.45)] px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3",
-        leftPanel:
-          "xl:col-span-2 bg-slate-900/65 backdrop-blur-xl rounded-2xl border border-sky-500/20 overflow-hidden shadow-[0_20px_45px_-25px_rgba(14,165,233,0.35)]",
-        rightPanel:
-          "bg-slate-900/65 rounded-2xl border border-sky-500/20 p-4 md:p-5 space-y-4 shadow-[0_20px_45px_-25px_rgba(14,165,233,0.35)] xl:sticky xl:top-24 h-fit",
-        panelHead:
-          "p-4 border-b border-sky-500/20 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-900/70 to-slate-800/40",
-        rowHover: "border-t border-slate-700/70 hover:bg-sky-500/10 transition",
-        stockBadge:
-          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-sky-500/20 text-sky-300",
-        addBtn:
-          "inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 text-white shadow-sm hover:shadow transition",
-        syncBtn:
-          "h-10 px-3 rounded-xl border border-sky-500/30 text-sky-200 hover:bg-sky-500/10 disabled:opacity-50 transition",
-        summary: "rounded-xl bg-slate-950/70 border border-sky-500/20 p-3 space-y-1 text-sm",
-      };
-    }
-
-    return {
-      pageBg:
-        "w-full px-3 md:px-6 py-4 md:py-6 bg-[radial-gradient(circle_at_top_left,_rgba(15,23,42,0.06),_transparent_36%),radial-gradient(circle_at_top_right,_rgba(14,116,144,0.07),_transparent_30%)]",
-      header:
-        "mb-4 md:mb-6 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-sm px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-3",
-      leftPanel:
-        "xl:col-span-2 bg-white/95 dark:bg-slate-800/92 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-700 overflow-hidden shadow-sm",
-      rightPanel:
-        "bg-white/95 dark:bg-slate-800/95 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 space-y-4 shadow-sm xl:sticky xl:top-24 h-fit",
-      panelHead:
-        "p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 bg-gradient-to-r from-white to-slate-50 dark:from-slate-800 dark:to-slate-900",
-      rowHover: "border-t border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition",
-      stockBadge:
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
-      addBtn:
-        "inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white text-white shadow-sm hover:shadow transition",
-      syncBtn:
-        "h-10 px-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition",
-      summary: "rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 space-y-1 text-sm",
-    };
-  }, [uiMode]);
+  const ui = {
+    pageBg: "min-h-screen bg-slate-50 dark:bg-[#151521] pb-20",
+    header: "sticky top-0 z-20 bg-white/90 dark:bg-[#1e1e2d]/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-4 mb-6",
+    leftPanel: "xl:col-span-2 space-y-4",
+    rightPanel: "bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 space-y-4 shadow-sm xl:sticky xl:top-[100px] h-fit",
+    panelHead: "mb-4 flex flex-col sm:flex-row items-center justify-between gap-3",
+    stockBadge: "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    addBtn: "inline-flex items-center justify-center gap-1.5 h-9 w-full sm:w-auto px-4 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-bold transition border border-emerald-200 dark:border-emerald-500/30",
+    syncBtn: "h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e1e2d] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-sm flex items-center justify-center font-bold",
+};
 
   return (
     <div className={`${ui.pageBg} sales-screen`}>
       <div className={ui.header}>
-        <div className="w-full md:w-auto">
-          <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 font-semibold">
-            Điểm bán thông minh
-          </p>
-          <h1 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-rose-500" />
-            Bán hàng tại quầy
-          </h1>
-        </div>
-        <div className="w-full md:w-auto space-y-2">
-          <div className="md:hidden">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Giao diện
-            </label>
-            <select
-              value={uiMode}
-              onChange={(e) => setUiMode(e.target.value as UiMode)}
-              className="mt-1 w-full h-9 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white/90 dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-100"
-            >
-              <option value="enterprise">Doanh nghiệp</option>
-              <option value="retail">Bán lẻ tại quầy</option>
-              <option value="dark">Kính tối</option>
-            </select>
-          </div>
-
-          <div className="hidden md:flex items-center gap-2 text-xs font-semibold">
-            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-100">
-              Giao diện
-            </span>
-            {[
-              { key: "enterprise", label: "Doanh nghiệp" },
-              { key: "retail", label: "Bán lẻ tại quầy" },
-              { key: "dark", label: "Kính tối" },
-            ].map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setUiMode(item.key as UiMode)}
-                className={`px-2.5 py-1 rounded-full border transition ${
-                  uiMode === item.key
-                    ? "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white"
-                    : "bg-white/70 text-slate-600 border-slate-300 dark:bg-slate-700/60 dark:text-slate-200 dark:border-slate-600"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-2 md:flex md:items-center gap-2 text-xs font-semibold">
-            <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 text-center md:text-left">
-              Sản phẩm: {filteredParts.length}
-            </span>
-            <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 text-center md:text-left">
-              Giỏ hàng: {cartItems.length}
-            </span>
-          </div>
+        <div className="max-w-[1400px] mx-auto w-full flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                        <ShoppingCart className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    Bán hàng tại quầy
+                </h1>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 ml-[50px]">
+                    Điểm bán thông minh
+                </p>
+            </div>
+            
+            <div className="flex items-center gap-2 text-xs font-bold">
+                <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                    Sản phẩm: {filteredParts.length}
+                </span>
+                <span className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
+                    Giỏ hàng: {cartItems.length}
+                </span>
+            </div>
         </div>
       </div>
-      <div className="relative grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
+      <div className="relative grid max-w-[1400px] mx-auto px-4 grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
         <section
           className={`${ui.leftPanel} transition-all duration-300 ease-out md:translate-x-0 md:opacity-100 md:pointer-events-auto md:static ${
             mobileStep === "products"
@@ -611,8 +497,8 @@ const SalesManager: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <div className="md:hidden p-3 space-y-3">
+          <div className="p-4 sm:p-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {pagedParts.map((part) => {
                 const stock = getBranchStock(part, currentBranchId);
                 const price = getBranchRetailPrice(part, currentBranchId);
@@ -622,96 +508,55 @@ const SalesManager: React.FC = () => {
                     type="button"
                     key={part.id}
                     onClick={() => addPartToCart(part)}
-                    className={`w-full text-left rounded-xl border p-3 active:scale-[0.99] transition ${
+                    className={`text-left rounded-2xl border p-3 sm:p-4 transition-all duration-200 active:scale-[0.98] flex flex-col h-full ${
                       cartItem
-                        ? "border-emerald-400/80 bg-emerald-50/40 dark:bg-emerald-500/10"
-                        : "border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60"
+                        ? "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.5)]"
+                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:shadow-sm"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-sm text-slate-900 dark:text-slate-100 leading-snug break-words">
-                          {part.name}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">SKU: {part.sku}</div>
-                        {part.warrantyPeriod && (
-                          <div className="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                            Bảo hành: {part.warrantyPeriod}
-                          </div>
-                        )}
+                    <div className="min-w-0 mb-auto w-full">
+                      <div className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug break-words mb-1">
+                        {part.name}
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={ui.stockBadge}>{stock}</span>
+                      <div className="text-[11px] font-medium text-slate-500 truncate">SKU: {part.sku}</div>
+                    </div>
+                    
+                    <div className="mt-4 flex flex-col items-start gap-2 w-full">
+                      <div className="w-full flex items-center justify-between">
+                        <div className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(price)}
+                        </div>
+                        <span className={ui.stockBadge}>{stock} tồn</span>
+                      </div>
+                      <div className="w-full flex items-center justify-between h-5">
+                        {part.warrantyPeriod ? (
+                          <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                            BH: {part.warrantyPeriod}
+                          </div>
+                        ) : <div></div>}
+                        
                         {cartItem && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
-                            Đã thêm x{cartItem.quantity}
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm">
+                            x{cartItem.quantity}
                           </span>
                         )}
-                      </div>
-                    </div>
-
-                    <div className="mt-2">
-                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                        {formatCurrency(price)}
                       </div>
                     </div>
                   </button>
                 );
               })}
+            </div>
 
-              {!filteredParts.length && (
-                <div className="px-4 py-8 text-center text-slate-500 text-sm">
-                  Không có sản phẩm phù hợp.
+            {!filteredParts.length && (
+              <div className="py-20 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                  <Search className="w-8 h-8 text-slate-400" />
                 </div>
-              )}
-            </div>
-
-            <div className="hidden md:block">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10">
-                  <tr className="text-left text-slate-500 dark:text-slate-400">
-                    <th className="px-4 py-3">Sản phẩm</th>
-                    <th className="px-4 py-3">Tồn</th>
-                    <th className="px-4 py-3">Giá bán</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedParts.map((part) => {
-                    const stock = getBranchStock(part, currentBranchId);
-                    const price = getBranchRetailPrice(part, currentBranchId);
-                    return (
-                      <tr
-                        key={part.id}
-                        onClick={() => addPartToCart(part)}
-                        className={`${ui.rowHover} cursor-pointer`}
-                        title="Nhấn để thêm vào giỏ"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900 dark:text-slate-100">{part.name}</div>
-                          <div className="text-xs text-slate-500">{part.sku}</div>
-                          {part.warrantyPeriod && (
-                            <div className="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                              Bảo hành: {part.warrantyPeriod}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
-                          <span className={ui.stockBadge}>{stock}</span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{formatCurrency(price)}</td>
-                      </tr>
-                    );
-                  })}
-                  {!filteredParts.length && (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-10 text-center text-slate-500">
-                        Không có sản phẩm phù hợp.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                <div className="text-slate-500 dark:text-slate-400 font-medium">
+                  Không tìm thấy sản phẩm phù hợp.
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center md:justify-between gap-2 bg-slate-50/70 dark:bg-slate-900/40">
@@ -770,34 +615,34 @@ const SalesManager: React.FC = () => {
               Quay lại chọn sản phẩm
             </button>
           </div>
-          <div className="rounded-2xl border border-emerald-200/60 dark:border-emerald-500/20 bg-gradient-to-br from-emerald-50/80 via-white/80 to-sky-50/70 dark:from-emerald-950/40 dark:via-slate-950/60 dark:to-slate-900/40 p-4 shadow-[0_18px_40px_-28px_rgba(16,185,129,0.55)]">
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 p-4 mb-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-200/70 font-semibold">
-                  Giao dich nhanh
+                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-400/70 font-bold mb-1">
+                  Giao dịch nhanh
                 </p>
-                <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-base">
-                  <ReceiptText className="w-5 h-5 text-emerald-500" />
+                <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-base">
+                  <ReceiptText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   Quản lý bán hàng
                 </h2>
               </div>
               <div className="text-right">
-                <div className="text-[11px] text-slate-500 dark:text-slate-300">Giỏ hàng</div>
-                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-300">
+                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Giỏ hàng</div>
+                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
                   {cartItems.length}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
             <button
               type="button"
               onClick={() => setRightTab("checkout")}
-              className={`h-9 rounded-lg text-sm font-semibold border transition ${
+              className={`h-9 rounded-lg text-sm font-bold transition-all ${
                 rightTab === "checkout"
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-[0_10px_30px_-20px_rgba(16,185,129,0.9)]"
-                  : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               Thanh toán
@@ -805,10 +650,10 @@ const SalesManager: React.FC = () => {
             <button
               type="button"
               onClick={() => setRightTab("history")}
-              className={`h-9 rounded-lg text-sm font-semibold border transition ${
+              className={`h-9 rounded-lg text-sm font-bold transition-all ${
                 rightTab === "history"
-                  ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-200 dark:text-slate-900 dark:border-slate-200"
-                  : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               Lịch sử bán hàng
@@ -817,65 +662,64 @@ const SalesManager: React.FC = () => {
 
           {rightTab === "checkout" && (
           <>
-          <div className="space-y-2 max-h-64 overflow-auto pr-1 mt-3">
+          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1 mb-4">
             {cartItems.map((item) => (
               <div
                 key={item.partId}
-                className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 p-3 bg-white/90 dark:bg-slate-950/40 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.6)]"
+                className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 bg-white dark:bg-[#1a1a27] shadow-sm relative group transition-all hover:border-emerald-300 dark:hover:border-emerald-500/50"
               >
                 <div className="flex justify-between items-start gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                  <div className="min-w-0 pr-8">
+                    <p className="font-bold text-sm text-slate-900 dark:text-white leading-snug">
                       {item.partName}
                     </p>
-                    <p className="text-xs text-slate-500">{item.sku || ""}</p>
+                    <p className="text-[11px] font-medium text-slate-500 mt-0.5">{item.sku || "N/A"}</p>
                   </div>
                   <button
                     onClick={() => removeItem(item.partId)}
-                    className="text-slate-400 hover:text-rose-500 w-8 h-8 rounded-lg border border-slate-200/70 dark:border-slate-700 inline-flex items-center justify-center"
-                    title="Xóa khỏi giỏ"
+                    className="absolute top-3 right-3 text-slate-400 hover:text-rose-500 w-7 h-7 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10 inline-flex items-center justify-center transition"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    onClick={() => updateQty(item.partId, item.quantity - 1)}
-                    className="w-9 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="w-10 text-center text-sm font-semibold">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => updateQty(item.partId, item.quantity + 1)}
-                    className="w-9 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <input
-                      value={formatCurrency(item.sellingPrice)}
-                      readOnly
-                      className="w-full h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm font-semibold text-slate-700 dark:text-slate-200 px-3"
-                    />
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
+                  <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
+                    <button
+                      onClick={() => updateQty(item.partId, item.quantity - 1)}
+                      className="w-8 h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-md transition shadow-sm"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-10 text-center text-sm font-bold text-slate-900 dark:text-white">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => updateQty(item.partId, item.quantity + 1)}
+                      className="w-8 h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-md transition shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-300 whitespace-nowrap">
-                    {formatCurrency(item.sellingPrice * item.quantity)}
+                  <div className="text-right">
+                    <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(item.sellingPrice * item.quantity)}
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
             {!cartItems.length && (
-              <div className="rounded-2xl border border-dashed border-slate-300/70 dark:border-slate-700 p-6 text-center text-sm text-slate-500">
-                Chưa có sản phẩm trong giỏ hàng.
+              <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-8 flex flex-col items-center justify-center text-center">
+                <ShoppingCart className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-3" />
+                <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                  Chưa có sản phẩm trong giỏ hàng.
+                </div>
               </div>
             )}
           </div>
 
           <div className="space-y-3 border-t border-slate-200/70 dark:border-slate-700 pt-4">
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Khách hàng</div>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -928,7 +772,7 @@ const SalesManager: React.FC = () => {
               </label>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Tổng kết đơn hàng
               </div>
@@ -965,7 +809,7 @@ const SalesManager: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Phương thức thanh toán
               </div>
@@ -1022,7 +866,7 @@ const SalesManager: React.FC = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/95 dark:bg-slate-950/40 p-4 space-y-3">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ghi chú</div>
               <textarea
                 value={note}
