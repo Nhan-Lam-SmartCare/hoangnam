@@ -367,6 +367,59 @@ function isMissingColumn(err: any, columnName: string) {
   );
 }
 
+function getMissingColumnFromSupabaseError(err: any): string | null {
+  const message = `${err?.message || ""} ${err?.details || ""}`;
+  const match = message.match(/'([^']+)'/i);
+  return match?.[1] || null;
+}
+
+async function getCashTxCreatorFields(): Promise<Record<string, any>> {
+  const { data } = await supabase.auth.getUser();
+  const user = data?.user;
+  if (!user) return {};
+  const creatorId = user.id;
+  const creatorName =
+    user.user_metadata?.name ||
+    user.user_metadata?.full_name ||
+    user.user_metadata?.display_name ||
+    user.email?.split("@")?.[0] ||
+    null;
+
+  return {
+    userid: creatorId,
+    username: creatorName,
+    created_by: creatorId,
+    createdby: creatorId,
+    created_by_name: creatorName,
+    createdbyname: creatorName,
+    userId: creatorId,
+    userName: creatorName,
+    createdBy: creatorId,
+    createdByName: creatorName,
+  };
+}
+
+async function insertCashTxWithColumnFallback(payload: Record<string, any>) {
+  let workingPayload = { ...payload };
+  let lastError: any = null;
+
+  for (let i = 0; i < 8; i += 1) {
+    const result = await supabase.from("cash_transactions").insert(workingPayload);
+    if (!result.error) return { ok: true, error: null as any };
+
+    const missingColumn = getMissingColumnFromSupabaseError(result.error);
+    if (missingColumn && missingColumn in workingPayload) {
+      delete workingPayload[missingColumn];
+      lastError = result.error;
+      continue;
+    }
+
+    return { ok: false, error: result.error };
+  }
+
+  return { ok: false, error: lastError };
+}
+
 async function insertInventoryTransactionsWithFallback(txRecords: any[]) {
   const attempt1 = await supabase
     .from("inventory_transactions")
@@ -396,24 +449,32 @@ async function createCashTxWithFallback(options: {
   cashTxBaseCamel: any;
   supplierId: string | null;
 }) {
+  const creatorFields = await getCashTxCreatorFields();
   const attempts = [
     {
       payload: {
         ...options.cashTxBaseLower,
         type: "expense",
         supplierId: options.supplierId,
+        ...creatorFields,
       },
       shouldRetry: (err: any) =>
         isMissingColumn(err, "type") || isMissingColumn(err, "supplierId"),
     },
     {
-      payload: options.cashTxBaseLower,
+      payload: {
+        ...options.cashTxBaseLower,
+        ...creatorFields,
+      },
       shouldRetry: (err: any) =>
         isMissingColumn(err, "branchId") ||
         isMissingColumn(err, "paymentSource"),
     },
     {
-      payload: options.cashTxBaseCamel,
+      payload: {
+        ...options.cashTxBaseCamel,
+        ...creatorFields,
+      },
       shouldRetry: (err: any) =>
         isMissingColumn(err, "branchId") ||
         isMissingColumn(err, "paymentSource"),
@@ -423,6 +484,7 @@ async function createCashTxWithFallback(options: {
         ...options.cashTxBaseCamel,
         type: "expense",
         supplierId: options.supplierId,
+        ...creatorFields,
       },
       shouldRetry: () => false,
     },
@@ -430,8 +492,8 @@ async function createCashTxWithFallback(options: {
 
   let lastError: any = null;
   for (const attempt of attempts) {
-    const result = await supabase.from("cash_transactions").insert(attempt.payload);
-    if (!result.error) {
+    const result = await insertCashTxWithColumnFallback(attempt.payload);
+    if (result.ok) {
       return { cashTxCreated: true, cashTxError: null as any };
     }
     lastError = result.error;

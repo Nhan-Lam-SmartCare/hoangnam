@@ -64,6 +64,60 @@ export interface StoreSettings {
   work_order_prefix?: string;
 }
 
+const getMissingColumnFromSupabaseError = (err: any): string | null => {
+  const message = `${err?.message || ""} ${err?.details || ""}`;
+  const match = message.match(/'([^']+)'/i);
+  return match?.[1] || null;
+};
+
+const buildCashTxCreatorFields = (user: any): Record<string, any> => {
+  if (!user) return {};
+  const creatorId = user.id;
+  const creatorName =
+    user.user_metadata?.name ||
+    user.user_metadata?.full_name ||
+    user.user_metadata?.display_name ||
+    user.email?.split("@")?.[0] ||
+    null;
+
+  return {
+    userid: creatorId,
+    username: creatorName,
+    created_by: creatorId,
+    createdby: creatorId,
+    created_by_name: creatorName,
+    createdbyname: creatorName,
+    userId: creatorId,
+    userName: creatorName,
+    createdBy: creatorId,
+    createdByName: creatorName,
+  };
+};
+
+const insertCashTransactionWithCreator = async (payload: Record<string, any>) => {
+  const { data } = await supabase.auth.getUser();
+  const user = data?.user;
+  const creatorFields = buildCashTxCreatorFields(user);
+  let workingPayload = { ...payload, ...creatorFields };
+  let lastError: any = null;
+
+  for (let i = 0; i < 8; i += 1) {
+    const { error } = await supabase.from("cash_transactions").insert(workingPayload);
+    if (!error) return { ok: true, error: null as any };
+
+    const missingColumn = getMissingColumnFromSupabaseError(error);
+    if (missingColumn && missingColumn in workingPayload) {
+      delete workingPayload[missingColumn];
+      lastError = error;
+      continue;
+    }
+
+    return { ok: false, error };
+  }
+
+  return { ok: false, error: lastError };
+};
+
 interface RepairServiceDraftWorker {
   worker_id: string;
   worker_name?: string;
@@ -1249,7 +1303,7 @@ const WorkOrderModal: React.FC<{
         const depositTxId = `TX-${Date.now()}-${Math.random()
           .toString(36)
           .substr(2, 9)}-DEP`;
-        await supabase.from("cash_transactions").insert({
+        await insertCashTransactionWithCreator({
           id: depositTxId,
           type: "income",
           category: "service_deposit",
@@ -1268,7 +1322,7 @@ const WorkOrderModal: React.FC<{
         const expenseTxId = `TX-${Date.now()}-${Math.random()
           .toString(36)
           .substr(2, 9)}-EXP`;
-        await supabase.from("cash_transactions").insert({
+        await insertCashTransactionWithCreator({
           id: expenseTxId,
           type: "expense",
           category: "parts_purchase",
@@ -1964,9 +2018,8 @@ const WorkOrderModal: React.FC<{
             if (depositTxId && depositAmount > 0) {
               // INSERT deposit transaction to database
               try {
-                const { error: depositDbError } = await supabase
-                  .from("cash_transactions")
-                  .insert({
+                const { ok: depositOk, error: depositDbError } =
+                  await insertCashTransactionWithCreator({
                     id: depositTxId,
                     type: "income",
                     category: "service_deposit",
@@ -1984,7 +2037,7 @@ const WorkOrderModal: React.FC<{
                     paymentsource: formData.paymentMethod,
                     workorderid: orderId,
                   });
-                if (depositDbError) {
+                if (!depositOk) {
                   console.error(
                     "[WorkOrderModal] deposit insert error:",
                     depositDbError
@@ -2036,9 +2089,8 @@ const WorkOrderModal: React.FC<{
             if (paymentTxId && additionalPaymentToApply > 0) {
               // INSERT payment transaction to database
               try {
-                const { error: paymentDbError } = await supabase
-                  .from("cash_transactions")
-                  .insert({
+                const { ok: paymentOk, error: paymentDbError } =
+                  await insertCashTransactionWithCreator({
                     id: paymentTxId,
                     type: "income",
                     category: "service_income",
@@ -2056,7 +2108,7 @@ const WorkOrderModal: React.FC<{
                     paymentsource: formData.paymentMethod,
                     workorderid: orderId,
                   });
-                if (paymentDbError) {
+                if (!paymentOk) {
                   console.error(
                     "[WorkOrderModal] payment insert error:",
                     paymentDbError
@@ -2143,9 +2195,8 @@ const WorkOrderModal: React.FC<{
                     .maybeSingle();
 
                   if (!existingTx) {
-                    const { error: expenseError } = await supabase
-                      .from("cash_transactions")
-                      .insert({
+                    const { ok: expenseOk, error: expenseError } =
+                      await insertCashTransactionWithCreator({
                         id: outsourcingTxId,
                         type: "expense",
                         category: "outsourcing",
@@ -2161,7 +2212,7 @@ const WorkOrderModal: React.FC<{
                         reference: orderId,
                       });
 
-                    if (expenseError) {
+                    if (!expenseOk) {
                       console.error("[Outsourcing] Insert FAILED:", expenseError);
                       showToast.error(
                         `Lỗi tạo phiếu chi gia công: ${expenseError.message}`
@@ -2236,9 +2287,8 @@ const WorkOrderModal: React.FC<{
                     .maybeSingle();
 
                   if (!existingNegTx) {
-                    const { error: negExpenseError } = await supabase
-                      .from("cash_transactions")
-                      .insert({
+                    const { ok: negExpenseOk, error: negExpenseError } =
+                      await insertCashTransactionWithCreator({
                         id: negativeSalesTxId,
                         type: "expense",
                         category: "refund", // Hoặc category phù hợp
@@ -2254,7 +2304,7 @@ const WorkOrderModal: React.FC<{
                         reference: orderId,
                       });
 
-                    if (negExpenseError) {
+                    if (!negExpenseOk) {
                       console.error(
                         "[Negative Sales] Insert FAILED:",
                         negExpenseError
@@ -2569,9 +2619,8 @@ const WorkOrderModal: React.FC<{
                 depositAmount - (order.depositAmount || 0);
               // INSERT additional deposit to database
               try {
-                const { error: addDepositErr } = await supabase
-                  .from("cash_transactions")
-                  .insert({
+                const { ok: addDepositOk, error: addDepositErr } =
+                  await insertCashTransactionWithCreator({
                     id: depositTxId,
                     type: "income",
                     category: "service_deposit",
@@ -2589,7 +2638,7 @@ const WorkOrderModal: React.FC<{
                     paymentsource: formData.paymentMethod,
                     workorderid: order.id,
                   });
-                if (addDepositErr) {
+                if (!addDepositOk) {
                   console.error(
                     "[WorkOrderModal-update] additional deposit error:",
                     addDepositErr

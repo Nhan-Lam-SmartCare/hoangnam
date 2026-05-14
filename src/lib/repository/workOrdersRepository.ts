@@ -6,6 +6,60 @@ import { formatWorkOrderId } from "../../utils/format";
 const WORK_ORDERS_TABLE = "work_orders";
 const ADDITIONAL_SERVICES_MARKER = "[ADDITIONAL_SERVICES]:";
 
+const getMissingColumnFromSupabaseError = (err: any): string | null => {
+  const message = `${err?.message || ""} ${err?.details || ""}`;
+  const match = message.match(/'([^']+)'/i);
+  return match?.[1] || null;
+};
+
+const buildCashTxCreatorFields = (user: any): Record<string, any> => {
+  if (!user) return {};
+  const creatorId = user.id;
+  const creatorName =
+    user.user_metadata?.name ||
+    user.user_metadata?.full_name ||
+    user.user_metadata?.display_name ||
+    user.email?.split("@")?.[0] ||
+    null;
+
+  return {
+    userid: creatorId,
+    username: creatorName,
+    created_by: creatorId,
+    createdby: creatorId,
+    created_by_name: creatorName,
+    createdbyname: creatorName,
+    userId: creatorId,
+    userName: creatorName,
+    createdBy: creatorId,
+    createdByName: creatorName,
+  };
+};
+
+const insertCashTransactionWithCreator = async (payload: Record<string, any>) => {
+  const { data } = await supabase.auth.getUser();
+  const user = data?.user;
+  const creatorFields = buildCashTxCreatorFields(user);
+  let workingPayload = { ...payload, ...creatorFields };
+  let lastError: any = null;
+
+  for (let i = 0; i < 8; i += 1) {
+    const { error } = await supabase.from("cash_transactions").insert(workingPayload);
+    if (!error) return { ok: true, error: null as any };
+
+    const missingColumn = getMissingColumnFromSupabaseError(error);
+    if (missingColumn && missingColumn in workingPayload) {
+      delete workingPayload[missingColumn];
+      lastError = error;
+      continue;
+    }
+
+    return { ok: false, error };
+  }
+
+  return { ok: false, error: lastError };
+};
+
 const parseWarrantyMonths = (raw: unknown): number => {
   const text = String(raw || "").trim().toLowerCase();
   if (!text) return 0;
@@ -650,8 +704,8 @@ async function ensureManualPartExpenseOnPayment(
     ];
 
     for (const payload of payloadAttempts) {
-      const { error } = await supabase.from("cash_transactions").insert(payload);
-      if (!error) return;
+      const result = await insertCashTransactionWithCreator(payload);
+      if (result.ok) return;
     }
 
     console.warn("[completeWorkOrderPayment] Failed to create manual-part expense transaction", {

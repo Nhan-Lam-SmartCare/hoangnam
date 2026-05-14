@@ -1,15 +1,24 @@
-export function printElementById(id: string) {
+type PrintElementOptions = {
+  pageSize?: string;
+  paperWidth?: string;
+  customStyle?: string;
+};
+
+export function printElementById(id: string, options?: PrintElementOptions) {
   const el = document.getElementById(id);
   if (!el) return;
 
-  const isThermalReceipt = id === "work-order-receipt";
-  const pageStyle = isThermalReceipt
+  const isThermalReceipt = id === "work-order-receipt" || !!options?.pageSize || !!options?.paperWidth;
+  const paperWidth = options?.paperWidth || "80mm";
+  const pageSize = options?.pageSize || `${paperWidth} auto`;
+  const receiptSelector = `#${id}`;
+  const baseStyle = isThermalReceipt
     ? `
-    @page { size: 80mm 200mm; margin: 0; }
-    html, body { width: 80mm; }
+    @page { size: ${pageSize}; margin: 0; }
+    html, body { width: ${paperWidth}; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0 auto; }
-    #work-order-receipt {
-      width: 76mm !important;
+    ${receiptSelector} {
+      width: calc(${paperWidth} - 4mm) !important;
       margin: 0 auto !important;
       padding: 2mm !important;
       box-sizing: border-box;
@@ -17,7 +26,7 @@ export function printElementById(id: string) {
     }
     @media print {
       .no-print { display: none; }
-      html, body { width: 80mm; }
+      html, body { width: ${paperWidth}; }
       body { margin: 0 auto; }
     }
   `
@@ -25,6 +34,7 @@ export function printElementById(id: string) {
     body { font-family: Arial, Helvetica, sans-serif; }
     @media print { .no-print { display: none; } }
   `;
+  const pageStyle = `${baseStyle}${options?.customStyle || ""}`;
 
   const isMobile =
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||

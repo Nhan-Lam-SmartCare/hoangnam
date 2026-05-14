@@ -192,6 +192,16 @@ export async function createCashTransaction(
       (input.type === "income" ? "general_income" : "general_expense");
     const txDate = input.date || new Date().toISOString();
 
+    const { data: authRes } = await supabase.auth.getUser();
+    const authUser = authRes?.user;
+    const creatorId = authUser?.id || null;
+    const creatorName =
+      authUser?.user_metadata?.name ||
+      authUser?.user_metadata?.full_name ||
+      authUser?.user_metadata?.display_name ||
+      authUser?.email?.split("@")?.[0] ||
+      null;
+
     const sourceCandidates: Array<string | null> = [];
     const pushCandidate = (value: unknown) => {
       if (value == null) return;
@@ -253,6 +263,12 @@ export async function createCashTransaction(
         workorderid: input.workOrderId,
         supplierid: input.supplierId,
         customerid: input.customerId,
+        userid: creatorId,
+        username: creatorName,
+        created_by: creatorId,
+        createdby: creatorId,
+        created_by_name: creatorName,
+        createdbyname: creatorName,
       };
 
       const withCamelSource: Record<string, any> = {
@@ -268,6 +284,10 @@ export async function createCashTransaction(
         workOrderId: input.workOrderId,
         supplierId: input.supplierId,
         customerId: input.customerId,
+        userId: creatorId,
+        userName: creatorName,
+        createdBy: creatorId,
+        createdByName: creatorName,
       };
 
       const withLegacySource: Record<string, any> = {
@@ -279,6 +299,8 @@ export async function createCashTransaction(
         date: txDate,
         description: input.notes || "",
         recipient: input.recipient || null,
+        userid: creatorId,
+        username: creatorName,
       };
 
       if (sourceCandidate) {
