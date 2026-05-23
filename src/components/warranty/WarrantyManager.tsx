@@ -12,6 +12,8 @@ import {
     type WarrantyClaim,
 } from "../../hooks/useWarrantyRepository";
 import { WarrantyCardModal } from "../warranty/WarrantyCardModal";
+import { WarrantyCardMobile } from "./WarrantyCardMobile";
+import { WarrantyCardDesktop } from "./WarrantyCardDesktop";
 import { formatDate } from "../../utils/format";
 import { showToast } from "../../utils/toast";
 import { useAuth } from "../../contexts/AuthContext";
@@ -149,159 +151,87 @@ export const WarrantyManager: React.FC = () => {
         return isExpired ? "expired" : card.status;
     };
 
-    const renderCard = (card: WarrantyCard, quantity: number = 1) => (
-        <div
-            key={card.id}
-            className="bg-white dark:bg-[#232334] rounded-xl p-4 border border-slate-200 dark:border-slate-700 hover:border-emerald-400/50 dark:hover:border-emerald-500/50 transition-all shadow-sm"
-        >
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                <div className="flex items-start gap-3 flex-1">
-                    <div className="w-10 h-10 shrink-0 bg-slate-100 dark:bg-slate-800/80 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-700">
-                        <Smartphone className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <h3 className="font-bold text-slate-900 dark:text-white text-base truncate max-w-[200px] sm:max-w-xs">
-                                {card.device_model}
-                            </h3>
-                            {quantity > 1 && (
-                                <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md text-[10px] font-bold">
-                                    x{quantity}
-                                </span>
-                            )}
-                            {getStatusBadge(card.status, card.warranty_end_date)}
-                        </div>
-                        <div className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                            IMEI/Serial: <span className="font-medium text-slate-700 dark:text-slate-300">{card.imei_serial || "N/A"}</span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="bg-slate-50 dark:bg-[#1a1a27] rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mb-1">Ngày mua</div>
-                                <div className="font-bold text-slate-900 dark:text-white text-sm">
-                                    {card.warranty_start_date ? formatDate(card.warranty_start_date) : "N/A"}
-                                    <span className="text-[10px] font-medium text-slate-500 ml-1">({card.warranty_period_months}T)</span>
-                                </div>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-[#1a1a27] rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mb-1">Ngày hết hạn</div>
-                                <div className="font-bold text-slate-900 dark:text-white text-sm">{formatDate(card.warranty_end_date)}</div>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-[#1a1a27] rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mb-1">Còn lại</div>
-                                <div className={`font-bold text-sm ${getDaysRemaining(card.warranty_end_date) > 30 ? "text-emerald-600 dark:text-emerald-400" : getDaysRemaining(card.warranty_end_date) > 0 ? "text-orange-500" : "text-rose-500"}`}>
-                                    {getDaysRemaining(card.warranty_end_date) > 0 ? `${getDaysRemaining(card.warranty_end_date)} ngày` : "Đã hết hạn"}
-                                </div>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-[#1a1a27] rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold mb-1">Trạng thái</div>
-                                <div className="font-bold text-slate-900 dark:text-white text-sm">
-                                    {getEffectiveStatus(card) === "active" ? "Còn hạn" : getEffectiveStatus(card) === "expired" ? "Hết hạn" : getEffectiveStatus(card) === "claimed" ? "Đang xử lý" : "Vô hiệu"}
-                                </div>
-                            </div>
-                        </div>
-
-                        {card.covered_parts && card.covered_parts.length > 0 && (
-                            <div className="mt-3">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1 uppercase tracking-wider">Phạm vi:</span>
-                                    {card.covered_parts.map((part: string, idx: number) => (
-                                        <span key={idx} className="px-2 py-0.5 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20 rounded-md text-[11px] font-semibold">
-                                            {part}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex sm:flex-col items-center justify-end gap-2 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-3 sm:pt-0 shrink-0">
-                    <button
-                        onClick={() => handlePrintWarrantyReceipt(card)}
-                        className="flex-1 sm:flex-none sm:w-full h-9 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[13px] font-semibold flex items-center justify-center gap-2 transition-colors border border-slate-200 dark:border-slate-700"
-                    >
-                        <Printer className="w-4 h-4" /> <span className="sm:hidden lg:inline">In phiếu</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (!canCreateClaim) {
-                                showToast.error("Bạn không có quyền tiếp nhận bảo hành.");
-                                return;
-                            }
-                            setClaimingCard(card);
+    const renderCard = (card: WarrantyCard, quantity: number = 1) => {
+        return (
+            <React.Fragment key={card.id}>
+                {/* Giao diện Desktop */}
+                <div className="hidden sm:block">
+                    <WarrantyCardDesktop
+                        card={card}
+                        quantity={quantity}
+                        canCreateClaim={canCreateClaim}
+                        canManageClaim={canManageClaim}
+                        canDeleteCard={canDeleteCard}
+                        activeDropdownId={activeDropdownId}
+                        setActiveDropdownId={setActiveDropdownId}
+                        onPrint={handlePrintWarrantyReceipt}
+                        onClaim={(c) => {
+                            setClaimingCard(c);
                             setClaimIssueText("");
                         }}
-                        disabled={!canCreateClaim}
-                        className="flex-1 sm:flex-none sm:w-full h-9 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[13px] font-semibold flex items-center justify-center gap-2 transition-colors border border-emerald-200 dark:border-emerald-500/30"
-                    >
-                        <Wrench className="w-4 h-4" /> Tiếp nhận
-                    </button>
-                    
-                    <div className="relative sm:w-full">
-                        <button
-                            onClick={() => setActiveDropdownId(activeDropdownId === card.id ? null : card.id)}
-                            className="h-9 w-9 sm:w-full rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                        >
-                            <MoreVertical className="w-4 h-4 sm:hidden" />
-                            <span className="hidden sm:inline text-[13px] font-semibold text-slate-600 dark:text-slate-400">Tùy chọn</span>
-                        </button>
-
-                        {activeDropdownId === card.id && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-40"
-                                    onClick={() => setActiveDropdownId(null)}
-                                />
-                                <div className="absolute right-0 sm:left-0 sm:right-auto mt-1 w-36 bg-white dark:bg-[#2a2a3c] rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden">
-                                    {card.status !== "voided" && (
-                                        <button
-                                            onClick={async () => {
-                                                setActiveDropdownId(null);
-                                                try {
-                                                    await updateWarrantyStatusMutation.mutateAsync({ id: card.id, status: "voided" });
-                                                    showToast.success("Đã vô hiệu phiếu bảo hành.");
-                                                } catch {
-                                                    showToast.error("Không thể cập nhật trạng thái phiếu.");
-                                                }
-                                            }}
-                                            disabled={!canManageClaim}
-                                            className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
-                                        >
-                                            Vô hiệu phiếu
-                                        </button>
-                                    )}
-                                    {canDeleteCard && (
-                                        <button
-                                            onClick={async () => {
-                                                setActiveDropdownId(null);
-                                                const confirmed = window.confirm("Xóa vĩnh viễn phiếu bảo hành này?");
-                                                if (!confirmed) return;
-                                                try {
-                                                    await deleteWarrantyCardMutation.mutateAsync(card.id);
-                                                    showToast.success("Đã xóa phiếu bảo hành.");
-                                                } catch (error) {
-                                                    console.error("Delete warranty card failed", error);
-                                                    showToast.error("Không thể xóa phiếu bảo hành.");
-                                                }
-                                            }}
-                                            disabled={deleteWarrantyCardMutation.isPending}
-                                            className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                                        >
-                                            Xóa phiếu
-                                        </button>
-                                    )}
-                                    {(card.status === "voided" && !canDeleteCard) && (
-                                        <div className="px-4 py-2.5 text-xs text-slate-400">Không có quyền thao tác</div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                        onVoid={async (id) => {
+                            try {
+                                await updateWarrantyStatusMutation.mutateAsync({ id, status: "voided" });
+                                showToast.success("Đã vô hiệu phiếu bảo hành.");
+                            } catch {
+                                showToast.error("Không thể cập nhật trạng thái phiếu.");
+                            }
+                        }}
+                        onDelete={async (id) => {
+                            const confirmed = window.confirm("Xóa vĩnh viễn phiếu bảo hành này?");
+                            if (!confirmed) return;
+                            try {
+                                await deleteWarrantyCardMutation.mutateAsync(id);
+                                showToast.success("Đã xóa phiếu bảo hành.");
+                            } catch (error) {
+                                console.error("Delete warranty card failed", error);
+                                showToast.error("Không thể xóa phiếu bảo hành.");
+                            }
+                        }}
+                        getStatusBadge={getStatusBadge}
+                    />
                 </div>
-            </div>
-        </div>
-    );
+
+                {/* Giao diện Mobile */}
+                <div className="sm:hidden">
+                    <WarrantyCardMobile
+                        card={card}
+                        quantity={quantity}
+                        canCreateClaim={canCreateClaim}
+                        canManageClaim={canManageClaim}
+                        canDeleteCard={canDeleteCard}
+                        activeDropdownId={activeDropdownId}
+                        setActiveDropdownId={setActiveDropdownId}
+                        onPrint={handlePrintWarrantyReceipt}
+                        onClaim={(c) => {
+                            setClaimingCard(c);
+                            setClaimIssueText("");
+                        }}
+                        onVoid={async (id) => {
+                            try {
+                                await updateWarrantyStatusMutation.mutateAsync({ id, status: "voided" });
+                                showToast.success("Đã vô hiệu phiếu bảo hành.");
+                            } catch {
+                                showToast.error("Không thể cập nhật trạng thái phiếu.");
+                            }
+                        }}
+                        onDelete={async (id) => {
+                            const confirmed = window.confirm("Xóa vĩnh viễn phiếu bảo hành này?");
+                            if (!confirmed) return;
+                            try {
+                                await deleteWarrantyCardMutation.mutateAsync(id);
+                                showToast.success("Đã xóa phiếu bảo hành.");
+                            } catch (error) {
+                                console.error("Delete warranty card failed", error);
+                                showToast.error("Không thể xóa phiếu bảo hành.");
+                            }
+                        }}
+                        getStatusBadge={getStatusBadge}
+                    />
+                </div>
+            </React.Fragment>
+        );
+    };
 
     const getActionHistory = (claim: WarrantyClaim): Array<{ label: string; at?: string; by?: string; note?: string }> => {
         const rows: Array<{ label: string; at?: string; by?: string; note?: string }> = [
@@ -436,24 +366,24 @@ export const WarrantyManager: React.FC = () => {
                     </div>
 
                     {/* Tabs & Search Row */}
-                    <div className="flex flex-col md:flex-row gap-3">
-                        <div className="flex bg-slate-100 dark:bg-[#151521] p-1 rounded-xl shrink-0 border border-slate-200 dark:border-slate-800">
+                    <div className="flex flex-col md:flex-row gap-3 relative z-10">
+                        <div className="flex bg-slate-100/80 dark:bg-slate-900/60 p-1 rounded-xl shrink-0 border border-slate-200/40 dark:border-slate-800/60 shadow-inner">
                             <button
                                 onClick={() => setActiveTab("cards")}
-                                className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex-1 md:flex-none text-center ${
+                                className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 flex-1 md:flex-none text-center hover:scale-[1.02] active:scale-95 ${
                                     activeTab === "cards"
-                                        ? "bg-white dark:bg-[#2a2a3c] text-emerald-600 dark:text-emerald-400 shadow-sm"
-                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        ? "bg-white dark:bg-[#2a2a3c] text-emerald-600 dark:text-emerald-400 shadow-md border border-slate-200/20 dark:border-slate-800/30"
+                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                 }`}
                             >
                                 Phiếu bảo hành
                             </button>
                             <button
                                 onClick={() => setActiveTab("claims")}
-                                className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex-1 md:flex-none text-center ${
+                                className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 flex-1 md:flex-none text-center hover:scale-[1.02] active:scale-95 ${
                                     activeTab === "claims"
-                                        ? "bg-white dark:bg-[#2a2a3c] text-emerald-600 dark:text-emerald-400 shadow-sm"
-                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                        ? "bg-white dark:bg-[#2a2a3c] text-emerald-600 dark:text-emerald-400 shadow-md border border-slate-200/20 dark:border-slate-800/30"
+                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                 }`}
                             >
                                 Tiếp nhận
@@ -467,33 +397,36 @@ export const WarrantyManager: React.FC = () => {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Tìm theo tên khách, SĐT, thiết bị, IMEI..."
-                                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1e1e2d] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm font-medium"
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-900 dark:text-white placeholder-slate-400/80 focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-300 text-sm font-semibold"
                             />
                         </div>
                     </div>
 
-                    {/* Status Filter */}
+                    {/* Status Filter - Swipeable container */}
                     {activeTab === "cards" && (
-                        <div className="flex flex-wrap gap-2 mt-4 pl-1">
+                        <div className="flex overflow-x-auto flex-nowrap gap-2 mt-4 pl-1 pb-2 hide-scrollbar-mobile custom-scrollbar-scientific scroll-smooth">
                             {[
                                 { value: "all", label: "Tất cả" },
                                 { value: "active", label: "Còn hạn" },
                                 { value: "expired", label: "Hết hạn" },
                                 { value: "claimed", label: "Đang xử lý" },
                                 { value: "voided", label: "Vô hiệu" },
-                            ].map((filter) => (
-                                <button
-                                    key={filter.value}
-                                    onClick={() => setStatusFilter(filter.value as any)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                                        statusFilter === filter.value
-                                            ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400"
-                                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-[#1e1e2d] dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
-                                    }`}
-                                >
-                                    {filter.label}
-                                </button>
-                            ))}
+                            ].map((filter) => {
+                                const isActive = statusFilter === filter.value;
+                                return (
+                                    <button
+                                        key={filter.value}
+                                        onClick={() => setStatusFilter(filter.value as any)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all duration-200 border ${
+                                            isActive
+                                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.12)] scale-[1.03]"
+                                                : "bg-white dark:bg-[#1e1e2d] border-slate-200/60 dark:border-slate-800/80 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-95"
+                                        }`}
+                                    >
+                                        {filter.label}
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -521,39 +454,44 @@ export const WarrantyManager: React.FC = () => {
                             );
 
                             return (
-                                <div key={group.key} className="bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-all duration-200">
+                                <div key={group.key} className="glass-card-premium rounded-2xl border border-slate-200/50 dark:border-slate-700/60 shadow-sm transition-all duration-300 hover:shadow-md mb-4 relative z-10">
                                     <button
                                         onClick={() => setExpandedCustomerKeys(prev => ({...prev, [group.key]: !isExpanded}))}
-                                        className="w-full px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                                        className={`w-full px-4 sm:px-6 py-4.5 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors duration-200 text-left active:scale-[0.99] rounded-t-2xl ${!isExpanded ? 'rounded-b-2xl' : ''}`}
                                     >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-[#151521] border border-emerald-100 dark:border-slate-700 flex items-center justify-center shrink-0">
-                                                <User className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 border border-emerald-500/20 dark:border-emerald-400/30 flex items-center justify-center shrink-0 shadow-inner relative mt-0.5">
+                                                <User className="w-5.5 h-5.5 text-emerald-600 dark:text-emerald-400" />
+                                                {counts.active ? (
+                                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1e1e2d] pulse-glow-green" />
+                                                ) : counts.claimed ? (
+                                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 rounded-full border-2 border-white dark:border-[#1e1e2d] animate-pulse" />
+                                                ) : (
+                                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-2 border-white dark:border-[#1e1e2d]" />
+                                                )}
                                             </div>
                                             <div className="text-left">
                                                 <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                                                     {group.name}
                                                 </div>
                                                 <div className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                                    <Phone className="w-3.5 h-3.5" />
+                                                    <Phone className="w-3.5 h-3.5 text-slate-400" />
                                                     {group.phone}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                                    {counts.active ? <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-xs font-bold border border-emerald-500/20 dark:border-emerald-500/10">{counts.active} còn hạn</span> : null}
+                                                    {counts.expired ? <span className="px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-600 dark:text-slate-400 text-[10px] sm:text-xs font-bold border border-slate-500/20">{counts.expired} hết hạn</span> : null}
+                                                    {counts.claimed ? <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] sm:text-xs font-bold border border-amber-500/20">{counts.claimed} đang xử lý</span> : null}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto pl-16 sm:pl-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                {counts.active ? <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 text-xs font-bold">{counts.active} còn hạn</span> : null}
-                                                {counts.expired ? <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-xs font-bold">{counts.expired} hết hạn</span> : null}
-                                                {counts.claimed ? <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 text-xs font-bold">{counts.claimed} đang xử lý</span> : null}
-                                            </div>
-                                            <div className="text-slate-400 bg-slate-100 dark:bg-[#151521] rounded-full p-1.5 border border-slate-200 dark:border-slate-700 shrink-0">
-                                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                            </div>
+                                        <div className="text-slate-400 bg-slate-100/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-2.5 shrink-0 transition-transform duration-300 shadow-sm active:scale-90">
+                                            <ChevronDown className={`w-4.5 h-4.5 transition-transform duration-300 ${isExpanded ? "rotate-180 text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} />
                                         </div>
                                     </button>
                                     
                                     {isExpanded && (
-                                        <div className="border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5 bg-slate-50/50 dark:bg-[#151521]/30 space-y-3">
+                                        <div className="border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5 bg-slate-50/50 dark:bg-[#151521]/30 space-y-3 rounded-b-2xl">
                                             {Array.from(
                                                 group.cards.reduce((acc, card) => {
                                                     const itemKey = `${card.device_model}__${card.imei_serial}__${card.warranty_period_months}__${card.warranty_end_date}__${card.status}`;

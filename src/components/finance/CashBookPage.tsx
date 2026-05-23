@@ -165,30 +165,19 @@ const CashBookTable: React.FC<{
   onPrint,
   onDelete,
 }) => (
-  <div className="overflow-x-auto">
+  <div>
     {isLoading ? (
       <div className="p-8 text-sm text-slate-500 text-center">Đang tải sổ quỹ...</div>
     ) : transactions.length === 0 ? (
       <div className="p-8 text-sm text-slate-500 text-center">Chưa có dữ liệu thu chi.</div>
     ) : (
-      <table className="w-full sm:min-w-[980px]">
-        <thead className="bg-slate-100 dark:bg-slate-700 sticky top-0 z-10">
-          <tr>
-            <th className="px-2 sm:px-4 py-3 text-left text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-200">Ngày</th>
-            <th className="px-2 sm:px-4 py-3 text-left text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-200">Loại</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200 hidden sm:table-cell">Danh mục</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200 hidden sm:table-cell">Nguồn tiền</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200 hidden lg:table-cell">Nội dung</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200 hidden lg:table-cell">Đối tượng</th>
-            <th className="px-2 sm:px-4 py-3 text-right text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-200">Số tiền</th>
-            <th className="px-2 sm:px-4 py-3 text-right text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-200">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
+      <>
+        {/* Mobile View: Cards */}
+        <div className="block sm:hidden space-y-3 p-3">
           {transactions.map((tx) => {
             const isIncome = (tx.type || "").toLowerCase() === "income";
             const createdAt = resolveTxCreatedAt(tx);
-            const createdAtText = formatDate(createdAt ? new Date(createdAt) : undefined, false);
+            const createdAtText = formatDate(createdAt ? new Date(createdAt) : undefined, true);
             const creatorName = resolveTxCreatorName(tx);
             const txCode = resolveTxCodeShort(tx);
             const paymentSourceId = resolvePaymentSourceId(tx);
@@ -201,68 +190,177 @@ const CashBookTable: React.FC<{
                   : paymentSourceId);
             const notesText = (tx as any).notes || (tx as any).description || "-";
             const recipientText = (tx as any).recipient || "-";
+            const categoryText = formatCashTxCategory((tx as any).category);
+
             return (
-              <tr
+              <div
                 key={tx.id}
-                className="border-t border-slate-200 dark:border-slate-700 even:bg-slate-50/50 even:dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 relative"
               >
-                <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm text-slate-700 dark:text-slate-200">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-medium">{createdAtText}</span>
-                    <span className="text-[11px] text-slate-500">Mã: {txCode}</span>
-                    <span className="text-[11px] text-slate-500">Người tạo: {creatorName}</span>
-                    <div className="sm:hidden text-[11px] text-slate-500 space-y-0.5 pt-1">
-                      <div>Nguồn tiền: {paymentSourceName}</div>
-                      <div>Đối tượng: {recipientText}</div>
-                      <div>Nội dung: {notesText}</div>
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        isIncome
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800"
+                      }`}
+                    >
+                      {isIncome ? "Thu" : "Chi"}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">#{txCode}</span>
+                  </div>
+                  <div className="text-right">
+                    <div
+                      className={`text-lg font-bold bg-clip-text text-transparent ${
+                        isIncome ? "bg-gradient-to-r from-emerald-600 to-emerald-500 dark:from-emerald-400 dark:to-emerald-300" : "bg-gradient-to-r from-red-600 to-red-500 dark:from-red-400 dark:to-red-300"
+                      }`}
+                    >
+                      {isIncome ? "+" : "-"}{formatCurrency(Number(tx.amount || 0))}
                     </div>
                   </div>
-                </td>
-                <td className="px-2 sm:px-4 py-3 text-sm">
-                  <span
-                    className={`inline-flex px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${
-                      isIncome
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                    }`}
-                  >
-                    {isIncome ? "Thu" : "Chi"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hidden sm:table-cell">{formatCashTxCategory((tx as any).category)}</td>
-                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hidden sm:table-cell">{paymentSourceName}</td>
-                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hidden lg:table-cell">{notesText}</td>
-                <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200 hidden lg:table-cell">{recipientText}</td>
-                <td
-                  className={`px-2 sm:px-4 py-3 text-xs sm:text-sm text-right font-semibold whitespace-nowrap ${
-                    isIncome ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"
-                  }`}
-                >
-                  {formatCurrency(Number(tx.amount || 0))}
-                </td>
-                <td className="px-2 sm:px-4 py-3 text-right">
-                  <div className="inline-flex items-center gap-1">
-                    <button
-                      onClick={() => onPrint(tx)}
-                      className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-                      title="In phiếu"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(tx)}
-                      className="p-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700/60 dark:text-red-300 dark:hover:bg-red-900/30"
-                      title="Xóa phiếu"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-2 mb-4">
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Ngày tạo</div>
+                    <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">{createdAtText}</div>
                   </div>
-                </td>
-              </tr>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Người tạo</div>
+                    <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">{creatorName}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Danh mục</div>
+                    <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">{categoryText}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Nguồn tiền</div>
+                    <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">{paymentSourceName}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Đối tác/Khách</div>
+                    <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">{recipientText}</div>
+                  </div>
+                  {notesText !== "-" && (
+                    <div className="col-span-2 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg mt-1 border border-slate-100 dark:border-slate-800">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Nội dung</div>
+                      <div className="text-[13px] text-slate-700 dark:text-slate-300 line-clamp-2">{notesText}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                  <button
+                    onClick={() => onPrint(tx)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-medium transition-colors"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    In phiếu
+                  </button>
+                  <button
+                    onClick={() => onDelete(tx)}
+                    className="flex items-center justify-center gap-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 dark:hover:border-red-800 text-xs font-medium transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             );
           })}
-        </tbody>
-      </table>
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full min-w-[980px]">
+            <thead className="bg-slate-100 dark:bg-slate-700 sticky top-0 z-10">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200">Ngày</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200">Loại</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200">Danh mục</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200">Nguồn tiền</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200">Nội dung</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-200">Đối tượng</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-200">Số tiền</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-200">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => {
+                const isIncome = (tx.type || "").toLowerCase() === "income";
+                const createdAt = resolveTxCreatedAt(tx);
+                const createdAtText = formatDate(createdAt ? new Date(createdAt) : undefined, false);
+                const creatorName = resolveTxCreatorName(tx);
+                const txCode = resolveTxCodeShort(tx);
+                const paymentSourceId = resolvePaymentSourceId(tx);
+                const paymentSourceName =
+                  paymentSources.find((source) => source.id === paymentSourceId)?.name ||
+                  (paymentSourceId === "cash"
+                    ? "Tiền mặt"
+                    : paymentSourceId === "bank"
+                      ? "Chuyển khoản"
+                      : paymentSourceId);
+                const notesText = (tx as any).notes || (tx as any).description || "-";
+                const recipientText = (tx as any).recipient || "-";
+                return (
+                  <tr
+                    key={tx.id}
+                    className="border-t border-slate-200 dark:border-slate-700 even:bg-slate-50/50 even:dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-700/40"
+                  >
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium">{createdAtText}</span>
+                        <span className="text-[11px] text-slate-500">Mã: {txCode}</span>
+                        <span className="text-[11px] text-slate-500">Người tạo: {creatorName}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          isIncome
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                        }`}
+                      >
+                        {isIncome ? "Thu" : "Chi"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{formatCashTxCategory((tx as any).category)}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{paymentSourceName}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{notesText}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{recipientText}</td>
+                    <td
+                      className={`px-4 py-3 text-sm text-right font-semibold whitespace-nowrap ${
+                        isIncome ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"
+                      }`}
+                    >
+                      {formatCurrency(Number(tx.amount || 0))}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => onPrint(tx)}
+                          className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                          title="In phiếu"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(tx)}
+                          className="p-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700/60 dark:text-red-300 dark:hover:bg-red-900/30"
+                          title="Xóa phiếu"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </>
     )}
   </div>
 );

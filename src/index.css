@@ -769,3 +769,95 @@ body.hide-bottom-nav nav[aria-label="Bottom Navigation"] {
 .animate-bounce-slow {
   animation: bounce-slow 2s ease-in-out infinite;
 }
+
+/* ==================== PREMIUM MODERN & SCIENTIFIC UTILITIES ==================== */
+.glass-card-premium {
+  background: rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(2, 6, 23, 0.37);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.light .glass-card-premium {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.15);
+}
+
+.glass-card-premium:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(59, 130, 246, 0.12);
+  transform: translateY(-2px);
+}
+
+.pulse-glow-red {
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.pulse-glow-green {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.custom-scrollbar-scientific::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar-scientific::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar-scientific::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+/* Neon glow tags */
+.neon-tag-blue {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: rgb(147, 197, 253);
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+.light .neon-tag-blue {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: rgb(29, 78, 216);
+  text-shadow: none;
+}
+
