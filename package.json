@@ -16,9 +16,13 @@
     "test": "vitest run --environment jsdom",
     "test:watch": "vitest --environment jsdom",
     "ci:test:critical": "vitest run tests/integration/rls_user_flow.test.ts --environment jsdom",
-    "test:integration:critical": "vitest run tests/integration/receipt_create_atomic.test.ts tests/integration/rls_access.test.ts tests/integration/inventory_trigger_correctness.test.ts --environment jsdom"
+    "test:integration:critical": "vitest run tests/integration/receipt_create_atomic.test.ts tests/integration/rls_access.test.ts tests/integration/inventory_trigger_correctness.test.ts --environment jsdom",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@supabase/supabase-js": "^2.76.1",
     "@tanstack/react-query": "^5.90.5",
     "@tanstack/react-query-devtools": "^5.90.2",
@@ -41,6 +45,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
     "@eslint/js": "^9.17.0",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.19",

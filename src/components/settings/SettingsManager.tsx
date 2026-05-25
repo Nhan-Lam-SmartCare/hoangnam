@@ -13,6 +13,7 @@ import {
 // import { safeAudit } from "../../lib/repository/auditLogsRepository";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { MFASetup } from "../auth/MFASetup";
+import { PrinterSettings } from "./PrinterSettings";
 import {
   APP_ACTION_OPTIONS,
   canDo,
@@ -149,7 +150,7 @@ const PERMISSION_GROUPS: Array<{
 ];
 
 interface SettingsManagerProps {
-  initialTab?: "general" | "branding" | "banking" | "invoice" | "security" | "staff";
+  initialTab?: "general" | "branding" | "banking" | "invoice" | "security" | "staff" | "printer";
   standaloneStaffPage?: boolean;
 }
 
@@ -164,7 +165,7 @@ export const SettingsManager = ({
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "general" | "branding" | "banking" | "invoice" | "security" | "staff"
+    "general" | "branding" | "banking" | "invoice" | "security" | "staff" | "printer"
   >(standaloneStaffPage ? "staff" : initialTab);
 
   // Staff management state
@@ -1899,6 +1900,7 @@ export const SettingsManager = ({
                   { id: "invoice", icon: <FileText className="w-5 h-5 text-slate-500" /> },
                   { id: "security", icon: <Shield className="w-5 h-5 text-slate-500" /> },
                   { id: "staff", icon: <Users className="w-5 h-5 text-slate-500" /> },
+                  { id: "printer", icon: <SettingsIcon className="w-5 h-5 text-slate-500" /> },
                 ].find((t) => t.id === activeTab);
                 return currentTab?.icon;
               })()}
@@ -1916,6 +1918,7 @@ export const SettingsManager = ({
               <option value="invoice">Hóa đơn</option>
               <option value="security">Bảo mật</option>
               {hasRole(["owner"]) && <option value="staff">Nhân viên</option>}
+              <option value="printer">Máy in</option>
             </select>
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
               <svg className="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -1963,6 +1966,11 @@ export const SettingsManager = ({
                   },
                 ]
                 : []),
+              {
+                id: "printer",
+                label: "Máy in",
+                icon: <SettingsIcon className="w-4 h-4" />,
+              },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -4225,10 +4233,15 @@ export const SettingsManager = ({
             </details>
           </div>
         )}
+
+        {/* Printer Tab */}
+        {activeTab === "printer" && (
+          <PrinterSettings />
+        )}
       </div>
 
       {/* Save Button (Bottom) */}
-      {!standaloneStaffPage && isOwner && activeTab !== "staff" && (
+      {!standaloneStaffPage && isOwner && activeTab !== "staff" && activeTab !== "printer" && (
         <div className="flex justify-end">
           <button
             onClick={handleSave}

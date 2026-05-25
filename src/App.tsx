@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import {
   BrowserRouter,
+  HashRouter,
   Routes,
   Route,
   useLocation,
@@ -24,6 +25,19 @@ import RepoErrorPanel from "./components/common/RepoErrorPanel";
 import { lazyImport } from "./utils/lazyImport";
 import { canAccessInventorySection } from "./utils/inventoryAccess";
 import { canDo } from "./utils/permissions";
+
+const isNative = typeof window !== "undefined" && (
+  window.location.pathname.includes("android_asset") ||
+  (window.location.hostname === "localhost" && !window.location.port)
+);
+
+const Router: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return isNative ? (
+    <HashRouter>{children}</HashRouter>
+  ) : (
+    <BrowserRouter>{children}</BrowserRouter>
+  );
+};
 
 // Lazy load large components for code splitting
 // Lazy load large components for code splitting
@@ -318,7 +332,7 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <AppProvider>
-            <BrowserRouter>
+            <Router>
               <ErrorBoundary>
                 <TopProgressBar />
                 <Routes>
@@ -346,7 +360,7 @@ export default function App() {
                 {/* Dev-only repository error panel */}
                 {import.meta.env.DEV && <RepoErrorPanel />}
               </ErrorBoundary>
-            </BrowserRouter>
+            </Router>
           </AppProvider>
         </AuthProvider>
       </ThemeProvider>

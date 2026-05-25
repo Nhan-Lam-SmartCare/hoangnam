@@ -19,6 +19,7 @@ import type { CartItem, Part } from "../../types";
 import { useCustomers } from "../../hooks/useSupabase";
 import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { usePrinter } from "../../hooks/usePrinter";
 
 const getBranchStock = (part: Part, branchId: string): number => {
   const stock = Math.max(0, Number(part.stock?.[branchId] || 0));
@@ -41,6 +42,7 @@ const SalesManager: React.FC = () => {
     deleteSale,
     sales,
   } = useAppContext();
+  const { isNative, printViaWiFi, printViaBluetooth } = usePrinter();
   const { data: customersFromRepo = [] } = useCustomers();
   const {
     data: partsFromRepo = [],
@@ -176,7 +178,7 @@ const SalesManager: React.FC = () => {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
-  const printInvoice = (payload: {
+  const generateSalesTextReceipt = (payload: {
     customer: { name: string; phone?: string };
     items: CartItem[];
     subtotalValue: number;
@@ -185,32 +187,95 @@ const SalesManager: React.FC = () => {
     payment: "cash" | "bank";
     noteText?: string;
   }) => {
-    const w = window.open("", "_blank", "width=420,height=700");
-    if (!w) {
-      showToast.warning("Trình duyệt đang chặn cửa sổ in hóa đơn.");
-      return;
-    }
+    const line = "--------------------------------";
+    const doubleLine = "================================";
+    const now = new Date().toLocaleString("vi-VN");
+    
+    let itemLines = "";
+    payload.items.forEach((it) => {
+      // Name line
+      itemLines += `${it.partName}\n`;
+      // Qty x Price = Total
+      const qtyPrice = `${it.quantity} x ${formatCurrency(it.sellingPrice)}`;
+      const totalIt = formatCurrency(it.sellingPrice * it.quantity);
+      const spacesCount = 32 - qtyPrice.length - totalIt.length;
+      const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
+      itemLines += `${qtyPrice}${spaces}${totalIt}\n`;
+    });
 
-    const rows = payload.items
-      .map(
-        (it) => `
-          <tr>
-            <td>${escapeHtml(it.partName)}</td>
-            <td style="text-align:center">${it.quantity}</td>
-            <td style="text-align:right">${formatCurrency(it.sellingPrice)}</td>
-            <td style="text-align:right">${formatCurrency(it.sellingPrice * it.quantity)}</td>
-          </tr>`
-      )
-      .join("");
+    const subtotalStr = formatCurrency(payload.subtotalValue);
+    const discountStr = `-${formatCurrency(payload.discountValue)}`;
+    const totalStr = formatCurrency(payload.totalValue);
 
-    w.document.write(`<!doctype html>
+    const subtotalLine = `Tam tinh:${" ".repeat(Math.max(1, 32 - 9 - subtotalStr.length))}${subtotalStr}`;
+    const discountLine = `Giam gia:${" ".repeat(Math.max(1, 32 - 9 - discountStr.length))}${discountStr}`;
+    const totalLine = `Thanh toan:${" ".repeat(Math.max(1, 32 - 11 - totalStr.length))}${totalStr}`;
+
+    return `
+================================
+         MOTOCARE PRO
+================================
+Ngay: ${now}
+Khach hang: ${payload.customer.name}
+${payload.customer.phone ? `SDT: ${payload.customer.phone}\n` : ""}${doubleLine}
+San pham          SL x DG / T.Tien
+${line}
+${itemLines}${line}
+${subtotalLine}
+${discountLine}
+${totalLine}
+${doubleLine}
+Thanh toan: ${payload.payment === "cash" ? "Tien mat" : "Chuyen khoan"}
+${payload.noteText ? `Ghi chu: ${payload.noteText}\n` : ""}
+Cam on quy khach da tin tuong!
+================================
+\n\n\n\n`;
+  };
+
+  const printInvoice = async (payload: {
+    customer: { name: string; phone?: string };
+    items: CartItem[];
+    subtotalValue: number;
+    discountValue: number;
+    totalValue: number;
+    payment: "cash" | "bank";
+    noteText?: string;
+  }) => {
+    const printMode = localStorage.getItem("motocare_print_mode") || "wifi";
+
+    if (isNative && printMode === "bluetooth") {
+      const text = generateSalesTextReceipt(payload);
+      try {
+        const success = await printViaBluetooth(text);
+        if (success) {
+          showToast.success("Đã gửi lệnh in nhiệt Bluetooth.");
+        } else {
+          showToast.error("In Bluetooth thất bại. Vui lòng kết nối máy in.");
+        }
+      } catch (err: any) {
+        showToast.error(`Lỗi in: ${err.message || err}`);
+      }
+    } else {
+      const rows = payload.items
+        .map(
+          (it) => `
+            <tr>
+              <td>${escapeHtml(it.partName)}</td>
+              <td style="text-align:center">${it.quantity}</td>
+              <td style="text-align:right">${formatCurrency(it.sellingPrice)}</td>
+              <td style="text-align:right">${formatCurrency(it.sellingPrice * it.quantity)}</td>
+            </tr>`
+        )
+        .join("");
+
+      const html = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Hóa đơn bán hàng</title>
   <style>
     body { font-family: Arial, Helvetica, sans-serif; padding: 16px; color: #0f172a; }
-    h1 { margin: 0 0 8px; font-size: 18px; }
+    h1 { margin: 0 0 8px; font-size: 18px; text-align: center; }
     .meta { font-size: 12px; margin-bottom: 10px; color: #334155; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { border-bottom: 1px dashed #cbd5e1; padding: 6px 4px; }
@@ -218,10 +283,12 @@ const SalesManager: React.FC = () => {
     .sum { margin-top: 10px; font-size: 13px; }
     .sum-row { display: flex; justify-content: space-between; margin: 3px 0; }
     .total { font-weight: 700; font-size: 15px; margin-top: 5px; }
+    .footer { margin-top: 20px; text-align: center; font-size: 12px; color: #64748b; }
   </style>
 </head>
 <body>
-  <h1>Hóa đơn bán hàng</h1>
+  <h1>MOTOCARE PRO</h1>
+  <div style="text-align:center; font-size:12px; margin-bottom: 15px;">Hóa đơn bán hàng</div>
   <div class="meta">Ngày giờ: ${new Date().toLocaleString("vi-VN")}</div>
   <div class="meta">Khách hàng: ${escapeHtml(payload.customer.name)}${payload.customer.phone ? ` - ${escapeHtml(payload.customer.phone)}` : ""}</div>
   <div class="meta">Thanh toán: ${payload.payment === "cash" ? "Tiền mặt" : "Chuyển khoản"}</div>
@@ -241,13 +308,13 @@ const SalesManager: React.FC = () => {
     <div class="sum-row"><span>Giảm giá</span><span>- ${formatCurrency(payload.discountValue)}</span></div>
     <div class="sum-row total"><span>Thanh toán</span><span>${formatCurrency(payload.totalValue)}</span></div>
   </div>
-  ${payload.noteText ? `<div class="meta">Ghi chú: ${payload.noteText}</div>` : ""}
+  ${payload.noteText ? `<div class="meta" style="margin-top:10px;">Ghi chú: ${payload.noteText}</div>` : ""}
+  <div class="footer">Cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ!</div>
 </body>
-</html>`);
-    w.document.close();
-    w.focus();
-    w.print();
-    w.close();
+</html>`;
+
+      await printViaWiFi(html);
+    }
   };
 
   const syncInventory = async () => {
