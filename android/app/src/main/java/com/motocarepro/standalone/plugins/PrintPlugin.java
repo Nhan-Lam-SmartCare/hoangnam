@@ -27,23 +27,40 @@ public class PrintPlugin extends Plugin {
             @Override
             public void run() {
                 try {
-                    // Create a WebView dynamically on the UI thread
-                    WebView webView = new WebView(getContext());
+                    // Create a WebView dynamically on the UI thread and configure settings for loading remote images
+                    final WebView webView = new WebView(getContext());
+                    webView.getSettings().setJavaScriptEnabled(true);
+                    webView.getSettings().setLoadsImagesAutomatically(true);
+                    webView.getSettings().setDomStorageEnabled(true);
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                        webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                    }
+
                     webView.setWebViewClient(new WebViewClient() {
                         @Override
-                        public void onPageFinished(WebView view, String url) {
-                            // Get PrintManager system service
-                            PrintManager printManager = (PrintManager) getContext().getSystemService(Context.PRINT_SERVICE);
-                            if (printManager != null) {
-                                String jobName = "Motocare Document";
-                                PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter(jobName);
-                                printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
-                                JSObject result = new JSObject();
-                                result.put("success", true);
-                                call.resolve(result);
-                            } else {
-                                call.reject("PrintManager service not available");
-                            }
+                        public void onPageFinished(final WebView view, String url) {
+                            // Delay print dialog to allow WebView to fetch and render remote images (Logo/QR)
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        // Get PrintManager system service
+                                        PrintManager printManager = (PrintManager) getContext().getSystemService(Context.PRINT_SERVICE);
+                                        if (printManager != null) {
+                                            String jobName = "Motocare Document";
+                                            PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter(jobName);
+                                            printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
+                                            JSObject result = new JSObject();
+                                            result.put("success", true);
+                                            call.resolve(result);
+                                        } else {
+                                            call.reject("PrintManager service not available");
+                                        }
+                                    } catch (Exception e) {
+                                        call.reject("Failed to trigger printing: " + e.getMessage());
+                                    }
+                                }
+                            }, 1000); // 1000ms delay to guarantee remote images are fully downloaded and drawn
                         }
                     });
 

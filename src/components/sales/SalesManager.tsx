@@ -20,6 +20,7 @@ import { useCustomers } from "../../hooks/useSupabase";
 import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePrinter } from "../../hooks/usePrinter";
+import { fetchStoreSettingsForBranch } from "../service/utils/service.utils";
 
 const getBranchStock = (part: Part, branchId: string): number => {
   const stock = Math.max(0, Number(part.stock?.[branchId] || 0));
@@ -43,6 +44,21 @@ const SalesManager: React.FC = () => {
     sales,
   } = useAppContext();
   const { isNative, printViaWiFi, printViaBluetooth } = usePrinter();
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await fetchStoreSettingsForBranch(currentBranchId);
+        if (data) {
+          setStoreSettings(data);
+        }
+      } catch (err) {
+        console.error("Error loading store settings in SalesManager:", err);
+      }
+    };
+    loadSettings();
+  }, [currentBranchId]);
   const { data: customersFromRepo = [] } = useCustomers();
   const {
     data: partsFromRepo = [],
@@ -190,6 +206,9 @@ const SalesManager: React.FC = () => {
     const line = "--------------------------------";
     const doubleLine = "================================";
     const now = new Date().toLocaleString("vi-VN");
+    const storeName = (storeSettings?.store_name || "Sơn Nam").toUpperCase();
+    const padSize = Math.max(0, Math.floor((32 - storeName.length) / 2));
+    const centeredStoreName = " ".repeat(padSize) + storeName;
     
     let itemLines = "";
     payload.items.forEach((it) => {
@@ -213,7 +232,7 @@ const SalesManager: React.FC = () => {
 
     return `
 ================================
-         MOTOCARE PRO
+${centeredStoreName}
 ================================
 Ngay: ${now}
 Khach hang: ${payload.customer.name}
@@ -268,48 +287,135 @@ Cam on quy khach da tin tuong!
         )
         .join("");
 
+      const paperSizeKey = storeSettings?.print_paper_size_receipt || "80mm";
+      const resolvePaperSize = (key: string, fallback = "80mm") => {
+        const PAPER_SIZE_MAP: Record<string, { width: string; pageSize: string }> = {
+          "58mm": { width: "58mm", pageSize: "58mm auto" },
+          "80mm": { width: "80mm", pageSize: "80mm auto" },
+          "A5":   { width: "148mm", pageSize: "A5 portrait" },
+          "A4":   { width: "210mm", pageSize: "A4 portrait" },
+        };
+        if (PAPER_SIZE_MAP[key]) return PAPER_SIZE_MAP[key];
+        const match = key.match(/^(\d+)mm$/i);
+        if (match) {
+          const w = `${match[1]}mm`;
+          return { width: w, pageSize: `${w} auto` };
+        }
+        return PAPER_SIZE_MAP[fallback] || PAPER_SIZE_MAP["80mm"];
+      };
+      const paperSize = resolvePaperSize(paperSizeKey, "80mm");
+
       const html = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>Hóa đơn bán hàng</title>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; padding: 16px; color: #0f172a; }
-    h1 { margin: 0 0 8px; font-size: 18px; text-align: center; }
-    .meta { font-size: 12px; margin-bottom: 10px; color: #334155; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    @page { size: ${paperSize.pageSize}; margin: 0; }
+    html, body { width: ${paperSize.width}; margin: 0 auto; padding: 0; background-color: #fff; color: #000; }
+    body { font-family: Arial, Helvetica, sans-serif; box-sizing: border-box; }
+    #sales-receipt {
+      width: calc(${paperSize.width} - 4mm) !important;
+      margin: 0 auto !important;
+      padding: 2mm !important;
+      box-sizing: border-box;
+      overflow-wrap: break-word;
+    }
+    .card {
+      border: 1px solid #dbe2ea;
+      border-radius: 3.5mm;
+      padding: 3mm;
+      margin-bottom: 4mm;
+      color: #000;
+      font-size: 8.5pt;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 2mm; }
     th, td { border-bottom: 1px dashed #cbd5e1; padding: 6px 4px; }
-    th { text-align: left; }
-    .sum { margin-top: 10px; font-size: 13px; }
+    th { text-align: left; font-weight: bold; }
+    .sum { margin-top: 10px; font-size: 9pt; }
     .sum-row { display: flex; justify-content: space-between; margin: 3px 0; }
-    .total { font-weight: 700; font-size: 15px; margin-top: 5px; }
-    .footer { margin-top: 20px; text-align: center; font-size: 12px; color: #64748b; }
+    .total { font-weight: 700; font-size: 11pt; margin-top: 5px; color: #2563eb; }
+    .footer { margin-top: 20px; text-align: center; font-size: 8.5pt; color: #334155; font-style: italic; }
   </style>
 </head>
 <body>
-  <h1>MOTOCARE PRO</h1>
-  <div style="text-align:center; font-size:12px; margin-bottom: 15px;">Hóa đơn bán hàng</div>
-  <div class="meta">Ngày giờ: ${new Date().toLocaleString("vi-VN")}</div>
-  <div class="meta">Khách hàng: ${escapeHtml(payload.customer.name)}${payload.customer.phone ? ` - ${escapeHtml(payload.customer.phone)}` : ""}</div>
-  <div class="meta">Thanh toán: ${payload.payment === "cash" ? "Tiền mặt" : "Chuyển khoản"}</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Sản phẩm</th>
-        <th style="text-align:center">SL</th>
-        <th style="text-align:right">Đơn giá</th>
-        <th style="text-align:right">Thành tiền</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="sum">
-    <div class="sum-row"><span>Tạm tính</span><span>${formatCurrency(payload.subtotalValue)}</span></div>
-    <div class="sum-row"><span>Giảm giá</span><span>- ${formatCurrency(payload.discountValue)}</span></div>
-    <div class="sum-row total"><span>Thanh toán</span><span>${formatCurrency(payload.totalValue)}</span></div>
+  <div id="sales-receipt">
+    <!-- Header with Logo, Store Info and Bank Info -->
+    <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.8mm; border-bottom: 2px solid #3b82f6; padding-bottom: 3mm; margin-bottom: 4mm;">
+      ${storeSettings?.logo_url ? `
+      <div style="width: 19mm; height: 19mm; border-radius: 999px; border: 1px solid #bfdbfe; background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%); display: flex; align-items: center; justify-content: center; padding: 2mm; box-shadow: 0 1.5mm 3mm rgba(37, 99, 235, 0.12); flex-shrink: 0; margin-bottom: 1.5mm; box-sizing: border-box;">
+        <img src="${storeSettings.logo_url}" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+      </div>` : ""}
+      
+      <div style="font-weight: bold; font-size: 13pt; line-height: 1.15; color: #1d4ed8; letter-spacing: 0.15mm;">
+        ${storeSettings?.store_name || "SƠN NAM"}
+      </div>
+      
+      <div style="font-size: 8pt; line-height: 1.45; color: #334155; max-width: 94%;">
+        ${storeSettings?.address || "Ấp Phú Lợi B, Xã Long Phú Thuận, Đồng Tháp"}
+      </div>
+      
+      <div style="display: flex; align-items: center; justify-content: center; gap: 1.6mm; font-size: 8pt; font-weight: bold; color: #0f172a; padding: 1mm 2.5mm; border-radius: 999px; border: 1px solid #bfdbfe; background-color: #eff6ff;">
+        <span style="color: #2563eb;">Hotline</span>
+        <span>${storeSettings?.phone || "0947.747.907"}</span>
+      </div>
+
+      ${storeSettings?.bank_name ? `
+      <div style="display: flex; align-items: center; gap: 3mm; width: 100%; border: 1px solid #93c5fd; border-radius: 3.5mm; padding: 2.8mm 3mm; background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%); box-shadow: inset 0 0 0 0.3mm rgba(255, 255, 255, 0.65); text-align: left; margin-top: 2mm; box-sizing: border-box;">
+        ${storeSettings.bank_qr_url ? `
+        <div style="width: 20mm; height: 20mm; border-radius: 2.5mm; overflow: hidden; border: 1px solid #bfdbfe; background-color: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <img src="${storeSettings.bank_qr_url}" alt="QR Banking" style="width: 100%; height: 100%; object-fit: contain;" />
+        </div>` : ""}
+        <div style="flex: 1; min-width: 0; color: #0f172a;">
+          <div style="font-weight: bold; font-size: 8.8pt; margin-bottom: 1mm; color: #1e3a8a;">${storeSettings.bank_name}</div>
+          ${storeSettings.bank_account_number ? `<div style="font-size: 8pt; margin-bottom: 0.6mm;">STK: ${storeSettings.bank_account_number}</div>` : ""}
+          ${storeSettings.bank_account_holder ? `<div style="font-size: 8pt; font-weight: 600;">${storeSettings.bank_account_holder}</div>` : ""}
+        </div>
+      </div>` : ""}
+    </div>
+
+    <!-- Title and Meta Info -->
+    <div style="text-align: center; margin-top: 3mm; margin-bottom: 3mm;">
+      <h1 style="font-size: 13pt; font-weight: bold; margin: 0; text-transform: uppercase; color: #1e40af; line-height: 1.25;">HÓA ĐƠN BÁN HÀNG</h1>
+    </div>
+
+    <div class="card">
+      <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Ngày giờ:</span> ${new Date().toLocaleString("vi-VN")}</div>
+      <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Khách hàng:</span> ${escapeHtml(payload.customer.name)}${payload.customer.phone ? ` - ${escapeHtml(payload.customer.phone)}` : ""}</div>
+      <div><span style="font-weight: bold;">Thanh toán:</span> ${payload.payment === "cash" ? "Tiền mặt" : "Chuyển khoản"}</div>
+    </div>
+
+    <!-- Products Table -->
+    <table>
+      <thead>
+        <tr>
+          <th>Sản phẩm</th>
+          <th style="text-align:center; width: 10mm;">SL</th>
+          <th style="text-align:right; width: 18mm;">Đơn giá</th>
+          <th style="text-align:right; width: 22mm;">Thành tiền</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <!-- Sum values -->
+    <div class="sum">
+      <div class="sum-row"><span>Tạm tính</span><span>${formatCurrency(payload.subtotalValue)} đ</span></div>
+      ${payload.discountValue > 0 ? `<div class="sum-row" style="color: #e74c3c;"><span>Giảm giá</span><span>-${formatCurrency(payload.discountValue)} đ</span></div>` : ""}
+      <div class="sum-row total"><span>TỔNG CỘNG</span><span>${formatCurrency(payload.totalValue)} đ</span></div>
+    </div>
+
+    ${payload.noteText ? `
+    <div class="card" style="margin-top: 4mm; background-color: #fff9e6; border: 1px solid #ffd700;">
+      <div style="font-weight: bold; margin-bottom: 0.8mm;">Ghi chú:</div>
+      <div>${escapeHtml(payload.noteText)}</div>
+    </div>` : ""}
+
+    <div class="footer">
+      <p style="margin: 0;">Cảm ơn quý khách đã tin tưởng và ủng hộ!</p>
+      <p style="margin: 1mm 0 0 0;">Hẹn gặp lại quý khách!</p>
+    </div>
   </div>
-  ${payload.noteText ? `<div class="meta" style="margin-top:10px;">Ghi chú: ${payload.noteText}</div>` : ""}
-  <div class="footer">Cảm ơn quý khách đã tin tưởng và sử dụng dịch vụ!</div>
 </body>
 </html>`;
 

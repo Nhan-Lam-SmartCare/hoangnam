@@ -308,15 +308,15 @@ Cam on quy khach da tin tuong!
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Receipt paper size */}
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                🧾 Phiếu sửa chữa / Hóa đơn bán:
+                🧾 Phiếu sửa chữa:
               </label>
               {(() => {
                 const PRESET_RECEIPT = ["58mm", "80mm", "A5", "A4"];
-                const currentVal = settings.print_paper_size_receipt || "80mm";
+                const currentVal = settings.print_paper_size_receipt || localStorage.getItem("motocare_print_paper_size_receipt") || "80mm";
                 const isCustom = !PRESET_RECEIPT.includes(currentVal);
                 const selectVal = isCustom ? "__custom__" : currentVal;
                 return (
@@ -324,11 +324,9 @@ Cam on quy khach da tin tuong!
                     <select
                       value={selectVal}
                       onChange={(e) => {
-                        if (e.target.value === "__custom__") {
-                          updateField("print_paper_size_receipt", "100mm");
-                        } else {
-                          updateField("print_paper_size_receipt", e.target.value);
-                        }
+                        const val = e.target.value === "__custom__" ? "100mm" : e.target.value;
+                        updateField("print_paper_size_receipt", val);
+                        localStorage.setItem("motocare_print_paper_size_receipt", val);
                       }}
                       disabled={!isOwner}
                       className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
@@ -348,7 +346,61 @@ Cam on quy khach da tin tuong!
                           value={parseInt(currentVal) || 100}
                           onChange={(e) => {
                             const v = Math.max(30, Math.min(300, Number(e.target.value) || 30));
-                            updateField("print_paper_size_receipt", `${v}mm`);
+                            const val = `${v}mm`;
+                            updateField("print_paper_size_receipt", val);
+                            localStorage.setItem("motocare_print_paper_size_receipt", val);
+                          }}
+                          disabled={!isOwner}
+                          className="w-24 px-3 py-1.5 text-sm border border-blue-400 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50 font-mono"
+                        />
+                        <span className="text-xs text-slate-500 dark:text-slate-400">mm (chiều rộng)</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Sales paper size */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                🛍️ Hóa đơn bán hàng:
+              </label>
+              {(() => {
+                const PRESET_SALES = ["58mm", "80mm", "A5", "A4"];
+                const currentVal = settings.print_paper_size_sales || localStorage.getItem("motocare_print_paper_size_sales") || "80mm";
+                const isCustom = !PRESET_SALES.includes(currentVal);
+                const selectVal = isCustom ? "__custom__" : currentVal;
+                return (
+                  <>
+                    <select
+                      value={selectVal}
+                      onChange={(e) => {
+                        const val = e.target.value === "__custom__" ? "100mm" : e.target.value;
+                        updateField("print_paper_size_sales", val);
+                        localStorage.setItem("motocare_print_paper_size_sales", val);
+                      }}
+                      disabled={!isOwner}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
+                    >
+                      <option value="58mm">58mm — Máy in bill nhỏ</option>
+                      <option value="80mm">80mm — Máy in bill (mặc định)</option>
+                      <option value="A5">A5 (148mm) — Giấy A5</option>
+                      <option value="A4">A4 (210mm) — Giấy A4</option>
+                      <option value="__custom__">✏️ Tùy chỉnh...</option>
+                    </select>
+                    {isCustom && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={30}
+                          max={300}
+                          value={parseInt(currentVal) || 100}
+                          onChange={(e) => {
+                            const v = Math.max(30, Math.min(300, Number(e.target.value) || 30));
+                            const val = `${v}mm`;
+                            updateField("print_paper_size_sales", val);
+                            localStorage.setItem("motocare_print_paper_size_sales", val);
                           }}
                           disabled={!isOwner}
                           className="w-24 px-3 py-1.5 text-sm border border-blue-400 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50 font-mono"
@@ -368,7 +420,7 @@ Cam on quy khach da tin tuong!
               </label>
               {(() => {
                 const PRESET_WARRANTY = ["58mm", "80mm", "A5", "A4"];
-                const currentVal = settings.print_paper_size_warranty || "A5";
+                const currentVal = settings.print_paper_size_warranty || localStorage.getItem("motocare_print_paper_size_warranty") || "A5";
                 const isCustom = !PRESET_WARRANTY.includes(currentVal);
                 const selectVal = isCustom ? "__custom__" : currentVal;
                 return (
@@ -376,11 +428,9 @@ Cam on quy khach da tin tuong!
                     <select
                       value={selectVal}
                       onChange={(e) => {
-                        if (e.target.value === "__custom__") {
-                          updateField("print_paper_size_warranty", "100mm");
-                        } else {
-                          updateField("print_paper_size_warranty", e.target.value);
-                        }
+                        const val = e.target.value === "__custom__" ? "100mm" : e.target.value;
+                        updateField("print_paper_size_warranty", val);
+                        localStorage.setItem("motocare_print_paper_size_warranty", val);
                       }}
                       disabled={!isOwner}
                       className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50"
@@ -400,7 +450,9 @@ Cam on quy khach da tin tuong!
                           value={parseInt(currentVal) || 100}
                           onChange={(e) => {
                             const v = Math.max(30, Math.min(300, Number(e.target.value) || 30));
-                            updateField("print_paper_size_warranty", `${v}mm`);
+                            const val = `${v}mm`;
+                            updateField("print_paper_size_warranty", val);
+                            localStorage.setItem("motocare_print_paper_size_warranty", val);
                           }}
                           disabled={!isOwner}
                           className="w-24 px-3 py-1.5 text-sm border border-blue-400 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white disabled:opacity-50 font-mono"

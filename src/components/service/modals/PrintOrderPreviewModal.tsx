@@ -1,4 +1,5 @@
 import React from "react";
+import { Capacitor } from "@capacitor/core";
 import { Share2, Printer, X } from "lucide-react";
 import { formatCurrency, formatWorkOrderId } from "../../../utils/format";
 import { showToast } from "../../../utils/toast";
@@ -81,6 +82,8 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
   const isMobileDevice =
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
     window.matchMedia?.("(pointer: coarse)").matches;
+
+  const isNative = Capacitor.isNativePlatform();
 
   const paperSizeKey = storeSettings?.print_paper_size_receipt || "80mm";
   const paperSize = resolvePaperSize(paperSizeKey, "80mm");
@@ -225,7 +228,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
   };
 
   const handleMobilePrint = async () => {
-    if (!isMobileDevice) {
+    if (isNative || !isMobileDevice) {
       onPrint();
       return;
     }
@@ -288,10 +291,10 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
               className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700"
             >
               <Printer className="h-4 w-4" />
-              {isMobileDevice ? "In DT" : "In phieu"}
+              {isNative ? "In phiếu" : (isMobileDevice ? "In DT" : "In phieu")}
             </button>
 
-            {isMobileDevice && (
+            {isMobileDevice && !isNative && (
               <button
                 onClick={onPrint}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-sm text-white transition hover:bg-slate-700"

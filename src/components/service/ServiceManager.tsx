@@ -54,6 +54,7 @@ import {
 } from "../../hooks/useDebtsRepository";
 import { showToast } from "../../utils/toast";
 import { printElementById } from "../../utils/print";
+import { usePrinter } from "../../hooks/usePrinter";
 import { supabase } from "../../supabaseClient";
 import { WorkOrderMobileModal } from "../service/WorkOrderMobileModal";
 import WorkOrderModal from "../service/components/WorkOrderModal";
@@ -131,6 +132,7 @@ export default function ServiceManager() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile } = useAuth(); // Get user profile early for createCustomerDebtIfNeeded
+  const { isNative, printViaWiFi, printViaBluetooth } = usePrinter();
   const isOwner = profile?.role === USER_ROLES.OWNER; // Check if user is owner
   const canCreateWorkOrder = canDo(profile, "work_order.create");
   const canUpdateWorkOrder = canDo(profile, "work_order.update");
@@ -775,11 +777,129 @@ export default function ServiceManager() {
     setShowPrintPreview(true);
   };
 
+  const generateWorkOrderTextReceipt = (order: WorkOrder, settings: StoreSettings | null) => {
+    const line = "--------------------------------";
+    const doubleLine = "================================";
+    const now = new Date(order.creationDate).toLocaleString("vi-VN");
+    const prefix = settings?.work_order_prefix || "SC";
+    const formattedId = `${prefix}-${String(order.id).padStart(5, '0')}`;
+
+    let partLines = "";
+    if (order.partsUsed && order.partsUsed.length > 0) {
+      partLines += `Phu tung:\n`;
+      order.partsUsed.forEach((p) => {
+        partLines += `- ${p.partName}\n`;
+        const qtyPrice = `  ${p.quantity} x ${formatCurrency(p.price)}`;
+        const totalP = formatCurrency(p.quantity * p.price);
+        const spacesCount = 32 - qtyPrice.length - totalP.length;
+        const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
+        partLines += `${qtyPrice}${spaces}${totalP}\n`;
+      });
+    }
+
+    let serviceLines = "";
+    if (order.additionalServices && order.additionalServices.length > 0) {
+      serviceLines += `Dich vu:\n`;
+      order.additionalServices.forEach((s) => {
+        serviceLines += `- ${s.serviceName || s.description || ""}\n`;
+        const qtyPrice = `  ${s.quantity || 1} x ${formatCurrency(s.price)}`;
+        const totalS = formatCurrency((s.price || 0) * (s.quantity || 1));
+        const spacesCount = 32 - qtyPrice.length - totalS.length;
+        const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
+        serviceLines += `${qtyPrice}${spaces}${totalS}\n`;
+      });
+    }
+
+    const partsTotal = order.partsUsed?.reduce((sum, p) => sum + p.quantity * p.price, 0) || 0;
+    const servicesTotal = order.additionalServices?.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0) || 0;
+    const laborCost = order.laborCost || 0;
+    const grandTotal = order.total || (partsTotal + servicesTotal + laborCost);
+
+    const partsStr = formatCurrency(partsTotal);
+    const servicesStr = formatCurrency(servicesTotal);
+    const laborStr = formatCurrency(laborCost);
+    const grandTotalStr = formatCurrency(grandTotal);
+
+    const partsLine = `Tien phu tung:${" ".repeat(Math.max(1, 32 - 14 - partsStr.length))}${partsStr}`;
+    const servicesLine = `Tien dich vu:${" ".repeat(Math.max(1, 32 - 13 - servicesStr.length))}${servicesStr}`;
+    const laborLine = `Tien cong:${" ".repeat(Math.max(1, 32 - 10 - laborStr.length))}${laborStr}`;
+    const totalLine = `Tong cong:${" ".repeat(Math.max(1, 32 - 10 - grandTotalStr.length))}${grandTotalStr}`;
+
+    return `
+================================
+         MOTOCARE PRO
+================================
+PHIEU DICH VU SUA CHUA
+Ngay: ${now}
+Ma phieu: ${formattedId}
+${doubleLine}
+Khach hang: ${order.customerName}
+SDT: ${order.customerPhone}
+Thiet bi: ${order.vehicleModel}
+Bien so: ${order.licensePlate}
+${doubleLine}
+Noi dung: ${order.issueDescription || "Sua chua xe"}
+${line}
+${partLines}${serviceLines}${line}
+${partsLine}
+${servicesLine}
+${laborLine}
+${totalLine}
+================================
+Cảm ơn quý khách đã tin tưởng!
+================================
+\n\n\n\n`;
+  };
+
   // Handle actual print
-  const handleDoPrint = () => {
-    setTimeout(() => {
-      printElementById("work-order-receipt");
-    }, 500);
+  const handleDoPrint = async () => {
+    const printMode = localStorage.getItem("motocare_print_mode") || "wifi";
+
+    if (isNative && printMode === "bluetooth") {
+      if (!printOrder) {
+        showToast.error("Không có thông tin hóa đơn sửa chữa.");
+        return;
+      }
+      const text = generateWorkOrderTextReceipt(printOrder, storeSettings);
+      try {
+        const success = await printViaBluetooth(text);
+        if (success) {
+          showToast.success("Đã gửi lệnh in nhiệt Bluetooth.");
+        } else {
+          showToast.error("In Bluetooth thất bại. Vui lòng kiểm tra kết nối máy in.");
+        }
+      } catch (err: any) {
+        showToast.error(`Lỗi in: ${err.message || err}`);
+      }
+    } else {
+      setTimeout(async () => {
+        const receiptElement = document.getElementById("work-order-receipt");
+        if (!receiptElement) {
+          showToast.error("Không tìm thấy mẫu in hóa đơn.");
+          return;
+        }
+
+        const html = `
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>Phiếu sửa chữa</title>
+              <style>
+                body { margin: 0; padding: 10px; font-family: sans-serif; }
+                @media print {
+                  body { padding: 0; }
+                }
+              </style>
+            </head>
+            <body>
+              ${receiptElement.innerHTML}
+            </body>
+          </html>
+        `;
+
+        await printViaWiFi(html);
+      }, 500);
+    }
   };
 
   // 🔹 Handle refund work order

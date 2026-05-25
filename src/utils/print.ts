@@ -1,3 +1,5 @@
+import { registerPlugin, Capacitor } from '@capacitor/core';
+
 type PrintElementOptions = {
   pageSize?: string;
   paperWidth?: string;
@@ -35,6 +37,15 @@ export function printElementById(id: string, options?: PrintElementOptions) {
     @media print { .no-print { display: none; } }
   `;
   const pageStyle = `${baseStyle}${options?.customStyle || ""}`;
+
+  if (Capacitor.isNativePlatform()) {
+    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Print</title><style>${pageStyle}</style></head><body>${el.outerHTML}</body></html>`;
+    const PrintPlugin = registerPlugin<any>('PrintPlugin');
+    PrintPlugin.printHtml({ html }).catch((err: any) => {
+      console.error("Native printElementById failed:", err);
+    });
+    return;
+  }
 
   const isMobile =
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
