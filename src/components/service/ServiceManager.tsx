@@ -54,6 +54,7 @@ import {
 } from "../../hooks/useDebtsRepository";
 import { showToast } from "../../utils/toast";
 import { printElementById } from "../../utils/print";
+import { shareBlobNative } from "../../utils/nativeShare";
 import { usePrinter } from "../../hooks/usePrinter";
 import { supabase } from "../../supabaseClient";
 import { WorkOrderMobileModal } from "../service/WorkOrderMobileModal";
@@ -482,18 +483,10 @@ export default function ServiceManager() {
       });
 
       const fileName = `phieu-sua-chua-${formatWorkOrderId(printOrder.id)}.png`;
+      const title = `Phiếu sửa chữa ${formatWorkOrderId(printOrder.id)}`;
 
-      if (navigator.share && navigator.canShare) {
-        const file = new File([blob], fileName, { type: "image/png" });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: `Phiếu sửa chữa ${formatWorkOrderId(printOrder.id)}`,
-          });
-          showToast.success("Đã chia sẻ phiếu thành công!");
-        } else {
-          downloadImage(blob, fileName);
-        }
+      if (await shareBlobNative(blob, fileName, title)) {
+        showToast.success("Đã mở chia sẻ phiếu thành công!");
       } else {
         downloadImage(blob, fileName);
       }

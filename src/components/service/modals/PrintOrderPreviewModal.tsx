@@ -5,6 +5,7 @@ import { formatCurrency, formatWorkOrderId } from "../../../utils/format";
 import { showToast } from "../../../utils/toast";
 import type { WorkOrder, WorkOrderPart } from "../../../types";
 import { sanitizeIssueDescriptionForPrint } from "../utils/service.utils";
+import { shareBlobNative } from "../../../utils/nativeShare";
 
 interface StoreSettings {
   store_name?: string;
@@ -128,24 +129,11 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
   };
 
   const shareReceiptImage = async (blob: Blob, fileName: string) => {
-    if (navigator.share && navigator.canShare) {
-      const file = new File([blob], fileName, { type: "image/png" });
-      const shareData = {
-        files: [file],
-        title: `Phieu ${formatWorkOrderId(
-          printOrder.id,
-          storeSettings?.work_order_prefix
-        )}`,
-        text: "In phieu qua ung dung may in Bluetooth/LAN",
-      };
-
-      if (navigator.canShare(shareData)) {
-        await navigator.share(shareData);
-        return true;
-      }
-    }
-
-    return false;
+    const title = `Phiếu ${formatWorkOrderId(
+      printOrder.id,
+      storeSettings?.work_order_prefix
+    )}`;
+    return await shareBlobNative(blob, fileName, title);
   };
 
   const downloadReceiptImage = (blob: Blob, fileName: string) => {
