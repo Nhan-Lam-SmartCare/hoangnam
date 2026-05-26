@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { registerPlugin, Capacitor } from '@capacitor/core';
+import { showToast } from '../utils/toast';
 
 export interface BluetoothDevice {
   name: string;
@@ -93,15 +94,33 @@ export const usePrinter = () => {
   // Print text via Bluetooth printer
   const printViaBluetooth = useCallback(async (text: string) => {
     if (!isNative) {
-      console.warn('Bluetooth printing is only supported on native mobile app');
+      showToast.warning('In Bluetooth chỉ hỗ trợ trên ứng dụng di động native');
       return false;
     }
+
+    const savedAddress = localStorage.getItem('motocare_bt_address') || connectedAddress;
+    if (!savedAddress) {
+      showToast.error('Chưa kết nối máy in Bluetooth. Vui lòng vào "Cài đặt máy in di động" để chọn và kết nối máy in trước.');
+      return false;
+    }
+
+    const printPromise = BluetoothPrint.printText({ text });
+
+    showToast.promise(
+      printPromise,
+      {
+        pending: 'Đang kết nối & truyền dữ liệu tới máy in Bluetooth...',
+        success: 'Đã gửi lệnh in nhiệt Bluetooth thành công!',
+        error: 'In Bluetooth thất bại. Vui lòng kiểm tra lại máy in.',
+      }
+    );
+
     try {
-      const result = await BluetoothPrint.printText({ text });
+      const result = await printPromise;
       return result.success;
     } catch (err) {
       console.error('Error printing via Bluetooth:', err);
-      throw err;
+      return false;
     }
   }, [isNative]);
 
@@ -111,6 +130,7 @@ export const usePrinter = () => {
       // Fallback on standard web: open print window
       const printWindow = window.open('', '_blank');
       if (printWindow) {
+        showToast.info('Đang chuẩn bị trang in...');
         printWindow.document.write(html);
         printWindow.document.close();
         printWindow.focus();
@@ -120,12 +140,24 @@ export const usePrinter = () => {
       }
       return false;
     }
+
+    const printPromise = PrintPlugin.printHtml({ html });
+
+    showToast.promise(
+      printPromise,
+      {
+        pending: 'Đang khởi tạo dịch vụ in hệ thống...',
+        success: 'Đã mở màn hình in thành công!',
+        error: 'Chuẩn bị in thất bại. Vui lòng kiểm tra lại.',
+      }
+    );
+
     try {
-      const result = await PrintPlugin.printHtml({ html });
+      const result = await printPromise;
       return result.success;
     } catch (err) {
       console.error('Error printing via system PrintManager:', err);
-      throw err;
+      return false;
     }
   }, [isNative]);
 

@@ -115,14 +115,7 @@ Bao cao: MAY IN HOAT DONG TOT
 Cam on quy khach da tin tuong!
 ================================
 \n\n\n\n`;
-      try {
-        const success = await printViaBluetooth(testText);
-        if (success) {
-          toast.success('Đã gửi lệnh in thử qua Bluetooth.');
-        }
-      } catch (err: any) {
-        toast.error(`Lỗi in: ${err.message || err}`);
-      }
+      await printViaBluetooth(testText);
     }
   };
 

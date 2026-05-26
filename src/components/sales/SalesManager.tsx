@@ -264,16 +264,7 @@ Cam on quy khach da tin tuong!
 
     if (isNative && printMode === "bluetooth") {
       const text = generateSalesTextReceipt(payload);
-      try {
-        const success = await printViaBluetooth(text);
-        if (success) {
-          showToast.success("Đã gửi lệnh in nhiệt Bluetooth.");
-        } else {
-          showToast.error("In Bluetooth thất bại. Vui lòng kết nối máy in.");
-        }
-      } catch (err: any) {
-        showToast.error(`Lỗi in: ${err.message || err}`);
-      }
+      await printViaBluetooth(text);
     } else {
       const rows = payload.items
         .map(

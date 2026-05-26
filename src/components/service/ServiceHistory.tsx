@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { printElementById } from "../../utils/print";
+import { showToast } from "../../utils/toast";
 import type { WorkOrder, WorkOrderPart } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { WORK_ORDER_STATUS } from "../../constants";
@@ -410,7 +411,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
     if (order.additionalServices && order.additionalServices.length > 0) {
       serviceLines += `Dich vu:\n`;
       order.additionalServices.forEach((s) => {
-        serviceLines += `- ${s.serviceName}\n`;
+        serviceLines += `- ${s.description || ""}\n`;
         const qtyPrice = `  ${s.quantity || 1} x ${formatCurrency(s.price)}`;
         const totalS = formatCurrency((s.price || 0) * (s.quantity || 1));
         const spacesCount = 32 - qtyPrice.length - totalS.length;
@@ -473,16 +474,7 @@ Cam on quy khach da tin tuong!
         return;
       }
       const text = generateWorkOrderTextReceipt(printOrder, storeSettings);
-      try {
-        const success = await printViaBluetooth(text);
-        if (success) {
-          showToast.success("Đã gửi lệnh in nhiệt Bluetooth.");
-        } else {
-          showToast.error("In Bluetooth thất bại. Vui lòng kiểm tra kết nối máy in.");
-        }
-      } catch (err: any) {
-        showToast.error(`Lỗi in: ${err.message || err}`);
-      }
+      await printViaBluetooth(text);
     } else {
       setTimeout(async () => {
         const receiptElement = document.getElementById("work-order-receipt");

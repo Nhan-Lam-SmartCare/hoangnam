@@ -55,7 +55,7 @@ const FORCE_OWNER_EMAILS = (
   import.meta.env.VITE_FORCE_OWNER_EMAILS || ""
 )
   .split(",")
-  .map((email) => email.trim().toLowerCase())
+  .map((email: string) => email.trim().toLowerCase())
   .filter(Boolean);
 const FORCE_OWNER_ENABLED =
   (import.meta.env.VITE_FORCE_OWNER_ENABLED || "true").toLowerCase() !==

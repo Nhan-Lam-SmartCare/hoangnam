@@ -801,7 +801,7 @@ export default function ServiceManager() {
     if (order.additionalServices && order.additionalServices.length > 0) {
       serviceLines += `Dich vu:\n`;
       order.additionalServices.forEach((s) => {
-        serviceLines += `- ${s.serviceName || s.description || ""}\n`;
+        serviceLines += `- ${s.description || ""}\n`;
         const qtyPrice = `  ${s.quantity || 1} x ${formatCurrency(s.price)}`;
         const totalS = formatCurrency((s.price || 0) * (s.quantity || 1));
         const spacesCount = 32 - qtyPrice.length - totalS.length;
@@ -861,16 +861,7 @@ Cảm ơn quý khách đã tin tưởng!
         return;
       }
       const text = generateWorkOrderTextReceipt(printOrder, storeSettings);
-      try {
-        const success = await printViaBluetooth(text);
-        if (success) {
-          showToast.success("Đã gửi lệnh in nhiệt Bluetooth.");
-        } else {
-          showToast.error("In Bluetooth thất bại. Vui lòng kiểm tra kết nối máy in.");
-        }
-      } catch (err: any) {
-        showToast.error(`Lỗi in: ${err.message || err}`);
-      }
+      await printViaBluetooth(text);
     } else {
       setTimeout(async () => {
         const receiptElement = document.getElementById("work-order-receipt");

@@ -1,4 +1,5 @@
 import { registerPlugin, Capacitor } from '@capacitor/core';
+import { showToast } from './toast';
 
 type PrintElementOptions = {
   pageSize?: string;
@@ -41,9 +42,15 @@ export function printElementById(id: string, options?: PrintElementOptions) {
   if (Capacitor.isNativePlatform()) {
     const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Print</title><style>${pageStyle}</style></head><body>${el.outerHTML}</body></html>`;
     const PrintPlugin = registerPlugin<any>('PrintPlugin');
-    PrintPlugin.printHtml({ html }).catch((err: any) => {
-      console.error("Native printElementById failed:", err);
-    });
+    const printPromise = PrintPlugin.printHtml({ html });
+    showToast.promise(
+      printPromise,
+      {
+        pending: 'Đang khởi tạo dịch vụ in hệ thống...',
+        success: 'Đã mở màn hình in thành công!',
+        error: 'Chuẩn bị in thất bại. Vui lòng kiểm tra lại.',
+      }
+    );
     return;
   }
 

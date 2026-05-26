@@ -53,6 +53,7 @@ export interface AppContextType {
     paymentMethod: "cash" | "bank";
     customer: { id?: string; name: string; phone?: string };
     note?: string;
+    paidAmount?: number;
   }) => void;
   setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
   setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
