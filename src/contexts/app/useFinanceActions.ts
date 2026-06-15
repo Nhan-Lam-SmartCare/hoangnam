@@ -1,7 +1,10 @@
 import { useCallback } from "react";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
 import { updatePaymentSourceBalance } from "../../lib/repository/paymentSourcesRepository";
-import { updatePart } from "../../lib/repository/partsRepository";
+import {
+  updatePart,
+  decrementStockForSale,
+} from "../../lib/repository/partsRepository";
 import { showToast } from "../../utils/toast";
 import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { supabase } from "../../supabaseClient";
@@ -81,8 +84,9 @@ export function useFinanceActions(
       customer: { id?: string; name: string; phone?: string };
       note?: string;
       paidAmount?: number;
-    }) => {
-      if (!data.items.length) return;
+    }): Promise<{ ok: boolean; saleId: string }> => {
+      if (!data.items.length)
+        return Promise.resolve({ ok: false, saleId: "" });
 
       const lineSubtotal = data.items.reduce(
         (sum, it) => sum + it.sellingPrice * it.quantity,
@@ -93,7 +97,10 @@ export function useFinanceActions(
         0
       );
       const total = lineSubtotal - lineDiscounts - data.discount;
-      const saleId = `SALE-${Date.now()}`;
+      const saleId = `SALE-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 5)
+        .toUpperCase()}`;
 
       const newSale: Sale = {
         id: saleId,
@@ -110,7 +117,7 @@ export function useFinanceActions(
         cashTransactionId: undefined,
       };
 
-      void (async () => {
+      const persistence = (async (): Promise<{ ok: boolean }> => {
         const { data: userData } = await supabase.auth.getUser();
         const currentUser = userData?.user;
         const issuedBy =
@@ -146,35 +153,21 @@ export function useFinanceActions(
           showToast.warning(
             `Đã tạo đơn tại máy nhưng lưu CSDL thất bại: ${mapRepoErrorForUser(mappedError)}`
           );
-          return;
+          return { ok: false };
         }
 
-        const soldByPart = data.items.reduce<Record<string, number>>((acc, item) => {
-          acc[item.partId] = (acc[item.partId] || 0) + item.quantity;
-          return acc;
-        }, {});
-
-        const stockUpdateErrors: string[] = [];
-        for (const [partId, soldQty] of Object.entries(soldByPart)) {
-          const part = parts.find((p) => p.id === partId);
-          if (!part) continue;
-
-          const currentStock = Number(part.stock?.[newSale.branchId] || 0);
-          const nextStock = Math.max(0, currentStock - soldQty);
-          const nextStockMap = {
-            ...(part.stock || {}),
-            [newSale.branchId]: nextStock,
-          };
-
-          const updateRes = await updatePart(partId, { stock: nextStockMap });
-          if (!updateRes.ok) {
-            stockUpdateErrors.push(part.name || partId);
-          }
-        }
-
-        if (stockUpdateErrors.length > 0) {
+        // Trừ kho nguyên tử qua RPC (chống bán âm khi nhiều thiết bị bán cùng lúc).
+        const decRes = await decrementStockForSale(
+          data.items.map((it) => ({ partId: it.partId, quantity: it.quantity })),
+          newSale.branchId
+        );
+        if (!decRes.ok) {
           showToast.warning(
-            `Đơn đã lưu nhưng chưa trừ kho CSDL cho: ${stockUpdateErrors.join(", ")}`
+            `Đơn đã lưu nhưng chưa trừ kho CSDL: ${mapRepoErrorForUser(decRes.error)}`
+          );
+        } else if (decRes.data.failedParts && decRes.data.failedParts.length > 0) {
+          showToast.warning(
+            `Đơn đã lưu nhưng chưa trừ kho CSDL cho: ${decRes.data.failedParts.join(", ")}`
           );
         }
 
@@ -364,6 +357,8 @@ export function useFinanceActions(
             console.error("Lỗi cập nhật số liệu khách hàng:", e);
           }
         }
+
+        return { ok: true };
       })();
 
       setSales((prev) => [newSale, ...prev]);
@@ -413,6 +408,8 @@ export function useFinanceActions(
       );
 
       clearCart();
+
+      return persistence.then((r) => ({ ok: r.ok, saleId }));
     },
     [
       clearCart,

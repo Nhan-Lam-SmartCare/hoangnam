@@ -46,6 +46,7 @@ export interface AppContextType {
   upsertWorkOrder: (order: WorkOrder) => void;
   setCartItems: React.Dispatch<React.SetStateAction<CartItem[]>>;
   clearCart: () => void;
+  setSales: React.Dispatch<React.SetStateAction<Sale[]>>;
   deleteSale: (saleId: string) => void;
   finalizeSale: (data: {
     items: CartItem[];
@@ -54,7 +55,7 @@ export interface AppContextType {
     customer: { id?: string; name: string; phone?: string };
     note?: string;
     paidAmount?: number;
-  }) => void;
+  }) => Promise<{ ok: boolean; saleId: string }>;
   setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
   setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
   recordInventoryTransaction: (tx: Omit<InventoryTransaction, "id">) => void;

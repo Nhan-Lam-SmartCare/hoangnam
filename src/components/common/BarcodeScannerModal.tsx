@@ -79,38 +79,36 @@ const ScannerContent: React.FC<ScannerContentProps> = ({
   onRetry,
 }) => {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4">
-      {error ? (
-        <div className="text-center">
-          <div className="text-red-400 mb-4 px-4">{error}</div>
-          <button
-            onClick={onRetry}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium"
-          >
-            Thử lại
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="relative w-full max-w-sm">
-            <div
-              id="barcode-scanner-container"
-              className="w-full rounded-xl overflow-hidden bg-black"
-              style={{ minHeight: 300 }}
-            />
+    <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
+      <div className="relative w-full max-w-sm">
+        <div
+          id="barcode-scanner-container"
+          className="w-full rounded-xl overflow-hidden bg-black"
+          style={{ minHeight: 300 }}
+        />
 
-            {isScanning && <ScannerFrameOverlay />}
+        {isScanning && !error && <ScannerFrameOverlay />}
+
+        {error && (
+          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-4 rounded-xl z-10">
+            <div className="text-red-400 mb-4 px-4 text-center">{error}</div>
+            <button
+              onClick={onRetry}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Thử lại
+            </button>
           </div>
+        )}
+      </div>
 
-          {lastScanned && (
-            <div className="mt-4 px-4 py-2 bg-green-600/20 border border-green-500 rounded-lg">
-              <p className="text-green-400 text-sm text-center font-mono">✓ Đã quét: {lastScanned}</p>
-            </div>
-          )}
-
-          <ScannerInstructions />
-        </>
+      {lastScanned && !error && (
+        <div className="mt-4 px-4 py-2 bg-green-600/20 border border-green-500 rounded-lg">
+          <p className="text-green-400 text-sm text-center font-mono">✓ Đã quét: {lastScanned}</p>
+        </div>
       )}
+
+      {!error && <ScannerInstructions />}
     </div>
   );
 };
@@ -190,6 +188,10 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         }
       }
 
+      if (!document.getElementById("barcode-scanner-container")) {
+        throw new Error("HTML Element with id=barcode-scanner-container not found");
+      }
+
       const scanner = new Html5Qrcode("barcode-scanner-container");
       scannerRef.current = scanner;
 
@@ -221,14 +223,31 @@ const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         },
       };
 
-      await scanner.start(
-        { facingMode },
-        config,
-        handleSuccessfulScan,
-        () => {
-          // Ignore scan errors (no code found)
+      try {
+        await scanner.start(
+          { facingMode },
+          config,
+          handleSuccessfulScan,
+          () => {
+            // Ignore scan errors (no code found)
+          }
+        );
+      } catch (startErr: any) {
+        // Fallback: if environment camera is not found/fails, try default camera
+        if (facingMode === "environment") {
+          console.warn("Environment camera failed, trying fallback default camera...");
+          const fallbackConfig = { ...config };
+          delete fallbackConfig.videoConstraints;
+          await scanner.start(
+            {},
+            fallbackConfig,
+            handleSuccessfulScan,
+            () => {}
+          );
+        } else {
+          throw startErr;
         }
-      );
+      }
 
       // Note: Do NOT apply zoom on iOS - it triggers macro mode and causes blur
       setIsScanning(true);

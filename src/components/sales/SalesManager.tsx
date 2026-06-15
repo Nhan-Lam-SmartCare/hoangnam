@@ -11,12 +11,21 @@ import {
   RefreshCcw,
   ArrowLeft,
   ArrowRight,
+  ChevronUp,
+  ChevronDown,
+  Camera,
+  Save,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { useAppContext } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { canDo } from "../../utils/permissions";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
-import type { CartItem, Part } from "../../types";
-import { useCustomers } from "../../hooks/useSupabase";
+import type { CartItem, Part, Sale } from "../../types";
+import { useCustomers, useSales, useCreateCustomer } from "../../hooks/useSupabase";
+import BarcodeScannerModal from "../common/BarcodeScannerModal";
 import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePrinter } from "../../hooks/usePrinter";
@@ -31,6 +40,48 @@ const getBranchStock = (part: Part, branchId: string): number => {
 const getBranchRetailPrice = (part: Part, branchId: string): number =>
   Math.max(0, Number(part.retailPrice?.[branchId] || 0));
 
+const getCompactCode = (value?: string | null) => {
+  const raw = String(value || "");
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 8) return digits.slice(-8);
+  if (digits.length >= 6) return digits.slice(-6);
+  const compact = raw.replace(/[^a-zA-Z0-9]/g, "");
+  if (compact.length >= 8) return compact.slice(-8).toLowerCase();
+  if (compact.length >= 6) return compact.slice(-6).toLowerCase();
+  return raw.toLowerCase();
+};
+
+const normalizeSaleRow = (row: any): Sale => ({
+  ...row,
+  id: row.id,
+  date: row.date,
+  items: Array.isArray(row.items) ? row.items : [],
+  subtotal: Number(row.subtotal || 0),
+  discount: Number(row.discount || 0),
+  total: Number(row.total || 0),
+  customer: row.customer || { name: "Khách lẻ" },
+  paymentMethod: row.paymentMethod || row.paymentmethod || "cash",
+  userId: row.userId || row.userid || "local-user",
+  userName: row.userName || row.username || "Local User",
+  branchId: row.branchId || row.branchid || row.branch_id || "CN1",
+  cashTransactionId:
+    row.cashTransactionId || row.cashtransactionid || row.cash_transaction_id,
+});
+
+interface HeldOrder {
+  id: string;
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  selectedCustomerId: string | null;
+  items: CartItem[];
+  discount: number;
+  discountType: "vnd" | "percent";
+  paymentMethod: "cash" | "bank";
+  note: string;
+  total: number;
+}
+
 const SalesManager: React.FC = () => {
   const {
     parts,
@@ -38,12 +89,15 @@ const SalesManager: React.FC = () => {
     cartItems,
     setCartItems,
     setParts,
+    setSales,
     currentBranchId,
     finalizeSale,
     deleteSale,
     sales,
   } = useAppContext();
   const { isNative, printViaWiFi, printViaBluetooth } = usePrinter();
+  const { profile } = useAuth();
+  const canDeleteSale = canDo(profile, "sale.delete");
   const [storeSettings, setStoreSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -60,6 +114,7 @@ const SalesManager: React.FC = () => {
     loadSettings();
   }, [currentBranchId]);
   const { data: customersFromRepo = [] } = useCustomers();
+  const { data: salesFromRepo = [], isSuccess: salesLoaded } = useSales();
   const {
     data: partsFromRepo = [],
     isSuccess: partsLoaded,
@@ -79,6 +134,14 @@ const SalesManager: React.FC = () => {
   const [paidAmount, setPaidAmount] = useState<number | "full">("full");
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = React.useRef(false);
+  const [editingLines, setEditingLines] = useState<Record<string, boolean>>({});
+  const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const createCustomer = useCreateCustomer();
+  const heldStorageKey = `motocare_held_orders_${currentBranchId}`;
+  const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [historyQuery, setHistoryQuery] = useState("");
@@ -159,6 +222,11 @@ const SalesManager: React.FC = () => {
     setParts(partsFromRepo);
   }, [partsLoaded, partsFromRepo, setParts]);
 
+  useEffect(() => {
+    if (!salesLoaded) return;
+    setSales((salesFromRepo || []).map(normalizeSaleRow));
+  }, [salesLoaded, salesFromRepo, setSales]);
+
     useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
@@ -175,6 +243,25 @@ const SalesManager: React.FC = () => {
     }
   }, [cartItems.length, mobileStep]);
 
+  // B5: nạp đơn đang giữ theo chi nhánh
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(heldStorageKey);
+      setHeldOrders(raw ? (JSON.parse(raw) as HeldOrder[]) : []);
+    } catch {
+      setHeldOrders([]);
+    }
+  }, [heldStorageKey]);
+
+  // B5: lưu đơn đang giữ
+  useEffect(() => {
+    try {
+      localStorage.setItem(heldStorageKey, JSON.stringify(heldOrders));
+    } catch {
+      // bỏ qua lỗi lưu cục bộ
+    }
+  }, [heldStorageKey, heldOrders]);
+
   const pagedParts = useMemo(() => {
     if (enablePartsPaging) return filteredParts;
     const start = (page - 1) * pageSize;
@@ -186,14 +273,23 @@ const SalesManager: React.FC = () => {
     [cartItems]
   );
 
+  // Tổng giảm giá theo từng dòng (A2)
+  const lineDiscountTotal = useMemo(
+    () => cartItems.reduce((sum, item) => sum + (item.discount || 0), 0),
+    [cartItems]
+  );
+
+  // Tạm tính sau khi trừ giảm giá theo dòng; giảm giá đơn (%) tính trên giá trị này.
+  const netSubtotal = Math.max(0, subtotal - lineDiscountTotal);
+
   const discountAmount = useMemo(() => {
     if (discountType === "percent") {
-      return Math.round((subtotal * discount) / 100);
+      return Math.round((netSubtotal * discount) / 100);
     }
     return discount;
-  }, [subtotal, discount, discountType]);
+  }, [netSubtotal, discount, discountType]);
 
-  const total = Math.max(0, subtotal - discountAmount);
+  const total = Math.max(0, netSubtotal - discountAmount);
 
     const escapeHtml = (value: string) =>
       value
@@ -211,10 +307,11 @@ const SalesManager: React.FC = () => {
     totalValue: number;
     payment: "cash" | "bank";
     noteText?: string;
+    dateValue?: string;
   }) => {
     const line = "--------------------------------";
     const doubleLine = "================================";
-    const now = new Date().toLocaleString("vi-VN");
+    const now = new Date(payload.dateValue || Date.now()).toLocaleString("vi-VN");
     const storeName = (storeSettings?.store_name || "Sơn Nam").toUpperCase();
     const padSize = Math.max(0, Math.floor((32 - storeName.length) / 2));
     const centeredStoreName = " ".repeat(padSize) + storeName;
@@ -268,6 +365,7 @@ Cam on quy khach da tin tuong!
     totalValue: number;
     payment: "cash" | "bank";
     noteText?: string;
+    dateValue?: string;
   }) => {
     const printMode = localStorage.getItem("motocare_print_mode") || "wifi";
 
@@ -380,7 +478,7 @@ Cam on quy khach da tin tuong!
     </div>
 
     <div class="card">
-      <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Ngày giờ:</span> ${new Date().toLocaleString("vi-VN")}</div>
+      <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Ngày giờ:</span> ${new Date(payload.dateValue || Date.now()).toLocaleString("vi-VN")}</div>
       <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Khách hàng:</span> ${escapeHtml(payload.customer.name)}${payload.customer.phone ? ` - ${escapeHtml(payload.customer.phone)}` : ""}</div>
       <div><span style="font-weight: bold;">Thanh toán:</span> ${payload.payment === "cash" ? "Tiền mặt" : "Chuyển khoản"}</div>
     </div>
@@ -488,7 +586,175 @@ Cam on quy khach da tin tuong!
     setCartItems((prev) => prev.filter((item) => item.partId !== partId));
   };
 
-  const submitSale = () => {
+  // A2: sửa đơn giá theo từng dòng
+  const updateLinePrice = (partId: string, nextPrice: number) => {
+    const safePrice = Math.max(0, Number(nextPrice) || 0);
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.partId === partId
+          ? {
+              ...item,
+              sellingPrice: safePrice,
+              // Không cho giảm giá dòng vượt thành tiền mới
+              discount: Math.min(item.discount || 0, safePrice * item.quantity),
+            }
+          : item
+      )
+    );
+  };
+
+  // A2: sửa giảm giá (đ) theo từng dòng
+  const updateLineDiscount = (partId: string, nextDiscount: number) => {
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.partId !== partId) return item;
+        const lineTotal = item.sellingPrice * item.quantity;
+        const safeDiscount = Math.min(
+          Math.max(0, Number(nextDiscount) || 0),
+          lineTotal
+        );
+        return { ...item, discount: safeDiscount };
+      })
+    );
+  };
+
+  // Quét mã vạch / nhấn Enter: tự thêm sản phẩm khớp barcode/SKU rồi xóa ô tìm
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return;
+
+    const exactMatch = inventoryParts.find((p) => {
+      const sku = (p.sku || "").toLowerCase();
+      const barcode = (p.barcode || "").toLowerCase();
+      return (
+        (sku === keyword || barcode === keyword) &&
+        getBranchStock(p, currentBranchId) > 0
+      );
+    });
+
+    const target =
+      exactMatch || (filteredParts.length === 1 ? filteredParts[0] : null);
+
+    if (target) {
+      e.preventDefault();
+      addPartToCart(target);
+      setSearch("");
+    }
+  };
+
+  // C11: xử lý mã quét từ camera
+  const handleScannedBarcode = (code: string) => {
+    const keyword = String(code || "").trim().toLowerCase();
+    if (!keyword) return;
+    const match = (enablePartsPaging ? parts : inventoryParts).find((p) => {
+      const sku = (p.sku || "").toLowerCase();
+      const barcode = (p.barcode || "").toLowerCase();
+      return sku === keyword || barcode === keyword;
+    });
+    if (match) {
+      addPartToCart(match);
+      showToast.success(`Đã thêm: ${match.name}`);
+    } else {
+      setSearch(code);
+      showToast.warning("Không tìm thấy sản phẩm khớp mã vừa quét.");
+    }
+  };
+
+  // B7: tạo nhanh khách hàng thành viên rồi liên kết vào đơn
+  const handleQuickCreateCustomer = async () => {
+    const name = customerSearch.trim();
+    if (!name || name === "Khách lẻ") {
+      showToast.warning("Vui lòng nhập tên khách hàng cần tạo.");
+      return;
+    }
+    try {
+      const created: any = await createCustomer.mutateAsync({
+        id: `CUS-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name,
+        phone: customerPhone.trim() || undefined,
+      } as any);
+      const newId = created?.id || null;
+      setCustomerName(name);
+      setSelectedCustomerId(newId);
+      setShowCustomerSuggestions(false);
+      showToast.success(`Đã tạo khách hàng "${name}".`);
+    } catch (err: any) {
+      showToast.error(
+        `Không tạo được khách hàng: ${err?.message || "lỗi không xác định"}`
+      );
+    }
+  };
+
+  // B5: reset form về trạng thái trống
+  const resetSaleForm = () => {
+    setCartItems([]);
+    setDiscount(0);
+    setDiscountType("vnd");
+    setPaidAmount("full");
+    setNote("");
+    setCustomerName("Khách lẻ");
+    setCustomerSearch("Khách lẻ");
+    setCustomerPhone("");
+    setSelectedCustomerId(null);
+    setEditingLines({});
+  };
+
+  // B5: giữ đơn hiện tại lại để bán khách khác
+  const holdCurrentOrder = () => {
+    if (!cartItems.length) {
+      showToast.warning("Giỏ hàng đang trống, không có gì để giữ.");
+      return;
+    }
+    const held: HeldOrder = {
+      id: `HOLD-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      customerName: customerName.trim() || "Khách lẻ",
+      customerPhone: customerPhone.trim(),
+      selectedCustomerId,
+      items: cartItems,
+      discount,
+      discountType,
+      paymentMethod,
+      note,
+      total,
+    };
+    setHeldOrders((prev) => [held, ...prev]);
+    resetSaleForm();
+    setMobileStep("products");
+    showToast.success("Đã giữ đơn. Bạn có thể mở lại bất cứ lúc nào.");
+  };
+
+  // B5: mở lại đơn đã giữ
+  const restoreHeldOrder = (held: HeldOrder) => {
+    if (cartItems.length > 0) {
+      const ok = window.confirm(
+        "Giỏ hàng hiện tại sẽ bị thay thế bằng đơn giữ. Tiếp tục?"
+      );
+      if (!ok) return;
+    }
+    setCartItems(held.items);
+    setDiscount(held.discount);
+    setDiscountType(held.discountType);
+    setPaymentMethod(held.paymentMethod);
+    setNote(held.note);
+    setCustomerName(held.customerName);
+    setCustomerSearch(held.customerName);
+    setCustomerPhone(held.customerPhone);
+    setSelectedCustomerId(held.selectedCustomerId);
+    setPaidAmount("full");
+    setHeldOrders((prev) => prev.filter((h) => h.id !== held.id));
+    setRightTab("checkout");
+    showToast.success("Đã mở lại đơn giữ.");
+  };
+
+  const removeHeldOrder = (id: string) => {
+    setHeldOrders((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const submitSale = async () => {
+    if (submitLockRef.current) return; // chặn double-submit khi đang xử lý
+
     if (!cartItems.length) {
       showToast.warning("Giỏ hàng đang trống.");
       return;
@@ -507,7 +773,7 @@ Cam on quy khach da tin tuong!
       showToast.warning("Giảm giá phần trăm không được lớn hơn 100%.");
       return;
     }
-    if (discountType === "vnd" && discount > subtotal) {
+    if (discountType === "vnd" && discount > netSubtotal) {
       showToast.warning("Giảm giá không được lớn hơn tạm tính.");
       return;
     }
@@ -553,37 +819,53 @@ Cam on quy khach da tin tuong!
       },
       items: cartItems,
       subtotalValue: subtotal,
-      discountValue: discountAmount,
+      discountValue: lineDiscountTotal + discountAmount,
       totalValue: total,
       payment: paymentMethod,
       noteText: note.trim() || undefined,
     } as const;
 
-    finalizeSale({
-      items: cartItems,
-      discount: discountAmount,
-      paymentMethod,
-      customer: payload.customer,
-      note: note.trim() || undefined,
-      paidAmount: finalPaidAmount,
-    });
+    submitLockRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const result = await finalizeSale({
+        items: cartItems,
+        discount: discountAmount,
+        paymentMethod,
+        customer: payload.customer,
+        note: note.trim() || undefined,
+        paidAmount: finalPaidAmount,
+      });
 
-    setDiscount(0);
-    setDiscountType("vnd");
-    setPaidAmount("full");
-    setNote("");
-    setCustomerName("Khách lẻ");
-    setCustomerSearch("Khách lẻ");
-    setCustomerPhone("");
-    setSelectedCustomerId(null);
-    setMobileStep("products");
-    if (autoPrintInvoice) {
-      printInvoice(payload);
+      setDiscount(0);
+      setDiscountType("vnd");
+      setPaidAmount("full");
+      setNote("");
+      setCustomerName("Khách lẻ");
+      setCustomerSearch("Khách lẻ");
+      setCustomerPhone("");
+      setSelectedCustomerId(null);
+      setMobileStep("products");
+
+      if (result.ok) {
+        if (autoPrintInvoice) {
+          printInvoice(payload);
+        }
+        showToast.success("Đã tạo phiếu bán hàng thành công.");
+      }
+      // Trường hợp lỗi đã được finalizeSale cảnh báo chi tiết.
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
     }
-    showToast.success("Đã tạo phiếu bán hàng thành công.");
   };
 
   const handleDeleteSale = (saleId: string) => {
+    if (!canDeleteSale) {
+      showToast.warning("Bạn không có quyền xóa phiếu bán hàng.");
+      return;
+    }
+
     const targetSale = sales.find((sale) => sale.id === saleId);
     if (!targetSale) {
       showToast.warning("Không tìm thấy phiếu bán hàng để xóa.");
@@ -598,6 +880,23 @@ Cam on quy khach da tin tuong!
     deleteSale(saleId);
   };
 
+  // B6: in lại hóa đơn từ một phiếu đã lưu (dùng đúng ngày của phiếu)
+  const reprintSale = (sale: Sale) => {
+    printInvoice({
+      customer: {
+        name: sale.customer?.name || "Khách lẻ",
+        phone: sale.customer?.phone || undefined,
+      },
+      items: sale.items,
+      subtotalValue: Number(sale.subtotal || 0),
+      discountValue: Number(sale.discount || 0),
+      totalValue: Number(sale.total || 0),
+      payment: sale.paymentMethod === "bank" ? "bank" : "cash",
+      noteText: (sale as any).note || undefined,
+      dateValue: sale.date,
+    });
+  };
+
   const historyPageSize = 6;
 
   const filteredSalesHistory = useMemo(() => {
@@ -607,10 +906,16 @@ Cam on quy khach da tin tuong!
       const customerName = (sale.customer?.name || "").toLowerCase();
       const customerPhone = (sale.customer?.phone || "").toLowerCase();
       const saleId = (sale.id || "").toLowerCase();
+      const saleCode = ((sale as any).sale_code || "").toLowerCase();
+      const cashTxId = (sale.cashTransactionId || (sale as any).cashtransactionid || "").toLowerCase();
+      const cashTxCode = getCompactCode(cashTxId);
       return (
         customerName.includes(keyword) ||
         customerPhone.includes(keyword) ||
-        saleId.includes(keyword)
+        saleId.includes(keyword) ||
+        saleCode.includes(keyword) ||
+        cashTxId.includes(keyword) ||
+        cashTxCode.includes(keyword)
       );
     });
     return normalized.slice(0, 200);
@@ -684,10 +989,20 @@ Cam on quy khach da tin tuong!
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm theo tên, SKU, mã vạch"
+                  onKeyDown={handleSearchKeyDown}
+                  aria-label="Tìm sản phẩm theo tên, SKU hoặc mã vạch"
+                  placeholder="Tìm/quét theo tên, SKU, mã vạch (Enter để thêm)"
                   className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm outline-none ring-0 focus:border-rose-400 focus:shadow-[0_0_0_3px_rgba(244,63,94,0.15)]"
                 />
               </div>
+              <button
+                onClick={() => setShowScanner(true)}
+                className={`${ui.syncBtn} w-10 px-0 inline-flex items-center justify-center shrink-0`}
+                title="Quét mã bằng camera"
+                aria-label="Quét mã bằng camera"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
               <button
                 onClick={syncInventory}
                 disabled={syncingInventory}
@@ -718,6 +1033,19 @@ Cam on quy khach da tin tuong!
                     }`}
                   >
                     <div className="min-w-0 mb-auto w-full">
+                      {part.imageUrl ? (
+                        <div className="w-full h-20 sm:h-24 mb-2 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                          <img
+                            src={part.imageUrl}
+                            alt={part.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      ) : null}
                       <div className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug break-words mb-1">
                         {part.name}
                       </div>
@@ -893,9 +1221,18 @@ Cam on quy khach da tin tuong!
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-10 text-center text-sm font-bold text-slate-900 dark:text-white">
-                      {item.quantity}
-                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const v = Math.floor(Number(e.target.value) || 0);
+                        if (v >= 1) updateQty(item.partId, v);
+                      }}
+                      aria-label={`Số lượng ${item.partName}`}
+                      className="w-12 text-center text-sm font-bold text-slate-900 dark:text-white bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                     <button
                       onClick={() => updateQty(item.partId, item.quantity + 1)}
                       className="w-8 h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-md transition shadow-sm"
@@ -904,11 +1241,55 @@ Cam on quy khach da tin tuong!
                     </button>
                   </div>
                   <div className="text-right">
+                    {item.discount ? (
+                      <div className="text-[11px] text-slate-400 line-through">
+                        {formatCurrency(item.sellingPrice * item.quantity)}
+                      </div>
+                    ) : null}
                     <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(item.sellingPrice * item.quantity)}
+                      {formatCurrency(item.sellingPrice * item.quantity - (item.discount || 0))}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingLines((prev) => ({
+                          ...prev,
+                          [item.partId]: !prev[item.partId],
+                        }))
+                      }
+                      className="text-[11px] font-semibold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition"
+                    >
+                      {editingLines[item.partId] ? "Đóng" : "Sửa giá"}
+                    </button>
                   </div>
                 </div>
+
+                {editingLines[item.partId] && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-dashed border-slate-200 dark:border-slate-700 pt-3">
+                    <label className="block">
+                      <span className="text-[11px] text-slate-500">Đơn giá</span>
+                      <input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        value={item.sellingPrice}
+                        onChange={(e) => updateLinePrice(item.partId, Number(e.target.value))}
+                        className="mt-0.5 w-full px-2 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] text-slate-500">Giảm giá (đ)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        value={item.discount || 0}
+                        onChange={(e) => updateLineDiscount(item.partId, Number(e.target.value))}
+                        className="mt-0.5 w-full px-2 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             ))}
             {!cartItems.length && (
@@ -994,10 +1375,9 @@ Cam on quy khach da tin tuong!
                 <span className="text-xs text-slate-500">Số điện thoại</span>
                 <input
                   value={customerPhone}
-                  onChange={(e) => {
-                    setCustomerPhone(e.target.value);
-                    setSelectedCustomerId(null); // Clear ID when manually typing phone
-                  }}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  inputMode="tel"
+                  aria-label="Số điện thoại khách hàng"
                   className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                 />
               </label>
@@ -1013,12 +1393,19 @@ Cam on quy khach da tin tuong!
                   {formatCurrency(subtotal)}
                 </span>
               </div>
+              {lineDiscountTotal > 0 && (
+                <div className="flex items-center justify-between text-sm text-rose-500">
+                  <span>Giảm giá theo dòng</span>
+                  <span className="font-semibold">-{formatCurrency(lineDiscountTotal)}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <label className="flex-1">
                   <span className="text-xs text-slate-500">Giảm giá</span>
                   <input
                     type="number"
                     min={0}
+                    inputMode="numeric"
                     value={discount}
                     onChange={(e) => setDiscount(Number(e.target.value) || 0)}
                     className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
@@ -1057,7 +1444,7 @@ Cam on quy khach da tin tuong!
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Phương thức thanh toán
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("cash")}
@@ -1080,13 +1467,6 @@ Cam on quy khach da tin tuong!
                 >
                   Chuyển khoản
                 </button>
-                <button
-                  type="button"
-                  disabled
-                  className="h-11 rounded-xl border text-sm font-semibold text-slate-400 border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 cursor-not-allowed"
-                >
-                  Quẹt thẻ
-                </button>
               </div>
 
               <label className="block">
@@ -1094,6 +1474,7 @@ Cam on quy khach da tin tuong!
                 <input
                   type="number"
                   min={0}
+                  inputMode="numeric"
                   value={paidAmount === "full" ? total : paidAmount}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -1102,6 +1483,30 @@ Cam on quy khach da tin tuong!
                   className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                 />
               </label>
+              {/* A3: nút tiền nhanh */}
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPaidAmount("full")}
+                  className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
+                    paidAmount === "full"
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
+                  }`}
+                >
+                  Đủ tiền
+                </button>
+                {[50000, 100000, 200000, 500000].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setPaidAmount(amount)}
+                    className="h-9 px-3 rounded-lg text-xs font-bold border border-slate-300/80 dark:border-slate-600 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-emerald-400 transition"
+                  >
+                    {formatCurrency(amount)}
+                  </button>
+                ))}
+              </div>
               {paidAmount !== "full" && paidAmount > total && (
                 <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                   Tiền thừa trả khách: {formatCurrency(paidAmount - total)}
@@ -1134,20 +1539,20 @@ Cam on quy khach da tin tuong!
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                disabled
-                className="h-12 rounded-2xl border border-slate-300/80 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-50/60 dark:bg-slate-900/60 cursor-not-allowed"
-              >
-                Lưu nháp
-              </button>
-
+            <div className="grid grid-cols-1 gap-3">
               <button
                 onClick={submitSale}
-                className="h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)] hover:shadow-[0_18px_35px_-18px_rgba(16,185,129,1)] transition"
+                disabled={isSubmitting || !cartItems.length}
+                className="h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)] hover:shadow-[0_18px_35px_-18px_rgba(16,185,129,1)] transition disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none inline-flex items-center justify-center gap-2"
               >
-                Xuất bán
+                {isSubmitting ? (
+                  <>
+                    <RefreshCcw className="w-4 h-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  "Xuất bán"
+                )}
               </button>
             </div>
 
@@ -1160,7 +1565,7 @@ Cam on quy khach da tin tuong!
                   },
                   items: cartItems,
                   subtotalValue: subtotal,
-                  discountValue: discountAmount,
+                  discountValue: lineDiscountTotal + discountAmount,
                   totalValue: total,
                   payment: paymentMethod,
                   noteText: note.trim() || undefined,
@@ -1195,14 +1600,16 @@ Cam on quy khach da tin tuong!
             </div>
 
             <div className="space-y-2 max-h-64 overflow-auto pr-1">
-              {pagedSalesHistory.map((sale) => (
+              {pagedSalesHistory.map((sale) => {
+                const isExpanded = expandedSaleId === sale.id;
+                return (
                 <div key={sale.id} className="text-xs rounded-lg border border-slate-200 dark:border-slate-700 p-2.5 bg-white/70 dark:bg-slate-900/40">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-800 dark:text-slate-100 truncate">
                         {sale.customer.name || "Khách lẻ"}
                       </div>
-                      <div className="text-slate-500 truncate">{sale.id}</div>
+                      <div className="text-slate-500 truncate">{(sale as any).sale_code || sale.id}</div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <div className="text-emerald-600 font-semibold whitespace-nowrap">
@@ -1210,21 +1617,66 @@ Cam on quy khach da tin tuong!
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleDeleteSale(sale.id)}
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                        title="Xóa phiếu bán hàng"
-                        aria-label="Xóa phiếu bán hàng"
+                        onClick={() => reprintSale(sale)}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        title="In lại hóa đơn"
+                        aria-label="In lại hóa đơn"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Printer className="w-3.5 h-3.5" />
                       </button>
+                      {canDeleteSale && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSale(sale.id)}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                          title="Xóa phiếu bán hàng"
+                          aria-label="Xóa phiếu bán hàng"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="mt-1 text-slate-500 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSaleId(isExpanded ? null : sale.id)}
+                    className="mt-1 w-full text-slate-500 flex items-center justify-between gap-2 hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+                  >
                     <span>{new Date(sale.date).toLocaleString("vi-VN")}</span>
-                    <span>{sale.items.length} sản phẩm</span>
-                  </div>
+                    <span className="inline-flex items-center gap-1">
+                      {sale.items.length} sản phẩm
+                      {isExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </span>
+                  </button>
+                  {isExpanded && (
+                    <div className="mt-2 border-t border-dashed border-slate-200 dark:border-slate-700 pt-2 space-y-1">
+                      {sale.items.map((it, idx) => (
+                        <div key={`${sale.id}-${it.partId}-${idx}`} className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">
+                            {it.quantity} × {it.partName}
+                          </span>
+                          <span className="shrink-0 font-medium text-slate-700 dark:text-slate-200">
+                            {formatCurrency(it.sellingPrice * it.quantity - (it.discount || 0))}
+                          </span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 mt-1">
+                        <span className="text-slate-500">
+                          {sale.paymentMethod === "bank" ? "Chuyển khoản" : "Tiền mặt"}
+                        </span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(sale.total)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
 
               {!filteredSalesHistory.length && (
                 <div className="text-xs text-slate-500">Chưa có giao dịch bán hàng.</div>
@@ -1291,6 +1743,42 @@ Cam on quy khach da tin tuong!
           </button>
         </div>
       )}
+
+      {mobileStep === "checkout" &&
+        rightTab === "checkout" &&
+        cartItems.length > 0 && (
+        <div
+          className="md:hidden fixed left-3 right-3 bottom-20 z-[9999]"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <button
+            onClick={submitSale}
+            disabled={isSubmitting}
+            className="w-full rounded-2xl px-4 py-3 transition bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-xl disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                {isSubmitting ? (
+                  <RefreshCcw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ReceiptText className="w-4 h-4" />
+                )}
+                <span className="text-sm font-semibold">
+                  {isSubmitting ? "Đang xử lý..." : "Xuất bán"}
+                </span>
+              </span>
+              <span className="text-sm font-bold">{formatCurrency(total)}</span>
+            </span>
+          </button>
+        </div>
+      )}
+
+      <BarcodeScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScan={handleScannedBarcode}
+        title="Quét mã sản phẩm"
+      />
     </div>
   );
 };
