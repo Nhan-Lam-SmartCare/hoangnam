@@ -1898,12 +1898,13 @@ const WorkOrderModal: React.FC<{
           }
         }
 
+        const maxAdditionalPayment = Math.max(0, total - totalDeposit);
         const additionalPaymentToApply =
           formData.status === "Trả máy"
             ? forceFullPayment
-              ? Math.max(0, total - totalDeposit)
+              ? maxAdditionalPayment
               : showPartialPayment
-                ? partialPayment
+                ? Math.min(partialPayment, maxAdditionalPayment)
                 : 0
             : 0;
 
@@ -4340,6 +4341,11 @@ const WorkOrderModal: React.FC<{
                                 onChange={(val) => setPartialPayment(val)}
                                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right font-semibold"
                               />
+                              {showPartialPayment && partialPayment > Math.max(0, total - totalDeposit) && (
+                                <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                  Tiền thừa trả khách: {formatCurrency(partialPayment - Math.max(0, total - totalDeposit))}
+                                </div>
+                              )}
                               <div className="grid grid-cols-3 gap-1.5 w-full">
                                 <button
                                   onClick={() => setPartialPayment(0)}

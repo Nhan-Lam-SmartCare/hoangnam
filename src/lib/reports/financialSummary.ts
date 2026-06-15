@@ -99,7 +99,7 @@ function canonicalizeCategory(category: string | null | undefined): string {
   return aliases[normalized] || normalized;
 }
 
-function isRefundCategory(category: string | null | undefined): boolean {
+export function isRefundCategory(category: string | null | undefined): boolean {
   return canonicalizeCategory(category) === "refund";
 }
 

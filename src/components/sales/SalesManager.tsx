@@ -71,7 +71,9 @@ const SalesManager: React.FC = () => {
   const [customerSearch, setCustomerSearch] = useState("Khách lẻ");
   const [customerName, setCustomerName] = useState("Khách lẻ");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<"vnd" | "percent">("vnd");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank">("cash");
   const [note, setNote] = useState("");
   const [paidAmount, setPaidAmount] = useState<number | "full">("full");
@@ -184,7 +186,14 @@ const SalesManager: React.FC = () => {
     [cartItems]
   );
 
-  const total = Math.max(0, subtotal - discount);
+  const discountAmount = useMemo(() => {
+    if (discountType === "percent") {
+      return Math.round((subtotal * discount) / 100);
+    }
+    return discount;
+  }, [subtotal, discount, discountType]);
+
+  const total = Math.max(0, subtotal - discountAmount);
 
     const escapeHtml = (value: string) =>
       value
@@ -490,8 +499,16 @@ Cam on quy khach da tin tuong!
       return;
     }
 
-    if (discount < 0 || discount > subtotal) {
-      showToast.warning("Giảm giá không hợp lệ.");
+    if (discount < 0) {
+      showToast.warning("Giảm giá không được âm.");
+      return;
+    }
+    if (discountType === "percent" && discount > 100) {
+      showToast.warning("Giảm giá phần trăm không được lớn hơn 100%.");
+      return;
+    }
+    if (discountType === "vnd" && discount > subtotal) {
+      showToast.warning("Giảm giá không được lớn hơn tạm tính.");
       return;
     }
 
@@ -507,19 +524,36 @@ Cam on quy khach da tin tuong!
     }
 
     const actualPaidAmount = paidAmount === "full" ? total : paidAmount;
-    if (actualPaidAmount < 0 || actualPaidAmount > total) {
+    if (actualPaidAmount < 0) {
       showToast.warning("Số tiền khách trả không hợp lệ.");
       return;
     }
 
+    const finalPaidAmount = Math.min(actualPaidAmount, total);
+    const remainingAmount = total - finalPaidAmount;
+
+    // Chặn ghi nợ đối với Khách lẻ vô danh
+    if (remainingAmount > 0) {
+      const isAnon = !selectedCustomerId && (
+        !customerName.trim() ||
+        customerName === "Khách lẻ" ||
+        !customerPhone.trim()
+      );
+      if (isAnon) {
+        showToast.warning("Không thể ghi nhận nợ cho Khách lẻ. Vui lòng liên kết khách hàng thành viên hoặc nhập đầy đủ tên và số điện thoại.");
+        return;
+      }
+    }
+
     const payload = {
       customer: {
+        id: selectedCustomerId || undefined,
         name: customerName.trim(),
         phone: customerPhone.trim() || undefined,
       },
       items: cartItems,
       subtotalValue: subtotal,
-      discountValue: discount,
+      discountValue: discountAmount,
       totalValue: total,
       payment: paymentMethod,
       noteText: note.trim() || undefined,
@@ -527,16 +561,21 @@ Cam on quy khach da tin tuong!
 
     finalizeSale({
       items: cartItems,
-      discount,
+      discount: discountAmount,
       paymentMethod,
       customer: payload.customer,
       note: note.trim() || undefined,
-      paidAmount: actualPaidAmount,
+      paidAmount: finalPaidAmount,
     });
 
     setDiscount(0);
+    setDiscountType("vnd");
     setPaidAmount("full");
     setNote("");
+    setCustomerName("Khách lẻ");
+    setCustomerSearch("Khách lẻ");
+    setCustomerPhone("");
+    setSelectedCustomerId(null);
     setMobileStep("products");
     if (autoPrintInvoice) {
       printInvoice(payload);
@@ -884,7 +923,30 @@ Cam on quy khach da tin tuong!
 
           <div className="space-y-3 border-t border-slate-200/70 dark:border-slate-700 pt-4">
             <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Khách hàng</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Khách hàng</div>
+                {selectedCustomerId && (
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 rounded font-bold">
+                    Đã liên kết thành viên
+                  </span>
+                )}
+              </div>
+              {selectedCustomerId && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCustomerId(null);
+                      setCustomerName("Khách lẻ");
+                      setCustomerSearch("Khách lẻ");
+                      setCustomerPhone("");
+                    }}
+                    className="text-[11px] text-rose-500 hover:text-rose-600 font-bold hover:underline transition"
+                  >
+                    Đặt lại về Khách lẻ
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -898,6 +960,7 @@ Cam on quy khach da tin tuong!
                       const next = e.target.value;
                       setCustomerSearch(next);
                       setCustomerName(next);
+                      setSelectedCustomerId(null); // Clear ID when typing
                       setShowCustomerSuggestions(true);
                     }}
                     placeholder="Tìm khách hàng (tên, SDT, biển số)"
@@ -915,6 +978,7 @@ Cam on quy khach da tin tuong!
                         setCustomerName(c.name);
                         setCustomerSearch(c.name);
                         setCustomerPhone(c.phone || "");
+                        setSelectedCustomerId(c.id);
                         setShowCustomerSuggestions(false);
                       }}
                       className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -930,7 +994,10 @@ Cam on quy khach da tin tuong!
                 <span className="text-xs text-slate-500">Số điện thoại</span>
                 <input
                   value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerPhone(e.target.value);
+                    setSelectedCustomerId(null); // Clear ID when manually typing phone
+                  }}
                   className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                 />
               </label>
@@ -959,12 +1026,25 @@ Cam on quy khach da tin tuong!
                 </label>
                 <select
                   aria-label="Don vi giam gia"
+                  value={discountType}
+                  onChange={(e) => {
+                    setDiscountType(e.target.value as "vnd" | "percent");
+                    setDiscount(0); // Reset discount when switching type
+                  }}
                   className="mt-5 w-14 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-sm"
-                  defaultValue="vnd"
                 >
                   <option value="vnd">đ</option>
+                  <option value="percent">%</option>
                 </select>
               </div>
+              {discountAmount > 0 && (
+                <div className="flex items-center justify-between text-sm text-rose-500">
+                  <span>Giảm giá {discountType === "percent" ? `(${discount}%)` : ""}</span>
+                  <span className="font-semibold">
+                    -{formatCurrency(discountAmount)}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between rounded-xl bg-emerald-600/10 dark:bg-emerald-500/20 px-3 py-2">
                 <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">Thành tiền</span>
                 <span className="text-lg font-bold text-emerald-700 dark:text-emerald-100">
@@ -1014,7 +1094,6 @@ Cam on quy khach da tin tuong!
                 <input
                   type="number"
                   min={0}
-                  max={total}
                   value={paidAmount === "full" ? total : paidAmount}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -1023,6 +1102,11 @@ Cam on quy khach da tin tuong!
                   className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                 />
               </label>
+              {paidAmount !== "full" && paidAmount > total && (
+                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  Tiền thừa trả khách: {formatCurrency(paidAmount - total)}
+                </div>
+              )}
               {paidAmount !== "full" && total - paidAmount > 0 && (
                 <div className="text-sm font-semibold text-rose-500">
                   Ghi nhận khách nợ: {formatCurrency(total - paidAmount)}
@@ -1076,7 +1160,7 @@ Cam on quy khach da tin tuong!
                   },
                   items: cartItems,
                   subtotalValue: subtotal,
-                  discountValue: discount,
+                  discountValue: discountAmount,
                   totalValue: total,
                   payment: paymentMethod,
                   noteText: note.trim() || undefined,

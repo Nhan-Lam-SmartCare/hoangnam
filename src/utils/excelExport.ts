@@ -799,3 +799,231 @@ export const exportDetailedInventoryReport = (
   const fileName = `TonKhoChiTiet_${branchId}_${startDate}_${endDate}.xlsx`;
   XLSX.writeFile(wb, fileName);
 };
+
+// ==================== SỔ DOANH THU MẪU S1a-HKD ====================
+/**
+ * Xuất Sổ chi tiết doanh thu bán hàng hóa, dịch vụ - Mẫu S1a-HKD
+ * (Theo Thông tư 152/2025/TT-BTC)
+ * Dành cho hộ kinh doanh dưới 500 triệu/năm - không thuộc diện chịu thuế GTGT
+ */
+export interface BusinessInfo {
+  businessName: string;      // Họ, cá nhân kinh doanh
+  taxCode: string;           // Mã số thuế
+  address: string;           // Địa chỉ
+  businessLocation?: string; // Địa điểm kinh doanh
+}
+
+export const exportS1aHKD = (
+  sales: Sale[],
+  workOrders: any[],
+  businessInfo: BusinessInfo,
+  startDate: Date,
+  endDate: Date
+) => {
+  const wb = XLSX.utils.book_new();
+
+  // Format period
+  const startMonth = startDate.getMonth() + 1;
+  const endMonth = endDate.getMonth() + 1;
+  const year = startDate.getFullYear();
+  const periodText = startMonth === endMonth 
+    ? `Tháng ${startMonth}/${year}` 
+    : `Từ tháng ${startMonth} đến tháng ${endMonth}/${year}`;
+
+  // Collect all transactions
+  interface RevenueEntry {
+    date: Date;
+    description: string;
+    amount: number;
+    type: "ban-hang" | "ban-phu-tung" | "sua-chua"; // Phân loại để kê khai thuế
+  }
+
+  const entries: RevenueEntry[] = [];
+
+  // From sales (bán hàng - bán lẻ phụ tùng)
+  // Lưu ý: sales đã được lọc từ financialSummary
+  sales.forEach((sale) => {
+    const saleDate = new Date(sale.date);
+    const itemNames = sale.items.map(i => i.partName).join(", ");
+    entries.push({
+      date: saleDate,
+      description: `Bán phụ tùng - ${sale.customer?.name || "Khách lẻ"}: ${itemNames.slice(0, 80)}${itemNames.length > 80 ? '...' : ''}`,
+      amount: sale.total,
+      type: "ban-hang",
+    });
+  });
+
+  // From work orders - TÁCH RIÊNG phụ tùng và tiền công
+  // Lưu ý: workOrders đã được lọc từ financialSummary (chỉ paid và trong date range)
+  workOrders.forEach((wo: any) => {
+    const woDate = new Date(wo.paymentDate || wo.paymentdate || wo.creationDate || wo.creationdate || wo.date);
+    
+    // Tính tiền phụ tùng từ partsUsed (không có field totalPrice trong WorkOrder!)
+    const partsUsed = wo.partsUsed || wo.partsused || [];
+    const partsTotal = partsUsed.reduce((sum: number, p: any) => {
+      const price = parseFloat(p.price || p.sellingPrice || p.sellingprice || 0);
+      const qty = parseFloat(p.quantity || 1);
+      return sum + (price * qty);
+    }, 0);
+    
+    // Tính tiền dịch vụ gia công từ additionalServices
+    const additionalServices = wo.additionalServices || wo.additionalservices || [];
+    const servicesTotal = additionalServices.reduce((sum: number, s: any) => {
+      const price = parseFloat(s.price || 0);
+      const qty = parseFloat(s.quantity || 1);
+      return sum + (price * qty);
+    }, 0);
+    
+    const laborCost = parseFloat(wo.laborCost || wo.laborcost || 0);
+    const discount = parseFloat(wo.discount || 0);
+    
+    // Tổng tiền = phụ tùng + tiền công + dịch vụ gia công - chiết khấu
+    const theoreticalTotal = partsTotal + laborCost + servicesTotal - discount;
+    
+    // Sử dụng totalPaid (số tiền thực thu) 
+    const totalPaid = parseFloat(wo.totalPaid || wo.totalpaid || wo.total || theoreticalTotal);
+    
+    // Tính tỷ lệ phân bổ dựa trên totalPaid
+    const ratio = theoreticalTotal > 0 ? totalPaid / theoreticalTotal : 1;
+    
+    // Phân bổ theo tỷ lệ
+    const actualPartsRevenue = Math.round(partsTotal * ratio);
+    const actualServicesRevenue = Math.round(servicesTotal * ratio);
+    const actualLaborRevenue = totalPaid - actualPartsRevenue - actualServicesRevenue;
+    
+    const vehicleInfo = wo.vehicleInfo?.licensePlate || wo.vehicleinfo?.licenseplate || wo.licensePlate || wo.licenseplate || "";
+    const customerName = wo.customerName || wo.customername || "Khách hàng";
+    
+    // 1. Tiền phụ tùng -> Bán phụ tùng (thuế suất thấp)
+    if (actualPartsRevenue > 0) {
+      const partNames = partsUsed.map((p: any) => p.partName || p.partname || "").filter(Boolean).join(", ");
+      entries.push({
+        date: woDate,
+        description: `Bán phụ tùng${vehicleInfo ? ` (${vehicleInfo})` : ""} - ${customerName}${partNames ? `: ${partNames.slice(0, 60)}${partNames.length > 60 ? '...' : ''}` : ''}`,
+        amount: actualPartsRevenue,
+        type: "ban-phu-tung",
+      });
+    }
+    
+    // 2. Tiền dịch vụ gia công (outsourcing) - cũng là dịch vụ
+    if (actualServicesRevenue > 0) {
+      entries.push({
+        date: woDate,
+        description: `Dịch vụ gia công${vehicleInfo ? ` (${vehicleInfo})` : ""} - ${customerName}`,
+        amount: actualServicesRevenue,
+        type: "sua-chua",
+      });
+    }
+    
+    // 3. Tiền công -> Sửa chữa/Dịch vụ (thuế suất cao hơn)
+    if (actualLaborRevenue > 0) {
+      entries.push({
+        date: woDate,
+        description: `Dịch vụ sửa chữa${vehicleInfo ? ` (${vehicleInfo})` : ""} - ${customerName}`,
+        amount: actualLaborRevenue,
+        type: "sua-chua",
+      });
+    }
+  });
+
+  // Sort by date
+  entries.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // Calculate totals by type
+  const totalGoods = entries
+    .filter(e => e.type === "ban-hang" || e.type === "ban-phu-tung")
+    .reduce((sum, e) => sum + e.amount, 0);
+  const totalServices = entries
+    .filter(e => e.type === "sua-chua")
+    .reduce((sum, e) => sum + e.amount, 0);
+  const totalRevenue = totalGoods + totalServices;
+
+  // Build sheet data according to Mẫu S1a-HKD format
+  // TÁCH RIÊNG cột Bán hàng hóa và Dịch vụ để kê khai thuế đúng
+  const sheetData: (string | number)[][] = [
+    // Header section
+    [`HỘ, CÁ NHÂN KINH DOANH: ${businessInfo.businessName}`, "", "", "", "Mẫu số S1a-HKD"],
+    [`Mã số thuế: ${businessInfo.taxCode}`, "", "", "", "(Kèm theo Thông tư số"],
+    [`Địa chỉ: ${businessInfo.address}`, "", "", "", "152/2025/TT-BTC ngày 31 tháng 12"],
+    ["", "", "", "", "năm 2025 của Bộ trưởng Bộ Tài chính)"],
+    [],
+    ["SỔ CHI TIẾT DOANH THU BÁN HÀNG HÓA, DỊCH VỤ", "", "", "", ""],
+    [`Địa điểm kinh doanh: ${businessInfo.businessLocation || businessInfo.address}`, "", "", "", ""],
+    [`Kỳ kê khai: ${periodText}`, "", "", "", ""],
+    [],
+    // Table header - TÁCH 2 CỘT cho thuế
+    ["Ngày tháng", "Nội dung giao dịch", "Bán hàng hóa", "Dịch vụ", "Tổng cộng"],
+    ["A", "B", "1", "2", "3 = 1 + 2"],
+  ];
+
+  // Add entries with separated columns
+  entries.forEach((entry) => {
+    const isGoods = entry.type === "ban-hang" || entry.type === "ban-phu-tung";
+    sheetData.push([
+      formatDate(entry.date.toISOString()),
+      entry.description,
+      isGoods ? entry.amount : "",      // Cột Bán hàng hóa
+      !isGoods ? entry.amount : "",     // Cột Dịch vụ
+      entry.amount,                      // Tổng
+    ]);
+  });
+
+  // Add empty rows for manual entries (total 5 empty rows)
+  for (let i = 0; i < Math.max(0, 5 - entries.length); i++) {
+    sheetData.push(["", "", "", "", ""]);
+  }
+
+  // Total row
+  sheetData.push(["", "TỔNG CỘNG", totalGoods, totalServices, totalRevenue]);
+  sheetData.push([]);
+  
+  // Summary for tax declaration
+  sheetData.push(["", "TÓM TẮT KÊ KHAI THUẾ:", "", "", ""]);
+  sheetData.push(["", "- Doanh thu bán hàng hóa (thuế suất thấp):", totalGoods, "", ""]);
+  sheetData.push(["", "- Doanh thu dịch vụ (thuế suất cao):", "", totalServices, ""]);
+  sheetData.push([]);
+  sheetData.push([]);
+
+  // Signature section
+  const today = new Date();
+  sheetData.push(["", "", "", `Ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`, ""]);
+  sheetData.push(["", "", "", "NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/", ""]);
+  sheetData.push(["", "", "", "CÁ NHÂN KINH DOANH", ""]);
+  sheetData.push(["", "", "", "(Ký, họ tên, đóng dấu)", ""]);
+
+  // Create worksheet
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+  // Set column widths
+  ws["!cols"] = [
+    { wch: 12 },  // Ngày tháng
+    { wch: 55 },  // Nội dung giao dịch
+    { wch: 18 },  // Bán hàng hóa
+    { wch: 18 },  // Dịch vụ
+    { wch: 18 },  // Tổng cộng
+  ];
+
+  // Merge cells for header
+  ws["!merges"] = [
+    { s: { r: 5, c: 0 }, e: { r: 5, c: 3 } }, // Title row
+    { s: { r: 6, c: 0 }, e: { r: 6, c: 3 } }, // Business location
+    { s: { r: 7, c: 0 }, e: { r: 7, c: 3 } }, // Period
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "S1a-HKD");
+
+  // Create filename
+  const monthStr = startMonth.toString().padStart(2, "0");
+  const fileName = `SoDoanhThu_S1a-HKD_T${monthStr}_${year}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  return {
+    fileName,
+    totalRevenue,
+    totalGoods,
+    totalServices,
+    transactionCount: entries.length,
+    period: periodText,
+  };
+};
+

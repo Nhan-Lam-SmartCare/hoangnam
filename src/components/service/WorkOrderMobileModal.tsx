@@ -1205,12 +1205,13 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
     // Desktop parity: additional payment only applies when status is "Trả máy"
     const totalDeposit = isDeposit ? depositAmount : 0;
+    const maxAdditionalPayment = Math.max(0, total - totalDeposit);
     const additionalPayment =
       status === "Trả máy"
         ? forceFullPayment
-          ? Math.max(0, total - totalDeposit)
+          ? maxAdditionalPayment
           : showPaymentInput
-            ? partialAmount
+            ? Math.min(partialAmount, maxAdditionalPayment)
             : 0
         : 0;
     const totalPaid = totalDeposit + additionalPayment;
@@ -3137,6 +3138,11 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                                     inputMode="numeric"
                                     className="w-full px-3 py-2.5 bg-white dark:bg-[#2b2b40] border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white text-sm focus:border-emerald-500 focus:outline-none transition-colors mb-2"
                                   />
+                                  {showPaymentInput && partialAmount > Math.max(0, total - (isDeposit ? depositAmount : 0)) && (
+                                    <div className="text-xs font-bold text-emerald-500 mt-1 mb-2">
+                                      Tiền thừa trả khách: {formatCurrency(partialAmount - Math.max(0, total - (isDeposit ? depositAmount : 0)))}
+                                    </div>
+                                  )}
                                   {/* Quick amount buttons */}
                                   <div className="flex items-center gap-2">
                                     <button

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-// Sales repo removed
+import { useSales } from "../../../hooks/useSupabase";
 import { useWorkOrdersRepo } from "../../../hooks/useWorkOrdersRepository";
 import { usePartsRepo } from "../../../hooks/usePartsRepository";
 import { useCashTxRepo } from "../../../hooks/useCashTransactionsRepository";
@@ -13,7 +13,7 @@ export const useDashboardData = (
     _selectedMonth?: number,
     _selectedQuarter?: number
 ) => {
-    const sales = useMemo<any[]>(() => [], []); // Sales module removed
+    const { data: sales = [] } = useSales();
     const { data: workOrders = [] } = useWorkOrdersRepo();
     const { data: parts = [] } = usePartsRepo();
     const { data: cashTransactions = [] } = useCashTxRepo();
