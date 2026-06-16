@@ -1707,7 +1707,14 @@ export default function ServiceManager() {
           storeSettings={printerStoreSettings || storeSettings || undefined}
           onPrint={handleDoPrint}
         />
-        {/* Old inline modal disabled */}
+        {/* Hidden Print Template for Mobile */}
+        {printOrder && (
+          <WorkOrderReceiptTemplate
+            id="work-order-receipt"
+            workOrder={printOrder}
+            storeSettings={printerStoreSettings || storeSettings || undefined}
+          />
+        )}
 
 
         {/* Repair Templates Modal for Mobile */}

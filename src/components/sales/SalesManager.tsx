@@ -1007,8 +1007,8 @@ Cam on quy khach da tin tuong!
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleSearchKeyDown}
                   aria-label="Tìm sản phẩm theo tên, SKU hoặc mã vạch"
-                  placeholder="Tìm/quét theo tên, SKU, mã vạch (Enter để thêm)"
-                  className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm outline-none ring-0 focus:border-rose-400 focus:shadow-[0_0_0_3px_rgba(244,63,94,0.15)]"
+                  placeholder="Tìm tên, SKU, mã vạch (Enter)..."
+                  className="w-full pl-9 pr-3 h-11 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm outline-none ring-0 focus:border-rose-400 focus:shadow-[0_0_0_3px_rgba(244,63,94,0.15)]"
                 />
               </div>
               <button
@@ -1031,18 +1031,22 @@ Cam on quy khach da tin tuong!
             </div>
           </div>
 
-          <div className="p-4 sm:p-5">
+          <div className="px-2 py-3 sm:p-5">
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {pagedParts.map((part) => {
                 const stock = getBranchStock(part, currentBranchId);
                 const price = getBranchRetailPrice(part, currentBranchId);
                 const cartItem = cartItems.find((item) => item.partId === part.id);
+                const warrantyText = part.warrantyPeriod 
+                  ? (/^\d+$/.test(String(part.warrantyPeriod).trim()) ? `${part.warrantyPeriod} tháng` : part.warrantyPeriod)
+                  : "";
+                
                 return (
                   <button
                     type="button"
                     key={part.id}
                     onClick={() => addPartToCart(part)}
-                    className={`text-left rounded-2xl border p-3 sm:p-4 transition-all duration-200 active:scale-[0.98] flex flex-col h-full ${
+                    className={`text-left rounded-2xl border p-2.5 sm:p-4 transition-all duration-200 active:scale-[0.98] flex flex-col h-full ${
                       cartItem
                         ? "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.5)]"
                         : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:shadow-sm"
@@ -1068,22 +1072,22 @@ Cam on quy khach da tin tuong!
                       <div className="text-[11px] font-medium text-slate-500 truncate">SKU: {part.sku}</div>
                     </div>
                     
-                    <div className="mt-4 flex flex-col items-start gap-2 w-full">
-                      <div className="w-full flex items-center justify-between">
+                    <div className="mt-3 flex flex-col items-start gap-1.5 w-full">
+                      <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                         <div className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(price)}
                         </div>
-                        <span className={ui.stockBadge}>{stock} tồn</span>
+                        <span className={`${ui.stockBadge} self-start sm:self-auto shrink-0`}>{stock} tồn</span>
                       </div>
-                      <div className="w-full flex items-center justify-between h-5">
-                        {part.warrantyPeriod ? (
+                      <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 min-h-[20px]">
+                        {warrantyText ? (
                           <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                            BH: {part.warrantyPeriod}
+                            BH: {warrantyText}
                           </div>
-                        ) : <div></div>}
+                        ) : <div className="hidden sm:block"></div>}
                         
                         {cartItem && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm self-start sm:self-auto shrink-0">
                             x{cartItem.quantity}
                           </span>
                         )}
