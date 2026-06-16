@@ -4,7 +4,7 @@ import { Share2, Printer, X } from "lucide-react";
 import { formatCurrency, formatWorkOrderId } from "../../../utils/format";
 import { showToast } from "../../../utils/toast";
 import type { WorkOrder, WorkOrderPart } from "../../../types";
-import { sanitizeIssueDescriptionForPrint } from "../utils/service.utils";
+import { sanitizeIssueDescriptionForPrint, getDynamicQrUrl } from "../utils/service.utils";
 import { shareBlobNative } from "../../../utils/nativeShare";
 
 interface StoreSettings {
@@ -422,7 +422,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                           "inset 0 0 0 0.3mm rgba(255, 255, 255, 0.65)",
                       }}
                     >
-                      {storeSettings.bank_qr_url && (
+                      {getDynamicQrUrl(printOrder, storeSettings) && (
                         <div
                           style={{
                             width: "20mm",
@@ -438,7 +438,7 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
                           }}
                         >
                           <img
-                            src={storeSettings.bank_qr_url}
+                            src={getDynamicQrUrl(printOrder, storeSettings)}
                             alt="QR Banking"
                             style={{
                               width: "100%",

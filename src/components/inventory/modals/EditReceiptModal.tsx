@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 
@@ -8,8 +8,8 @@ import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import type { InventoryTransaction } from "../../../types";
-import SupplierModal from "./SupplierModal";
-import AddProductToReceiptModal from "./AddProductToReceiptModal";
+import SupplierModal from "../components/SupplierModal";
+import AddProductToReceiptModal from "../components/AddProductToReceiptModal";
 
 const EditReceiptModal: React.FC<{
   receipt: {
@@ -70,7 +70,7 @@ const EditReceiptModal: React.FC<{
 
   const [payments, setPayments] = useState(() => {
     // Extract payer from notes if available
-    let payerName = "Nh├ón vi├¬n";
+    let payerName = "Nhân viên";
     const firstItem = receipt.items[0];
     if (firstItem?.notes?.includes("NV:")) {
       const extracted = firstItem.notes.split("NV:")[1]?.split("NCC:")[0]?.trim();
@@ -88,7 +88,7 @@ const EditReceiptModal: React.FC<{
         time: timeStr,
         date: receipt.date,
         payer: payerName,
-        cashier: "(Tiß╗ün mß║╖t)", // Default, will update if bank
+        cashier: "(Tiền mẸt)", // Default, will update if bank
         amount: receipt.total,
       },
     ];
@@ -107,7 +107,7 @@ const EditReceiptModal: React.FC<{
           .maybeSingle();
 
         if (data && (data.paymentsource === "bank" || data.paymentsource === "transfer")) {
-          setPayments(prev => prev.map(p => ({ ...p, cashier: "(Chuyß╗ân khoß║ún)" })));
+          setPayments(prev => prev.map(p => ({ ...p, cashier: "(Chuyển khoản)" })));
         } else if (!data) {
           // No transaction found -> Unpaid
           // Clear the "fake" payment that was initialized
@@ -116,7 +116,7 @@ const EditReceiptModal: React.FC<{
         } else {
           // Transaction exists but is cash (or other)
           // Ensure it says Cash
-          setPayments(prev => prev.map(p => ({ ...p, cashier: "(Tiß╗ün mß║╖t)" })));
+          setPayments(prev => prev.map(p => ({ ...p, cashier: "(Tiền mẸt)" })));
         }
       } catch (err) {
         console.error("Error fetching payment info:", err);
@@ -167,12 +167,12 @@ const EditReceiptModal: React.FC<{
 
   const removeItem = (index: number) => {
     if (items.length === 1) {
-      showToast.error("Phß║úi c├│ ├¡t nhß║Ñt 1 sß║ún phß║⌐m");
+      showToast.error("Phải có ít nhất 1 sản phẩm");
       return;
     }
     const newItems = items.filter((_, i) => i !== index);
     setItems(newItems);
-    showToast.success("─É├ú x├│a sß║ún phß║⌐m");
+    showToast.success("Đã xóa sản phẩm");
   };
 
   const handleAddProduct = (product: {
@@ -194,7 +194,7 @@ const EditReceiptModal: React.FC<{
     };
     setItems([...items, newItem]);
     setShowAddProductModal(false);
-    showToast.success(`─É├ú th├¬m ${product.partName} (sß║╜ l╞░u khi bß║Ñm L╞»U)`);
+    showToast.success(`Đã thêm ${product.partName} (sẽ lưu khi bấm LƯU)`);
   };
 
   const handleSaveSupplier = (supplierData: {
@@ -208,8 +208,8 @@ const EditReceiptModal: React.FC<{
     setShowSupplierModal(false);
     showToast.success(
       supplierModalMode === "add"
-        ? "─É├ú th├¬m nh├á cung cß║Ñp"
-        : "─É├ú cß║¡p nhß║¡t nh├á cung cß║Ñp"
+        ? "Đã thêm nhà cung cấp"
+        : "Đã cập nhật nhà cung cấp"
     );
   };
 
@@ -225,11 +225,11 @@ const EditReceiptModal: React.FC<{
 
   const handleEditItem = (index: number) => {
     setEditingItemIndex(index);
-    showToast.info("Nhß║Ñn v├áo ├┤ sß╗æ l╞░ß╗úng hoß║╖c ─æ╞ín gi├í ─æß╗â chß╗ënh sß╗¡a");
+    showToast.info("Nhấn vào ô số lượng hoẸc đơn giá để chỉnh sửa");
   };
 
   const handleItemMenu = (index: number) => {
-    if (confirm("Bß║ín c├│ muß╗æn x├│a sß║ún phß║⌐m n├áy?")) {
+    if (confirm("Bạn có muốn xóa sản phẩm này?")) {
       removeItem(index);
     }
   };
@@ -237,11 +237,11 @@ const EditReceiptModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplier) {
-      showToast.error("Vui l├▓ng chß╗ìn nh├á cung cß║Ñp");
+      showToast.error("Vui lòng chọn nhà cung cấp");
       return;
     }
     if (items.some((item) => item.quantity <= 0)) {
-      showToast.error("Sß╗æ l╞░ß╗úng phß║úi lß╗¢n h╞ín 0");
+      showToast.error("Số lượng phải lớn hơn 0");
       return;
     }
 
@@ -264,13 +264,13 @@ const EditReceiptModal: React.FC<{
           <div className="sm:hidden sticky top-0 bg-slate-50 dark:bg-slate-900 z-20 px-4 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start">
             <div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                Chß╗ënh sß╗¡a phiß║┐u
+                Chỉnh sửa phiếu
               </h3>
               <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
                 <span className="font-mono bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 font-medium">
                   {receipt.receiptCode}
                 </span>
-                <span>ΓÇó</span>
+                <span>•</span>
                 <span>{new Date(receipt.date).toLocaleDateString("vi-VN")}</span>
               </div>
             </div>
@@ -279,7 +279,7 @@ const EditReceiptModal: React.FC<{
               onClick={onClose}
               className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-400 hover:text-slate-600 border border-slate-100 dark:border-slate-700"
             >
-              Γ£ò
+              ✕
             </button>
           </div>
 
@@ -301,7 +301,7 @@ const EditReceiptModal: React.FC<{
                   />
                 </svg>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  [Chß╗ënh sß╗¡a] Phiß║┐u Nhß║¡p Kho {receipt.receiptCode}
+                  [Chỉnh sửa] Phiếu Nhập Kho {receipt.receiptCode}
                 </h3>
               </div>
               <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -321,7 +321,7 @@ const EditReceiptModal: React.FC<{
               onClick={onClose}
               className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-2xl w-8 h-8 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-slate-700"
             >
-              Γ£ò
+              ✕
             </button>
           </div>
 
@@ -339,9 +339,9 @@ const EditReceiptModal: React.FC<{
                       </svg>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">Nh├á cung cß║Ñp</div>
+                      <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">Nhà cung cấp</div>
                       <div className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                        {supplier || "Ch╞░a chß╗ìn"}
+                        {supplier || "Chưa chọn"}
                       </div>
                       {supplierPhone && <div className="text-xs text-slate-400 mt-0.5">{supplierPhone}</div>}
                     </div>
@@ -365,7 +365,7 @@ const EditReceiptModal: React.FC<{
             {/* Desktop Supplier Section */}
             <div className="hidden sm:block">
               <label className="block text-base font-medium text-teal-600 dark:text-teal-400 mb-2">
-                Nh├á cung cß║Ñp:
+                Nhà cung cấp:
               </label>
               <div className="flex gap-2">
                 <div className="flex-1 relative supplier-dropdown-container">
@@ -377,7 +377,7 @@ const EditReceiptModal: React.FC<{
                       setShowSupplierDropdown(true);
                     }}
                     onFocus={() => setShowSupplierDropdown(true)}
-                    placeholder="T├¼m kiß║┐m v├á chß╗ìn mß╗Öt nh├á cung cß║Ñp"
+                    placeholder="Tìm kiếm và chọn một nhà cung cấp"
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                   />
                   {supplierSearchTerm && (
@@ -390,7 +390,7 @@ const EditReceiptModal: React.FC<{
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
-                      Γ£ò
+                      ✕
                     </button>
                   )}
                   {/* Supplier Dropdown */}
@@ -439,7 +439,7 @@ const EditReceiptModal: React.FC<{
                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                     />
                   </svg>
-                  Chß╗ënh sß╗¡a
+                  Chỉnh sửa
                 </button>
                 <button
                   type="button"
@@ -447,7 +447,7 @@ const EditReceiptModal: React.FC<{
                   className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2"
                 >
                   <span className="text-xl">+</span>
-                  Th├¬m mß╗¢i
+                  Thêm mới
                 </button>
               </div>
             </div>
@@ -457,7 +457,7 @@ const EditReceiptModal: React.FC<{
               {/* Mobile Header V3 */}
               <div className="sm:hidden flex justify-between items-center mb-4">
                 <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Sß║ún phß║⌐m ({items.length})
+                  Sản phẩm ({items.length})
                 </div>
                 <button
                   type="button"
@@ -467,14 +467,14 @@ const EditReceiptModal: React.FC<{
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Th├¬m
+                  Thêm
                 </button>
               </div>
 
               {/* Desktop Header */}
               <div className="hidden sm:flex justify-between items-center mb-2">
                 <label className="block text-base font-medium text-teal-600 dark:text-teal-400">
-                  Chi tiß║┐t sß║ún phß║⌐m nhß║¡p kho:
+                  Chi tiết sản phẩm nhập kho:
                 </label>
                 <button
                   type="button"
@@ -482,7 +482,7 @@ const EditReceiptModal: React.FC<{
                   className="text-sm text-teal-600 hover:text-teal-700 dark:text-teal-400 flex items-center gap-1"
                 >
                   <span className="text-lg">+</span>
-                  Th├¬m sß║ún phß║⌐m
+                  Thêm sản phẩm
                 </button>
               </div>
 
@@ -495,16 +495,16 @@ const EditReceiptModal: React.FC<{
                         -
                       </th>
                       <th className="px-3 py-2 text-left text-sm font-medium text-slate-700 dark:text-slate-300">
-                        T├¬n
+                        Tên
                       </th>
                       <th className="px-3 py-2 text-center text-sm font-medium text-slate-700 dark:text-slate-300">
                         SL
                       </th>
                       <th className="px-3 py-2 text-right text-sm font-medium text-slate-700 dark:text-slate-300">
-                        ─É╞ín gi├í nhß║¡p
+                        Đơn giá nhập
                       </th>
                       <th className="px-3 py-2 text-right text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Th├ánh tiß╗ün
+                        Thành tiền
                       </th>
                       <th className="px-3 py-2 text-center text-sm font-medium text-slate-700 dark:text-slate-300 w-20"></th>
                     </tr>
@@ -558,7 +558,7 @@ const EditReceiptModal: React.FC<{
                               type="button"
                               onClick={() => handleEditItem(index)}
                               className="p-1 text-blue-400 hover:bg-blue-500/20 rounded"
-                              title="Chß╗ënh sß╗¡a"
+                              title="Chỉnh sửa"
                             >
                               <svg
                                 className="w-4 h-4"
@@ -578,7 +578,7 @@ const EditReceiptModal: React.FC<{
                               type="button"
                               onClick={() => handleItemMenu(index)}
                               className="p-1 text-slate-400 hover:bg-slate-500/20 rounded"
-                              title="X├│a sß║ún phß║⌐m"
+                              title="Xóa sản phẩm"
                             >
                               <svg
                                 className="w-4 h-4"
@@ -605,7 +605,7 @@ const EditReceiptModal: React.FC<{
                         colSpan={4}
                         className="px-3 py-2 text-right font-bold text-slate-900 dark:text-slate-100"
                       >
-                        Tß╗öNG:
+                        TỔNG:
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-slate-900 dark:text-slate-100">
                         {formatCurrency(totalAmount)}
@@ -649,7 +649,7 @@ const EditReceiptModal: React.FC<{
                       {/* Quantity */}
                       <div className="col-span-4">
                         <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5 block">
-                          Sß╗æ l╞░ß╗úng
+                          Số lượng
                         </label>
                         <input
                           type="number"
@@ -665,7 +665,7 @@ const EditReceiptModal: React.FC<{
                       {/* Price */}
                       <div className="col-span-8">
                         <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5 block">
-                          ─É╞ín gi├í
+                          Đơn giá
                         </label>
                         <FormattedNumberInput
                           value={item.unitPrice}
@@ -678,7 +678,7 @@ const EditReceiptModal: React.FC<{
                     {/* Footer: Total Badge */}
                     <div className="mt-4 flex justify-end">
                       <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 px-4 py-2 rounded-full">
-                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Th├ánh tiß╗ün</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Thành tiền</span>
                         <span className="text-base font-black text-blue-600 dark:text-blue-400">
                           {formatCurrency(item.totalPrice)}
                         </span>
@@ -692,14 +692,14 @@ const EditReceiptModal: React.FC<{
                   <div className="flex justify-between items-center">
                     <div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-1">
-                        Tß╗òng cß╗Öng
+                        Tổng cộng
                       </div>
                       <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
                         {formatCurrency(totalAmount)}
                       </div>
                     </div>
                     <div className={`px-3 py-1.5 rounded-full text-xs font-bold ${isPaid ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
-                      {isPaid ? "Γ£ô ─É├ú thanh to├ín" : "Ch╞░a thanh to├ín"}
+                      {isPaid ? "✓ Đã thanh toán" : "Chưa thanh toán"}
                     </div>
                   </div>
                 </div>
@@ -709,13 +709,13 @@ const EditReceiptModal: React.FC<{
             {/* Payment Section (Desktop Only or Simplified Mobile) */}
             <div className="hidden sm:block border border-slate-300 dark:border-slate-600 rounded-lg p-4">
               <label className="block text-base font-medium text-teal-600 dark:text-teal-400 mb-3">
-                C├┤ng nß╗ú:
+                Công nợ:
               </label>
 
               {/* Total Payment */}
               <div className="flex items-center justify-between mb-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                 <span className="text-lg font-bold text-red-600 dark:text-red-400">
-                  Tß╗öNG PHß║óI CHI: {formatCurrency(totalAmount)}
+                  TỔNG PHẢI CHI: {formatCurrency(totalAmount)}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
@@ -732,7 +732,7 @@ const EditReceiptModal: React.FC<{
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    ─É├ú thanh to├ín ─æß╗º
+                    Đã thanh toán đủ
                   </span>
 
                 </div>
@@ -753,7 +753,7 @@ const EditReceiptModal: React.FC<{
                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                Tß╗òng phß║úi chi l├á ph├¡ ch╞░a phß║úi trß║ú cho ─æß╗æi t├íc sß╗¡a chß╗»a
+                Tổng phải chi là phí chưa phải trả cho đối tác sửa chữa
               </div>
 
               {/* Payment History Table */}
@@ -764,13 +764,13 @@ const EditReceiptModal: React.FC<{
                       -
                     </th>
                     <th className="px-2 py-2 text-left text-slate-700 dark:text-slate-300">
-                      Thß╗¥i gian
+                      Thời gian
                     </th>
                     <th className="px-2 py-2 text-left text-slate-700 dark:text-slate-300">
-                      Ng╞░ß╗¥i chi - Ghi ch├║
+                      Người chi - Ghi chú
                     </th>
                     <th className="px-2 py-2 text-right text-slate-700 dark:text-slate-300">
-                      Sß╗æ tiß╗ün
+                      Số tiền
                     </th>
                   </tr>
                 </thead>
@@ -811,7 +811,7 @@ const EditReceiptModal: React.FC<{
                       colSpan={3}
                       className="px-2 py-2 text-right font-bold text-slate-900 dark:text-slate-100"
                     >
-                      Tß╗òng ─æ├ú chi
+                      Tổng đã chi
                     </td>
                     <td className="px-2 py-2 text-right font-bold text-slate-900 dark:text-slate-100">
                       {formatCurrency(totalPaid)}
@@ -835,10 +835,10 @@ const EditReceiptModal: React.FC<{
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span>─ÉANG L╞»U...</span>
+                  <span>ĐANG LƯU...</span>
                 </>
               ) : (
-                <span>L╞»U THAY ─Éß╗öI</span>
+                <span>LƯU THAY ĐỔI</span>
               )}
             </button>
           </div >
@@ -850,7 +850,7 @@ const EditReceiptModal: React.FC<{
               onClick={onClose}
               className="px-6 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
             >
-              ─É├ôNG
+              ĐÓNG
             </button>
             <button
               type="submit"
@@ -863,7 +863,7 @@ const EditReceiptModal: React.FC<{
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              L╞»U
+              LƯU
             </button>
           </div >
         </form >

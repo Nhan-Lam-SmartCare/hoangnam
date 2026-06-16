@@ -67,12 +67,12 @@ import CreatePOModal from "../purchase-orders/CreatePOModal";
 import { PODetailView } from "../purchase-orders/PODetailView";
 import { ExternalDataImport } from "../inventory/ExternalDataImport";
 import type { PurchaseOrder } from "../../types";
-import EditReceiptModal from "../inventory/components/EditReceiptModal";
+import EditReceiptModal from "./modals/EditReceiptModal";
 // Extracted modals
 import GoodsReceiptMobileWrapper from "./modals/GoodsReceiptMobileWrapper";
 import GoodsReceiptModal from "./modals/GoodsReceiptModal";
 import InventoryHistorySection from "./InventoryHistorySection";
-import ImportInventoryModal from "./components/ImportInventoryModal";
+import ImportInventoryModal from "./modals/ImportInventoryModal";
 import EditPartModal from "./modals/EditPartModal";
 
 const LOW_STOCK_THRESHOLD = 5;

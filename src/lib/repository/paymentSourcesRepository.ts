@@ -33,37 +33,19 @@ export async function updatePaymentSourceBalance(
   delta: number
 ): Promise<RepoResult<PaymentSource>> {
   try {
-    // Fetch current row
-    const { data: current, error: fetchErr } = await supabase
-      .from(TABLE)
-      .select("*")
-      .eq("id", id)
-      .single();
-    if (fetchErr || !current)
-      return failure({
-        code: "supabase",
-        message: "Không tìm thấy nguồn tiền",
-        cause: fetchErr,
-      });
+    const { data, error } = await supabase.rpc("adjust_payment_source_balance_atomic", {
+      p_source_id: id,
+      p_branch_id: branchId,
+      p_delta: delta,
+    });
 
-    const balance = current.balance || {};
-    const newBalance = {
-      ...balance,
-      [branchId]: (balance[branchId] || 0) + delta,
-    };
-
-    const { data, error } = await supabase
-      .from(TABLE)
-      .update({ balance: newBalance })
-      .eq("id", id)
-      .select()
-      .single();
     if (error || !data)
       return failure({
         code: "supabase",
         message: "Cập nhật số dư thất bại",
         cause: error,
       });
+
     // Audit balance adjustment
     let userId: string | null = null;
     try {

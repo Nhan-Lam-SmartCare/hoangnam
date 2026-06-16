@@ -15,7 +15,7 @@ import {
   Printer,
 } from 'lucide-react';
 import ConfirmModal from '../common/ConfirmModal';
-import EditReceiptModal from './components/EditReceiptModal';
+import EditReceiptModal from './modals/EditReceiptModal';
 import BatchPrintBarcodeModal from './BatchPrintBarcodeModal';
 import { InventoryTransaction, Part } from '../../types';
 
@@ -1006,7 +1006,7 @@ const InventoryHistorySection: React.FC<{
         <EditReceiptModal
           receipt={editingReceipt}
           onClose={() => setEditingReceipt(null)}
-          onSave={async (updatedData) => {
+          onSave={async (updatedData: any) => {
             try {
               // Track original item IDs to detect deletions
               const originalItemIds = new Set(

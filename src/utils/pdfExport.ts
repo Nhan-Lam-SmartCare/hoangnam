@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatCurrency } from "./format";
-import { Part, Sale, InventoryTransaction } from "../types";
+import { formatCurrency, formatDate, formatWorkOrderId } from "./format";
+import { Part, Sale, InventoryTransaction, WorkOrder } from "../types";
 
 // Add font support for Vietnamese (using default fonts)
 const addHeader = (doc: jsPDF, title: string, subtitle?: string) => {
@@ -465,4 +465,65 @@ export const exportLowStockReport = (
 
   addFooter(doc);
   doc.save(`CanhBao_TonKho_${new Date().toISOString().slice(0, 10)}.pdf`);
+};
+
+export const exportWorkOrdersPdf = (
+  orders: WorkOrder[],
+  prefix?: string
+) => {
+  const doc = new jsPDF();
+  const startY = addHeader(
+    doc,
+    "BÁO CÁO PHIẾU SỬA CHỮA",
+    `Tổng số phiếu: ${orders.length}`
+  );
+
+  const tableData = orders.map((order) => {
+    const formattedId = formatWorkOrderId(order.id, prefix) || "";
+    const creationDate = formatDate(order.creationDate, true);
+    const customerName = order.customerName || "";
+    const vehicleModel = order.vehicleModel || "";
+    const licensePlate = order.licensePlate || "";
+    
+    const partsTotal = order.partsUsed?.reduce((sum, p) => sum + (p.quantity * p.price), 0) || 0;
+    const servicesTotal = order.additionalServices?.reduce((sum, s) => sum + ((s.price || 0) * (s.quantity || 1)), 0) || 0;
+    const laborCost = order.laborCost || 0;
+    const total = order.total || (partsTotal + servicesTotal + laborCost - (order.discount || 0));
+
+    const status = order.status || "";
+    const paymentStatus = order.paymentStatus === "paid" 
+      ? "Đã TT" 
+      : order.paymentStatus === "partial" 
+        ? "Còn nợ" 
+        : "Chưa TT";
+
+    return [
+      formattedId,
+      creationDate,
+      customerName,
+      `${vehicleModel}${licensePlate ? ` (${licensePlate})` : ""}`,
+      formatCurrency(total),
+      `${status} (${paymentStatus})`,
+    ];
+  });
+
+  autoTable(doc, {
+    startY,
+    head: [["Mã Phiếu", "Ngày tạo", "Khách hàng", "Thiết bị/Xe", "Tổng cộng", "Trạng thái"]],
+    body: tableData,
+    theme: "striped",
+    headStyles: { fillColor: [59, 130, 246] },
+    styles: { fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 20 },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 40 },
+      3: { cellWidth: 48 },
+      4: { cellWidth: 32, halign: "right" },
+      5: { cellWidth: 28, halign: "center" },
+    },
+  });
+
+  addFooter(doc);
+  doc.save(`BaoCao_PhieuSuaChua_${new Date().toISOString().slice(0, 10)}.pdf`);
 };

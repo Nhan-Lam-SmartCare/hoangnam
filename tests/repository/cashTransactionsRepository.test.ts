@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as client from "../../src/supabaseClient";
 import {
   fetchCashTransactions,
@@ -9,8 +9,14 @@ import {
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 const mockInsert = vi.fn();
+const mockAuth = {
+  getUser: vi.fn(),
+};
 
-vi.spyOn(client, "supabase", "get").mockReturnValue({ from: mockFrom } as any);
+vi.spyOn(client, "supabase", "get").mockReturnValue({
+  from: mockFrom,
+  auth: mockAuth,
+} as any);
 
 function makeOrderedQuery(data: any = [], error: any = null) {
   return {
@@ -45,15 +51,20 @@ mockFrom.mockImplementation((table: string) => {
   } as any;
 });
 
-// Success defaults
-mockSelect.mockImplementation((_table: string) => makeSelectResult([], null));
-mockInsert.mockImplementation((_table: string, _rows: any[]) => ({ error: null }));
-
-function injectSelectErrorOnce(errorMsg: string) {
-  mockSelect.mockImplementationOnce((_table: string) =>
-    makeSelectResult(null, { message: errorMsg })
-  );
-}
+beforeEach(() => {
+  mockSelect.mockImplementation((_table: string) => makeSelectResult([], null));
+  mockInsert.mockImplementation((_table: string, _rows: any[]) => ({ error: null }));
+  mockAuth.getUser.mockResolvedValue({
+    data: {
+      user: {
+        id: "test-user-id",
+        email: "test@example.com",
+        user_metadata: { name: "Test User" },
+      },
+    },
+    error: null,
+  });
+});
 
 describe("cashTransactionsRepository", () => {
   it("fetchCashTransactions success", async () => {
@@ -75,7 +86,9 @@ describe("cashTransactionsRepository", () => {
   });
 
   it("fetchCashTransactions supabase error", async () => {
-    injectSelectErrorOnce("DB error");
+    mockSelect.mockImplementation((_table: string) =>
+      makeSelectResult(null, { message: "DB error" })
+    );
     const res = await fetchCashTransactions();
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error.code).toBe("supabase");

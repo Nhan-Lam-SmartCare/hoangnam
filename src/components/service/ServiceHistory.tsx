@@ -19,8 +19,9 @@ import type { WorkOrder, WorkOrderPart } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { WORK_ORDER_STATUS } from "../../constants";
 import { useWorkOrdersRepo } from "../../hooks/useWorkOrdersRepository";
-import { usePrinter } from "../../hooks/usePrinter";
+import { useWorkOrderPrinter } from "./hooks/useWorkOrderPrinter";
 import PrintOrderPreviewModal from "./modals/PrintOrderPreviewModal";
+import { WorkOrderReceiptTemplate } from "./components/WorkOrderReceiptTemplate";
 import {
   fetchStoreSettingsForBranch,
   sanitizeIssueDescriptionForPrint,
@@ -51,7 +52,15 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
   const { data: fetchedWorkOrders } = useWorkOrdersRepo();
   const workOrders = fetchedWorkOrders || contextWorkOrders;
   const navigate = useNavigate();
-  const { isNative, printViaWiFi, printViaBluetooth } = usePrinter();
+  
+  const {
+    printOrder,
+    showPrintPreview,
+    storeSettings: printerStoreSettings,
+    handlePrintOrder,
+    handleDoPrint,
+    closePrintPreview,
+  } = useWorkOrderPrinter(currentBranchId);
 
   // Sync fetched work orders to context
   useEffect(() => {
@@ -80,9 +89,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
   const [customDateEnd, setCustomDateEnd] = useState("");
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
 
-  // State for print preview modal
-  const [printOrder, setPrintOrder] = useState<WorkOrder | null>(null);
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  // Store settings local state for other parts of the page (loaded on mount)
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(
     null
   );
@@ -334,176 +341,40 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
     0
   );
 
-  const exportToCSV = () => {
-    const headers = [
-      "Mã Phiếu",
-      "Ngày tạo",
-      "Khách hàng",
-      "Thiết bị",
-      "Serial/IMEI",
-      "Trạng thái",
-      "Tổng chi phí",
-    ];
-    const csvContent = [
-      headers.join(","),
-      ...filteredOrders.map((order) =>
-        [
-          formatWorkOrderId(order.id, storeSettings?.work_order_prefix) || "",
-          formatDate(order.creationDate, true),
-          order.customerName || "",
-          order.vehicleModel || "",
-          order.licensePlate || "",
-          order.status || "",
-          order.total?.toString() || "0",
-        ].join(",")
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute(
-        "download",
-        `lich-su-sua-chua-${new Date().toISOString().split("T")[0]}.csv`
-      );
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  const handleExportExcel = async () => {
+    if (filteredOrders.length === 0) {
+      showToast.warning("Không có phiếu nào để xuất.");
+      return;
+    }
+    try {
+      const { exportWorkOrdersReport } = await import("../../utils/excelExport");
+      exportWorkOrdersReport(filteredOrders, storeSettings?.work_order_prefix);
+      showToast.success("Đã xuất báo cáo Excel.");
+    } catch (err) {
+      console.error("Failed to export Excel report:", err);
+      showToast.error("Xuất Excel thất bại.");
     }
   };
 
-  // Handle print work order - show preview modal
-  const handlePrintOrder = (order: WorkOrder) => {
-    setPrintOrder(order);
-    setShowPrintPreview(true);
+  const handleExportPdf = async () => {
+    if (filteredOrders.length === 0) {
+      showToast.warning("Không có phiếu nào để xuất.");
+      return;
+    }
+    try {
+      const { exportWorkOrdersPdf } = await import("../../utils/pdfExport");
+      exportWorkOrdersPdf(filteredOrders, storeSettings?.work_order_prefix);
+      showToast.success("Đã xuất báo cáo PDF.");
+    } catch (err) {
+      console.error("Failed to export PDF report:", err);
+      showToast.error("Xuất PDF thất bại.");
+    }
   };
 
   // Handle edit work order - navigate to service page with order data
   const handleEditOrder = (order: WorkOrder) => {
     // Navigate to service manager with order ID in state
     navigate("/service", { state: { editOrder: order } });
-  };
-
-  const generateWorkOrderTextReceipt = (order: WorkOrder, settings: StoreSettings | null) => {
-    const line = "--------------------------------";
-    const doubleLine = "================================";
-    const now = new Date(order.creationDate).toLocaleString("vi-VN");
-    const prefix = settings?.work_order_prefix || "SC";
-    const formattedId = `${prefix}-${String(order.id).padStart(5, '0')}`;
-
-    let partLines = "";
-    if (order.partsUsed && order.partsUsed.length > 0) {
-      partLines += `Phu tung:\n`;
-      order.partsUsed.forEach((p) => {
-        partLines += `- ${p.partName}\n`;
-        const qtyPrice = `  ${p.quantity} x ${formatCurrency(p.price)}`;
-        const totalP = formatCurrency(p.quantity * p.price);
-        const spacesCount = 32 - qtyPrice.length - totalP.length;
-        const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
-        partLines += `${qtyPrice}${spaces}${totalP}\n`;
-      });
-    }
-
-    let serviceLines = "";
-    if (order.additionalServices && order.additionalServices.length > 0) {
-      serviceLines += `Dich vu:\n`;
-      order.additionalServices.forEach((s) => {
-        serviceLines += `- ${s.description || ""}\n`;
-        const qtyPrice = `  ${s.quantity || 1} x ${formatCurrency(s.price)}`;
-        const totalS = formatCurrency((s.price || 0) * (s.quantity || 1));
-        const spacesCount = 32 - qtyPrice.length - totalS.length;
-        const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
-        serviceLines += `${qtyPrice}${spaces}${totalS}\n`;
-      });
-    }
-
-    const partsTotal = order.partsUsed?.reduce((sum, p) => sum + p.quantity * p.price, 0) || 0;
-    const servicesTotal = order.additionalServices?.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0) || 0;
-    const laborCost = order.laborCost || 0;
-    const grandTotal = order.total || (partsTotal + servicesTotal + laborCost);
-
-    const partsStr = formatCurrency(partsTotal);
-    const servicesStr = formatCurrency(servicesTotal);
-    const laborStr = formatCurrency(laborCost);
-    const grandTotalStr = formatCurrency(grandTotal);
-
-    const partsLine = `Tien phu tung:${" ".repeat(Math.max(1, 32 - 14 - partsStr.length))}${partsStr}`;
-    const servicesLine = `Tien dich vu:${" ".repeat(Math.max(1, 32 - 13 - servicesStr.length))}${servicesStr}`;
-    const laborLine = `Tien cong:${" ".repeat(Math.max(1, 32 - 10 - laborStr.length))}${laborStr}`;
-    const totalLine = `Tong cong:${" ".repeat(Math.max(1, 32 - 10 - grandTotalStr.length))}${grandTotalStr}`;
-
-    return `
-================================
-         MOTOCARE PRO
-================================
-PHIEU DICH VU SUA CHUA
-Ngay: ${now}
-Ma phieu: ${formattedId}
-${doubleLine}
-Khach hang: ${order.customerName}
-SDT: ${order.customerPhone}
-Thiet bi: ${order.vehicleModel}
-Bien so: ${order.licensePlate}
-${doubleLine}
-Noi dung: ${order.issueDescription || "Sua chua xe"}
-${line}
-${partLines}${serviceLines}${line}
-${partsLine}
-${servicesLine}
-${laborLine}
-${totalLine}
-${doubleLine}
-KTV: ${order.technicianName || "Chua phan cong"}
-Trang thai: ${order.status}
-${doubleLine}
-Cam on quy khach da tin tuong!
-================================
-\n\n\n\n`;
-  };
-
-  // Handle actual print
-  const handleDoPrint = async () => {
-    const printMode = localStorage.getItem("motocare_print_mode") || "wifi";
-
-    if (isNative && printMode === "bluetooth") {
-      if (!printOrder) {
-        showToast.error("Không có thông tin hóa đơn sửa chữa.");
-        return;
-      }
-      const text = generateWorkOrderTextReceipt(printOrder, storeSettings);
-      await printViaBluetooth(text);
-    } else {
-      setTimeout(async () => {
-        const receiptElement = document.getElementById("work-order-receipt");
-        if (!receiptElement) {
-          showToast.error("Không tìm thấy mẫu in hóa đơn.");
-          return;
-        }
-
-        const html = `
-          <html>
-            <head>
-              <meta charset="utf-8" />
-              <title>Phiếu sửa chữa</title>
-              <style>
-                body { margin: 0; padding: 10px; font-family: sans-serif; }
-                @media print {
-                  body { padding: 0; }
-                }
-              </style>
-            </head>
-            <body>
-              ${receiptElement.innerHTML}
-            </body>
-          </html>
-        `;
-
-        await printViaWiFi(html);
-      }, 500);
-    }
   };
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -586,13 +457,20 @@ Cam on quy khach da tin tuong!
           </div>
         </div>
 
-        <div className="col-span-2 md:col-span-1 bg-white dark:bg-slate-800 rounded-xl p-3 md:p-4 border border-slate-200 dark:border-slate-700">
+        <div className="col-span-2 md:col-span-1 bg-white dark:bg-slate-800 rounded-xl p-3 md:p-4 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
           <button
-            onClick={exportToCSV}
+            onClick={handleExportExcel}
             className="w-full px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
           >
             <Download className="w-4 h-4" />
             Xuất Excel
+          </button>
+          <button
+            onClick={handleExportPdf}
+            className="w-full px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Xuất PDF
           </button>
         </div>
       </div>
@@ -1293,696 +1171,19 @@ Cam on quy khach da tin tuong!
       {/* Print Preview Modal - Mobile optimized */}
       <PrintOrderPreviewModal
         isOpen={showPrintPreview}
-        onClose={() => {
-          setShowPrintPreview(false);
-          setPrintOrder(null);
-        }}
+        onClose={closePrintPreview}
         printOrder={printOrder}
-        storeSettings={storeSettings || undefined}
+        storeSettings={printerStoreSettings || storeSettings || undefined}
         onPrint={handleDoPrint}
       />
 
       {/* Hidden Print Template */}
       {printOrder && (
-        <div
+        <WorkOrderReceiptTemplate
           id="work-order-receipt"
-          className="hidden print:block"
-          style={{
-            width: "80mm",
-            margin: "0 auto",
-            padding: "3mm",
-            fontFamily: "Arial, sans-serif",
-            fontSize: "9pt",
-            color: "#000",
-            backgroundColor: "#fff",
-          }}
-        >
-          {/* Header with Logo, Store Info and Bank Info */}
-          <div
-            style={{
-              borderBottom: "2px solid #3b82f6",
-              paddingBottom: "3mm",
-              marginBottom: "4mm",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                textAlign: "center",
-                gap: "1.8mm",
-                marginBottom: storeSettings?.bank_name ? "3.5mm" : "0",
-              }}
-            >
-              {storeSettings?.logo_url && (
-                <div
-                  style={{
-                    width: "19mm",
-                    height: "19mm",
-                    borderRadius: "999px",
-                    border: "1px solid #bfdbfe",
-                    background:
-                      "linear-gradient(180deg, #ffffff 0%, #eff6ff 100%)",
-                    boxShadow: "0 1.5mm 3mm rgba(37, 99, 235, 0.12)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "2mm",
-                  }}
-                >
-                  <img
-                    src={storeSettings.logo_url}
-                    alt="Logo"
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
-              )}
-              <div
-                style={{
-                  fontWeight: "bold",
-                  fontSize: "14pt",
-                  lineHeight: "1.15",
-                  color: "#1d4ed8",
-                  letterSpacing: "0.15mm",
-                  maxWidth: "100%",
-                }}
-              >
-                {storeSettings?.store_name || "S?N NAM"}
-              </div>
-              <div
-                style={{
-                  fontSize: "8.5pt",
-                  lineHeight: "1.45",
-                  color: "#334155",
-                  maxWidth: "94%",
-                }}
-              >
-                {storeSettings?.address ||
-                  "?p Ph? L?i B, X? Long Ph? Thu?n, ??ng Th?p"}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "1.6mm",
-                  fontSize: "8.5pt",
-                  fontWeight: "bold",
-                  color: "#0f172a",
-                  padding: "1.2mm 3mm",
-                  borderRadius: "999px",
-                  border: "1px solid #bfdbfe",
-                  backgroundColor: "#eff6ff",
-                }}
-              >
-                <span style={{ color: "#2563eb" }}>Hotline</span>
-                <span>{storeSettings?.phone || "0947.747.907"}</span>
-              </div>
-            </div>
-            {storeSettings?.bank_name && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "3mm",
-                  width: "100%",
-                  border: "1px solid #93c5fd",
-                  borderRadius: "3.5mm",
-                  padding: "2.8mm 3mm",
-                  background:
-                    "linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%)",
-                  boxShadow: "inset 0 0 0 0.3mm rgba(255, 255, 255, 0.65)",
-                }}
-              >
-                {storeSettings.bank_qr_url && (
-                  <div
-                    style={{
-                      width: "20mm",
-                      height: "20mm",
-                      borderRadius: "2.5mm",
-                      overflow: "hidden",
-                      border: "1px solid #bfdbfe",
-                      backgroundColor: "#ffffff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <img
-                      src={storeSettings.bank_qr_url}
-                      alt="QR Banking"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                      }}
-                    />
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0, color: "#0f172a" }}>
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      fontSize: "8.8pt",
-                      marginBottom: "1mm",
-                      color: "#1e3a8a",
-                    }}
-                  >
-                    {storeSettings.bank_name}
-                  </div>
-                  {storeSettings.bank_account_number && (
-                    <div style={{ fontSize: "8pt", marginBottom: "0.6mm" }}>
-                      STK: {storeSettings.bank_account_number}
-                    </div>
-                  )}
-                  {storeSettings.bank_account_holder && (
-                    <div style={{ fontSize: "8pt", fontWeight: 600 }}>
-                      {storeSettings.bank_account_holder}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Title & Meta */}
-          <div style={{ marginBottom: "4mm" }}>
-            <div style={{ textAlign: "center", marginBottom: "2mm" }}>
-              <h1
-                style={{
-                  fontSize: "13pt",
-                  fontWeight: "bold",
-                  margin: "0",
-                  textTransform: "uppercase",
-                  color: "#1e40af",
-                  lineHeight: 1.25,
-                }}
-              >
-                PHIẾU DỊCH VỤ SỬA CHỮA
-              </h1>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: "2mm",
-                fontSize: "8.5pt",
-                color: "#666",
-              }}
-            >
-              <div>
-                {new Date(printOrder.creationDate).toLocaleString("vi-VN", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-              <div style={{ fontWeight: "bold" }}>
-                Mã:{" "}
-                {formatWorkOrderId(
-                  printOrder.id,
-                  storeSettings?.work_order_prefix
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Customer Info */}
-          <div
-            style={{
-              border: "1px solid #ddd",
-              padding: "3mm",
-              marginBottom: "4mm",
-              borderRadius: "2mm",
-            }}
-          >
-            <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
-              <span style={{ fontWeight: "bold" }}>Khách hàng:</span> {printOrder.customerName}
-            </div>
-            <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
-              <span style={{ fontWeight: "bold" }}>SĐT:</span> {printOrder.customerPhone}
-            </div>
-            <div style={{ marginBottom: "1.2mm", wordBreak: "break-word" }}>
-              <span style={{ fontWeight: "bold" }}>Thiết bị:</span> {printOrder.vehicleModel}
-            </div>
-            <div style={{ wordBreak: "break-word" }}>
-              <span style={{ fontWeight: "bold" }}>Serial/IMEI:</span> {printOrder.licensePlate}
-            </div>
-          </div>
-
-          {/* Issue Description */}
-          <div
-            style={{
-              border: "1px solid #ddd",
-              padding: "3mm",
-              marginBottom: "4mm",
-              borderRadius: "2mm",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: "1.5mm" }}>
-              Mô tả sự cố:
-            </div>
-            <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-              {printableIssueDescription}
-            </div>
-          </div>
-
-          {/* Parts Table */}
-          {printOrder.partsUsed && printOrder.partsUsed.length > 0 && (
-            <div style={{ marginBottom: "4mm" }}>
-              <p
-                style={{
-                  fontWeight: "bold",
-                  margin: "0 0 2mm 0",
-                  fontSize: "11pt",
-                }}
-              >
-                Phụ tùng sử dụng:
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "2mm" }}>
-                {printOrder.partsUsed.map((part: WorkOrderPart, idx: number) => (
-                  <div
-                    key={idx}
-                    style={{
-                      border: "1px solid #ddd",
-                      borderRadius: "2mm",
-                      padding: "2.5mm",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "10pt",
-                        fontWeight: "bold",
-                        marginBottom: "1mm",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {part.partName}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "baseline",
-                        gap: "2mm",
-                        fontSize: "9pt",
-                        color: "#374151",
-                      }}
-                    >
-                      <div>
-                        SL: {part.quantity} x {formatCurrency(part.price)}
-                      </div>
-                      <div style={{ fontWeight: "bold", color: "#111827", whiteSpace: "nowrap" }}>
-                        {formatCurrency(part.price * part.quantity)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Additional Services */}
-          {printOrder.additionalServices &&
-            printOrder.additionalServices.length > 0 && (
-              <div style={{ marginBottom: "4mm" }}>
-                <p
-                  style={{
-                    fontWeight: "bold",
-                    margin: "0 0 2mm 0",
-                    fontSize: "11pt",
-                  }}
-                >
-                  Dịch vụ bổ sung:
-                </p>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: "#f5f5f5" }}>
-                      <th
-                        style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "left",
-                          fontSize: "10pt",
-                        }}
-                      >
-                        Tên dịch vụ
-                      </th>
-                      <th
-                        style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "center",
-                          fontSize: "10pt",
-                          width: "15%",
-                        }}
-                      >
-                        SL
-                      </th>
-                      <th
-                        style={{
-                          border: "1px solid #ddd",
-                          padding: "2mm",
-                          textAlign: "right",
-                          fontSize: "10pt",
-                          width: "25%",
-                        }}
-                      >
-                        Thành tiền
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printOrder.additionalServices.map((service, idx) => (
-                      <tr key={idx}>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            fontSize: "10pt",
-                          }}
-                        >
-                          {service.description}
-                        </td>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            textAlign: "center",
-                            fontSize: "10pt",
-                          }}
-                        >
-                          {service.quantity || 1}
-                        </td>
-                        <td
-                          style={{
-                            border: "1px solid #ddd",
-                            padding: "2mm",
-                            textAlign: "right",
-                            fontSize: "10pt",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {formatCurrency((service.price || 0) * (service.quantity || 1))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-          {/* Cost Summary - Only show items > 0 */}
-          <div
-            style={{
-              border: "1px solid #ddd",
-              padding: "4mm",
-              marginBottom: "4mm",
-              borderRadius: "2mm",
-              backgroundColor: "#f9f9f9",
-            }}
-          >
-            <table style={{ width: "100%", borderSpacing: "0" }}>
-              <tbody>
-                {/* Tiền phụ tùng - chỉ hiển thị khi > 0 */}
-                {(() => {
-                  const partsTotal = printOrder.partsUsed?.reduce(
-                    (sum: number, p: WorkOrderPart) => sum + p.price * p.quantity,
-                    0
-                  ) || 0;
-                  return partsTotal > 0 && (
-                    <tr>
-                      <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                        Tiền phụ tùng:
-                      </td>
-                      <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
-                        {formatCurrency(partsTotal)}
-                      </td>
-                    </tr>
-                  );
-                })()}
-
-                {/* Phí dịch vụ (laborCost) - chỉ hiển thị khi > 0 */}
-                {(printOrder.laborCost ?? 0) > 0 && (
-                  <tr>
-                    <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                      Phí dịch vụ:
-                    </td>
-                    <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
-                      {formatCurrency(printOrder.laborCost || 0)}
-                    </td>
-                  </tr>
-                )}
-
-                {/* Giá công/Đặt hàng - chỉ hiển thị khi > 0 */}
-                {(() => {
-                  const additionalTotal = printOrder.additionalServices?.reduce(
-                    (sum: number, s: any) => sum + (s.price || 0) * (s.quantity || 1),
-                    0
-                  ) || 0;
-                  return additionalTotal > 0 && (
-                    <tr>
-                      <td style={{ fontWeight: "bold", paddingBottom: "2mm", fontSize: "10pt" }}>
-                        Giá công/Đặt hàng:
-                      </td>
-                      <td style={{ textAlign: "right", paddingBottom: "2mm", fontSize: "10pt" }}>
-                        {formatCurrency(additionalTotal)}
-                      </td>
-                    </tr>
-                  );
-                })()}
-
-                {/* Dịch vụ bổ sung aggregated above as Giá công/Đặt hàng */}
-                {printOrder.discount != null && printOrder.discount > 0 && (
-                  <tr>
-                    <td
-                      style={{
-                        fontWeight: "bold",
-                        paddingBottom: "2mm",
-                        fontSize: "10pt",
-                        color: "#e74c3c",
-                      }}
-                    >
-                      Giảm giá:
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        paddingBottom: "2mm",
-                        fontSize: "10pt",
-                        color: "#e74c3c",
-                      }}
-                    >
-                      -{formatCurrency(printOrder.discount)}
-                    </td>
-                  </tr>
-                )}
-                <tr style={{ borderTop: "2px solid #333" }}>
-                  <td
-                    style={{
-                      fontWeight: "bold",
-                      paddingTop: "2mm",
-                      fontSize: "12pt",
-                    }}
-                  >
-                    TỔNG CỘNG:
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      paddingTop: "2mm",
-                      fontSize: "12pt",
-                      fontWeight: "bold",
-                      color: "#2563eb",
-                    }}
-                  >
-                    {formatCurrency(printOrder.total)} ₫
-                  </td>
-                </tr>
-                {printOrder.totalPaid != null && printOrder.totalPaid > 0 && (
-                  <tr>
-                    <td
-                      style={{
-                        fontWeight: "bold",
-                        paddingTop: "2mm",
-                        fontSize: "10pt",
-                        color: "#16a34a",
-                      }}
-                    >
-                      Đã thanh toán:
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        paddingTop: "2mm",
-                        fontSize: "10pt",
-                        color: "#16a34a",
-                      }}
-                    >
-                      {formatCurrency(printOrder.totalPaid)}
-                    </td>
-                  </tr>
-                )}
-                {printOrder.remainingAmount != null &&
-                  printOrder.remainingAmount > 0 && (
-                    <tr>
-                      <td
-                        style={{
-                          fontWeight: "bold",
-                          fontSize: "11pt",
-                          color: "#dc2626",
-                        }}
-                      >
-                        Còn lại:
-                      </td>
-                      <td
-                        style={{
-                          textAlign: "right",
-                          fontSize: "11pt",
-                          fontWeight: "bold",
-                          color: "#dc2626",
-                        }}
-                      >
-                        {formatCurrency(printOrder.remainingAmount)}
-                      </td>
-                    </tr>
-                  )}
-                {printOrder.paymentMethod && (
-                  <tr>
-                    <td
-                      style={{
-                        paddingTop: "2mm",
-                        fontSize: "9pt",
-                        color: "#666",
-                      }}
-                    >
-                      Hình thức thanh toán:
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        paddingTop: "2mm",
-                        fontSize: "9pt",
-                        color: "#666",
-                      }}
-                    >
-                      {printOrder.paymentMethod === "cash"
-                        ? "Tiền mặt"
-                        : printOrder.paymentMethod === "bank"
-                          ? "Chuyển khoản"
-                          : printOrder.paymentMethod}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div
-            style={{
-              marginTop: "8mm",
-              paddingTop: "4mm",
-              borderTop: "1px dashed #999",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: "10pt",
-              }}
-            >
-              <div style={{ textAlign: "center", width: "45%" }}>
-                <p style={{ fontWeight: "bold", margin: "0 0 10mm 0" }}>
-                  Khách hàng
-                </p>
-                <p style={{ margin: "0", fontSize: "9pt", color: "#666" }}>
-                  (Ký và ghi rõ họ tên)
-                </p>
-              </div>
-              <div style={{ textAlign: "center", width: "45%" }}>
-                <p style={{ fontWeight: "bold", margin: "0 0 10mm 0" }}>
-                  Nhân viên
-                </p>
-                <p style={{ margin: "0", fontSize: "9pt", color: "#666" }}>
-                  {printOrder.technicianName || "(Ký và ghi rõ họ tên)"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Note */}
-          <div
-            style={{
-              marginTop: "4mm",
-              padding: "3mm",
-              backgroundColor: "#fff9e6",
-              border: "1px solid #ffd700",
-              borderRadius: "2mm",
-              fontSize: "9pt",
-              textAlign: "center",
-            }}
-          >
-            <p style={{ margin: "0", fontStyle: "italic" }}>
-              Cảm ơn quý khách đã sử dụng dịch vụ!
-            </p>
-            <p style={{ margin: "1mm 0 0 0", fontStyle: "italic" }}>
-              Vui lòng giữ phiếu này để đối chiếu khi nhận xe
-            </p>
-          </div>
-
-          {/* Warranty Policy Disclaimer */}
-          <div
-            style={{
-              marginTop: "3mm",
-              padding: "2mm",
-              fontSize: "8pt",
-              color: "#666",
-              borderTop: "1px solid #e5e7eb",
-              lineHeight: "1.4",
-            }}
-          >
-            <p style={{ margin: "0 0 1mm 0", fontWeight: "bold" }}>
-              Chính sách bảo hành:
-            </p>
-            <ul
-              style={{
-                margin: "0",
-                paddingLeft: "5mm",
-                listStyleType: "disc",
-              }}
-            >
-              <li>
-                Bảo hành áp dụng cho phụ tùng chính hãng và lỗi kỹ thuật do thợ
-              </li>
-              <li>
-                Không bảo hành đối với va chạm, ngã xe, ngập nước sau khi nhận
-                xe
-              </li>
-              <li>
-                Mang theo phiếu này khi đến bảo hành. Liên hệ hotline nếu có
-                thắc mắc
-              </li>
-            </ul>
-          </div>
-        </div>
+          workOrder={printOrder}
+          storeSettings={printerStoreSettings || storeSettings || undefined}
+        />
       )}
     </div>
   );

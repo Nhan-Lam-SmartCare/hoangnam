@@ -7,6 +7,7 @@ const mockFrom = vi.hoisted(() => vi.fn());
 const mockGetUser = vi.hoisted(() => vi.fn());
 const mockSalesInsert = vi.hoisted(() => vi.fn());
 const mockWarrantyInsert = vi.hoisted(() => vi.fn());
+const mockRpc = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/supabaseClient", () => ({
   supabase: {
@@ -14,6 +15,7 @@ vi.mock("../../src/supabaseClient", () => ({
       getUser: mockGetUser,
     },
     from: mockFrom,
+    rpc: mockRpc,
   },
 }));
 
@@ -117,14 +119,89 @@ describe("salesRepository.createSaleAtomic compatibility", () => {
 
     mockSalesInsert.mockResolvedValue({ error: null });
     mockWarrantyInsert.mockResolvedValue({ error: null });
+    mockRpc.mockImplementation((rpcName: string, params: any) => {
+      if (rpcName === "sale_decrement_stock_atomic") {
+        return Promise.resolve({ data: { failedParts: [] }, error: null });
+      }
+      if (rpcName === "adjust_payment_source_balance_atomic") {
+        return Promise.resolve({
+          data: {
+            id: params?.p_source_id || "cash",
+            balance: { [params?.p_branch_id || "CN1"]: 185000 },
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === "sales") {
-        return { insert: mockSalesInsert };
+        return {
+          insert: mockSalesInsert,
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }),
+        };
       }
 
       if (table === "warranty_cards") {
         return { insert: mockWarrantyInsert };
+      }
+
+      if (table === "customers") {
+        const queryChain: any = {
+          select: vi.fn().mockImplementation(() => queryChain),
+          eq: vi.fn().mockImplementation(() => queryChain),
+          limit: vi.fn().mockResolvedValue({
+            data: [{ id: "CUST-1", totalspent: 0, visitcount: 0 }],
+            error: null,
+          }),
+          single: vi.fn().mockResolvedValue({
+            data: { totalspent: 0, visitcount: 0 },
+            error: null,
+          }),
+        };
+        return {
+          select: vi.fn().mockImplementation(() => queryChain),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }),
+        };
+      }
+
+      if (table === "payment_sources" || table === "paymentsources") {
+        const queryChain: any = {
+          select: vi.fn().mockImplementation(() => queryChain),
+          eq: vi.fn().mockImplementation(() => queryChain),
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          single: vi.fn().mockResolvedValue({
+            data: { id: "cash", balance: { CN1: 0 } },
+            error: null,
+          }),
+        };
+        return {
+          select: vi.fn().mockImplementation(() => queryChain),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { id: "cash", balance: { CN1: 185000 } },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === "cash_transactions") {
+        return {
+          select: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }),
+          insert: vi.fn().mockResolvedValue({ error: null }),
+        };
       }
 
       throw new Error(`Unexpected table in test: ${table}`);

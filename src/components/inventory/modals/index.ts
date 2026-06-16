@@ -5,3 +5,4 @@ export { default as GoodsReceiptModal } from './GoodsReceiptModal';
 export { default as InventoryHistoryModal } from './InventoryHistoryModal';
 export { default as ImportInventoryModal } from './ImportInventoryModal';
 export { default as EditPartModal } from './EditPartModal';
+export { default as EditReceiptModal } from './EditReceiptModal';

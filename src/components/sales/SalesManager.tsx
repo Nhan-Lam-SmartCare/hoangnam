@@ -29,7 +29,7 @@ import BarcodeScannerModal from "../common/BarcodeScannerModal";
 import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePrinter } from "../../hooks/usePrinter";
-import { fetchStoreSettingsForBranch } from "../service/utils/service.utils";
+import { fetchStoreSettingsForBranch, getDynamicQrUrl } from "../service/utils/service.utils";
 
 const getBranchStock = (part: Part, branchId: string): number => {
   const stock = Math.max(0, Number(part.stock?.[branchId] || 0));
@@ -366,6 +366,7 @@ Cam on quy khach da tin tuong!
     payment: "cash" | "bank";
     noteText?: string;
     dateValue?: string;
+    saleId?: string;
   }) => {
     const printMode = localStorage.getItem("motocare_print_mode") || "wifi";
 
@@ -373,6 +374,16 @@ Cam on quy khach da tin tuong!
       const text = generateSalesTextReceipt(payload);
       await printViaBluetooth(text);
     } else {
+      const qrUrl = getDynamicQrUrl(
+        {
+          id: payload.saleId || "DRAFT",
+          total: payload.totalValue,
+          isSale: true,
+          code: payload.saleId,
+        },
+        storeSettings
+      );
+
       const rows = payload.items
         .map(
           (it) => `
@@ -460,9 +471,9 @@ Cam on quy khach da tin tuong!
 
       ${storeSettings?.bank_name ? `
       <div style="display: flex; align-items: center; gap: 3mm; width: 100%; border: 1px solid #93c5fd; border-radius: 3.5mm; padding: 2.8mm 3mm; background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%); box-shadow: inset 0 0 0 0.3mm rgba(255, 255, 255, 0.65); text-align: left; margin-top: 2mm; box-sizing: border-box;">
-        ${storeSettings.bank_qr_url ? `
+        ${qrUrl ? `
         <div style="width: 20mm; height: 20mm; border-radius: 2.5mm; overflow: hidden; border: 1px solid #bfdbfe; background-color: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <img src="${storeSettings.bank_qr_url}" alt="QR Banking" style="width: 100%; height: 100%; object-fit: contain;" />
+          <img src="${qrUrl}" alt="QR Banking" style="width: 100%; height: 100%; object-fit: contain;" />
         </div>` : ""}
         <div style="flex: 1; min-width: 0; color: #0f172a;">
           <div style="font-weight: bold; font-size: 8.8pt; margin-bottom: 1mm; color: #1e3a8a;">${storeSettings.bank_name}</div>
@@ -480,6 +491,7 @@ Cam on quy khach da tin tuong!
     <div class="card">
       <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Ngày giờ:</span> ${new Date(payload.dateValue || Date.now()).toLocaleString("vi-VN")}</div>
       <div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Khách hàng:</span> ${escapeHtml(payload.customer.name)}${payload.customer.phone ? ` - ${escapeHtml(payload.customer.phone)}` : ""}</div>
+      ${payload.saleId ? `<div style="margin-bottom: 1.2mm;"><span style="font-weight: bold;">Mã đơn:</span> ${escapeHtml(payload.saleId)}</div>` : ""}
       <div><span style="font-weight: bold;">Thanh toán:</span> ${payload.payment === "cash" ? "Tiền mặt" : "Chuyển khoản"}</div>
     </div>
 
@@ -849,7 +861,10 @@ Cam on quy khach da tin tuong!
 
       if (result.ok) {
         if (autoPrintInvoice) {
-          printInvoice(payload);
+          printInvoice({
+            ...payload,
+            saleId: result.saleId,
+          });
         }
         showToast.success("Đã tạo phiếu bán hàng thành công.");
       }
@@ -894,6 +909,7 @@ Cam on quy khach da tin tuong!
       payment: sale.paymentMethod === "bank" ? "bank" : "cash",
       noteText: (sale as any).note || undefined,
       dateValue: sale.date,
+      saleId: sale.id,
     });
   };
 

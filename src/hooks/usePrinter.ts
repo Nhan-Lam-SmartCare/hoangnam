@@ -133,6 +133,23 @@ export const usePrinter = () => {
         showToast.info('Đang chuẩn bị trang in...');
         printWindow.document.write(html);
         printWindow.document.close();
+
+        // Đợi tất cả ảnh tải xong trước khi in để tránh mất logo/QR
+        const images = printWindow.document.getElementsByTagName('img');
+        const imagePromises = Array.from(images).map((img) => {
+          return new Promise<void>((resolve) => {
+            if (img.complete) {
+              resolve();
+            } else {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(() => resolve(), 5000); // Tối đa 5 giây
+            }
+          });
+        });
+
+        await Promise.all(imagePromises);
+
         printWindow.focus();
         printWindow.print();
         printWindow.close();

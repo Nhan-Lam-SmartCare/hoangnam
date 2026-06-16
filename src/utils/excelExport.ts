@@ -6,8 +6,9 @@ import {
   PayrollRecord,
   Customer,
   Supplier,
+  WorkOrder,
 } from "../types";
-import { formatCurrency, formatDate, formatAnyId } from "./format";
+import { formatCurrency, formatDate, formatAnyId, formatWorkOrderId } from "./format";
 import {
   formatCashTxCategory,
   getCashTxCategoryKey,
@@ -1025,5 +1026,113 @@ export const exportS1aHKD = (
     transactionCount: entries.length,
     period: periodText,
   };
+};
+
+// ==================== WORK ORDERS REPORT ====================
+export const exportWorkOrdersReport = (
+  orders: WorkOrder[],
+  prefix?: string
+) => {
+  const wb = XLSX.utils.book_new();
+
+  const headers = [
+    "Mã Phiếu",
+    "Ngày tạo",
+    "Khách hàng",
+    "SĐT",
+    "Thiết bị/Xe",
+    "Biển số/IMEI",
+    "Nội dung sửa chữa",
+    "Kỹ thuật viên",
+    "Chi phí linh kiện",
+    "Chi phí dịch vụ/công",
+    "Giảm giá",
+    "Tổng chi phí",
+    "Đã thu",
+    "Còn nợ",
+    "Trạng thái",
+    "Thanh toán",
+  ];
+
+  const data: (string | number)[][] = [
+    ["BÁO CÁO DANH SÁCH PHIẾU SỬA CHỮA"],
+    [`Ngày xuất báo cáo: ${new Date().toLocaleString("vi-VN")}`],
+    [],
+    headers,
+  ];
+
+  orders.forEach((order) => {
+    const formattedId = formatWorkOrderId(order.id, prefix) || "";
+    const creationDate = formatDate(order.creationDate, true);
+    const customerName = order.customerName || "";
+    const customerPhone = order.customerPhone || "";
+    const vehicleModel = order.vehicleModel || "";
+    const licensePlate = order.licensePlate || "";
+    const issueDescription = order.issueDescription || "";
+    const technicianName = order.technicianName || "";
+
+    const partsTotal = order.partsUsed?.reduce((sum, p) => sum + (p.quantity * p.price), 0) || 0;
+    const servicesTotal = order.additionalServices?.reduce((sum, s) => sum + ((s.price || 0) * (s.quantity || 1)), 0) || 0;
+    const laborCost = order.laborCost || 0;
+    const servicesAndLabor = servicesTotal + laborCost;
+
+    const discount = order.discount || 0;
+    const total = order.total || (partsTotal + servicesAndLabor - discount);
+    const remainingAmount = order.remainingAmount || 0;
+    const paidAmount = Math.max(0, total - remainingAmount);
+
+    const status = order.status || "";
+    const paymentStatus = order.paymentStatus === "paid" 
+      ? "Đã thanh toán" 
+      : order.paymentStatus === "partial" 
+        ? "Thanh toán một phần" 
+        : "Chưa thanh toán";
+
+    data.push([
+      formattedId,
+      creationDate,
+      customerName,
+      customerPhone,
+      vehicleModel,
+      licensePlate,
+      issueDescription,
+      technicianName,
+      partsTotal,
+      servicesAndLabor,
+      discount,
+      total,
+      paidAmount,
+      remainingAmount,
+      status,
+      paymentStatus,
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  
+  // Set column widths
+  ws["!cols"] = [
+    { wch: 15 }, // Mã Phiếu
+    { wch: 18 }, // Ngày tạo
+    { wch: 20 }, // Khách hàng
+    { wch: 15 }, // SĐT
+    { wch: 18 }, // Thiết bị/Xe
+    { wch: 15 }, // Biển số/IMEI
+    { wch: 30 }, // Nội dung sửa chữa
+    { wch: 20 }, // Kỹ thuật viên
+    { wch: 15 }, // Chi phí linh kiện
+    { wch: 18 }, // Chi phí dịch vụ/công
+    { wch: 12 }, // Giảm giá
+    { wch: 15 }, // Tổng chi phí
+    { wch: 15 }, // Đã thu
+    { wch: 15 }, // Còn nợ
+    { wch: 12 }, // Trạng thái
+    { wch: 18 }, // Thanh toán
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Phiếu Sửa Chữa");
+  
+  const fileName = `DanhSachPhieuSuaChua_${new Date().toISOString().split("T")[0]}.xlsx`;
+  XLSX.writeFile(wb, fileName);
 };
 

@@ -393,12 +393,6 @@ export const useWarrantyCards = () => {
 
                 const fallbackRows = await deriveWarrantyCardsFromWorkOrders(String(profileBranchId));
                 if (fallbackRows.length > 0) return fallbackRows;
-
-                // Fallback for legacy branch id formats (e.g. CN1 vs UUID):
-                // if rows exist but none match exactly, show available rows instead of empty state.
-                if (rows.length > 0) {
-                    return rows;
-                }
             }
 
             return filtered;
@@ -756,8 +750,12 @@ export const useCreateWarrantyClaim = () => {
 
 // Hook to get warranty claims
 export const useWarrantyClaims = (warrantyCardId?: string) => {
+    const { profile } = useAuth();
+    const profileBranchId =
+        profile?.branch_id || (profile as any)?.branchId || null;
+
     return useQuery({
-        queryKey: ["warranty_claims", warrantyCardId],
+        queryKey: ["warranty_claims", profileBranchId || "all", warrantyCardId],
         queryFn: async () => {
             let lastMissingTableError: any = null;
             for (const tableName of WARRANTY_CLAIM_TABLE_CANDIDATES) {
@@ -771,7 +769,21 @@ export const useWarrantyClaims = (warrantyCardId?: string) => {
                 }
 
                 const { data, error } = await query;
-                if (!error) return data;
+                if (!error) {
+                    const rows = data || [];
+                    if (!profileBranchId) return rows;
+
+                    // Filter claims by their associated warranty card's branch_id
+                    return rows.filter((claim: any) => {
+                        const cardBranchId =
+                            claim?.warranty_cards?.branch_id ??
+                            claim?.warranty_cards?.branchid ??
+                            claim?.warranty_cards?.branchId ??
+                            null;
+                        if (!cardBranchId) return true; // Keep legacy claims with no card branch info
+                        return String(cardBranchId) === String(profileBranchId);
+                    });
+                }
 
                 if (isMissingTableError(error, tableName)) {
                     lastMissingTableError = error;

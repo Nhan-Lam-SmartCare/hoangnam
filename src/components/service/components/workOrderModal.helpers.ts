@@ -1,4 +1,5 @@
 import type { Part, RepairOrderService, ServiceConfig } from '../../../types';
+import { supabase } from '../../../supabaseClient';
 
 export interface RepairServiceDraftWorker {
   worker_id: string;
@@ -74,4 +75,74 @@ export const getWarrantyText = (part: Part | null | undefined): string => {
       (part as any).warranty ??
       ''
   ).trim();
+};
+
+export interface StoreSettings {
+  store_name?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  logo_url?: string;
+  bank_qr_url?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_account_holder?: string;
+  bank_branch?: string;
+  work_order_prefix?: string;
+}
+
+const getMissingColumnFromSupabaseError = (err: any): string | null => {
+  const message = `${err?.message || ''} ${err?.details || ''}`;
+  const match = message.match(/'([^']+)'/i);
+  return match?.[1] || null;
+};
+
+const buildCashTxCreatorFields = (user: any): Record<string, any> => {
+  if (!user) return {};
+  const creatorId = user.id;
+  const creatorName =
+    user.user_metadata?.name ||
+    user.user_metadata?.full_name ||
+    user.user_metadata?.display_name ||
+    user.email?.split('@')?.[0] ||
+    null;
+
+  return {
+    userid: creatorId,
+    username: creatorName,
+    created_by: creatorId,
+    createdby: creatorId,
+    created_by_name: creatorName,
+    createdbyname: creatorName,
+    userId: creatorId,
+    userName: creatorName,
+    createdBy: creatorId,
+    createdByName: creatorName,
+  };
+};
+
+export const insertCashTransactionWithCreator = async (
+  payload: Record<string, any>
+) => {
+  const { data } = await supabase.auth.getUser();
+  const user = data?.user;
+  const creatorFields = buildCashTxCreatorFields(user);
+  const workingPayload = { ...payload, ...creatorFields };
+  let lastError: any = null;
+
+  for (let i = 0; i < 8; i += 1) {
+    const { error } = await supabase.from('cash_transactions').insert(workingPayload);
+    if (!error) return { ok: true, error: null as any };
+
+    const missingColumn = getMissingColumnFromSupabaseError(error);
+    if (missingColumn && missingColumn in workingPayload) {
+      delete workingPayload[missingColumn];
+      lastError = error;
+      continue;
+    }
+
+    return { ok: false, error };
+  }
+
+  return { ok: false, error: lastError };
 };
