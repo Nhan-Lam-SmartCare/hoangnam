@@ -497,14 +497,23 @@ export function useFinanceActions(
       const sale = sales.find((s) => s.id === saleId);
       if (!sale) return;
 
-      // Các giao dịch sổ quỹ thực tế gắn với đơn (nguồn sự thật để hoàn tiền
-      // ĐÚNG số đã thu — không hoàn theo sale.total khi đơn còn nợ) (#4).
-      const linkedTx = cashTransactions.filter((ct) => ct.saleId === saleId);
-      const linkedDebts = customerDebts.filter(
-        (d) => (d as any).saleId === saleId
-      );
+      const saleBranchId = sale.branchId || currentBranchId;
 
       void (async () => {
+        // Query linked cash transactions directly from the database (bypass stale client state)
+        const { data: dbLinkedTx } = await supabase
+          .from("cash_transactions")
+          .select("*")
+          .or(`saleid.eq.${saleId},saleId.eq.${saleId}`);
+        const actualLinkedTx = dbLinkedTx || [];
+
+        // Query linked customer debts directly from the database (bypass stale client state)
+        const { data: dbLinkedDebts } = await supabase
+          .from("customer_debts")
+          .select("*")
+          .or(`sale_id.eq.${saleId},saleId.eq.${saleId}`);
+        const actualLinkedDebts = dbLinkedDebts || [];
+
         const { error } = await supabase.from("sales").delete().eq("id", saleId);
         if (error) {
           const mappedError = {
@@ -517,10 +526,10 @@ export function useFinanceActions(
           return;
         }
 
-        // 1) Hoàn kho nguyên tử (RPC, fallback read-modify-write) (#5).
+        // 1) Hoàn kho nguyên tử (RPC, fallback read-modify-write) trên ĐÚNG chi nhánh của đơn hàng
         const incRes = await incrementStockForReturn(
           sale.items.map((it) => ({ partId: it.partId, quantity: it.quantity })),
-          currentBranchId
+          saleBranchId
         );
         if (!incRes.ok) {
           showToast.warning(
@@ -537,11 +546,11 @@ export function useFinanceActions(
         }
 
         // 2) Hoàn tiền THẬT vào CSDL: xóa giao dịch sổ quỹ + đảo số dư nguồn tiền
-        //    theo đúng số đã thu, dùng RPC nguyên tử có sẵn (#3, #4).
+        //    theo đúng số đã thu trên ĐÚNG chi nhánh ghi nhận đơn hàng.
         const refundBySource: Record<string, number> = {};
         let refundFailed = false;
-        for (const tx of linkedTx) {
-          const srcId = tx.paymentSourceId || sale.paymentMethod;
+        for (const tx of actualLinkedTx) {
+          const srcId = tx.paymentsource || tx.paymentSource || tx.paymentSourceId || sale.paymentMethod;
           const amt = Number(tx.amount || 0);
           const delRes = await deleteCashTransaction(tx.id);
           if (!delRes.ok) {
@@ -551,7 +560,7 @@ export function useFinanceActions(
           if (amt > 0) {
             const balRes = await updatePaymentSourceBalance(
               srcId,
-              currentBranchId,
+              saleBranchId,
               -amt
             );
             if (!balRes.ok) {
@@ -567,12 +576,12 @@ export function useFinanceActions(
           );
         }
 
-        // 3) Xóa công nợ liên kết với đơn (nếu có) (#4).
-        for (const d of linkedDebts) {
+        // 3) Xóa công nợ liên kết với đơn (nếu có)
+        for (const d of actualLinkedDebts) {
           await deleteCustomerDebt(d.id);
         }
 
-        // 4) Đảo thống kê khách hàng (best-effort) (#4).
+        // 4) Đảo thống kê khách hàng (best-effort)
         if (sale.customer?.id) {
           try {
             const { data: cur } = await supabase
@@ -607,7 +616,7 @@ export function useFinanceActions(
               ...p,
               stock: {
                 ...p.stock,
-                [currentBranchId]: (p.stock[currentBranchId] || 0) + soldQty,
+                [saleBranchId]: (p.stock[saleBranchId] || 0) + soldQty,
               },
             };
           })
@@ -623,15 +632,15 @@ export function useFinanceActions(
               ...ps,
               balance: {
                 ...ps.balance,
-                [currentBranchId]: (ps.balance[currentBranchId] || 0) - refund,
+                [saleBranchId]: (ps.balance[saleBranchId] || 0) - refund,
               },
             };
           })
         );
 
-        if (linkedDebts.length > 0) {
+        if (actualLinkedDebts.length > 0) {
           setCustomerDebts((prev) =>
-            prev.filter((d) => (d as any).saleId !== saleId)
+            prev.filter((d) => (d as any).saleId !== saleId && (d as any).sale_id !== saleId)
           );
         }
 
