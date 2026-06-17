@@ -327,7 +327,6 @@ const InventoryHistorySection: React.FC<{
     if (!confirmed) return;
 
     try {
-      // Get all transactions for selected receipts with item details
       const receiptCodesToDelete = Array.from(selectedReceipts);
       const allTransactions: any[] = [];
 
@@ -337,13 +336,10 @@ const InventoryHistorySection: React.FC<{
             if (item.id) {
               allTransactions.push({
                 id: item.id,
-                part_id: item.partId || item.partid || item.part_id,
+                part_id: item.partId,
                 part_name: item.partName,
-                quantity_change: Number(item.quantity || item.quantity_change || 0),
-                // Hoàn kho theo ĐÚNG chi nhánh của giao dịch, không phải chi
-                // nhánh đang chọn (chống sai lệch tồn kho đa chi nhánh).
-                branch_id:
-                  item.branchId || item.branchid || item.branch_id || branchId,
+                quantity_change: item.quantity,
+                branch_id: item.branchId || item.branchid || item.branch_id,
               });
             }
           });
@@ -358,6 +354,8 @@ const InventoryHistorySection: React.FC<{
       // Rollback stock for each part BEFORE deleting transactions
       for (const tx of allTransactions) {
         if (tx.part_id && tx.quantity_change > 0) {
+          const txBranchId = tx.branch_id || branchId;
+
           // Get current part stock
           const { data: partData, error: partError } = await supabase
             .from("parts")
@@ -370,9 +368,7 @@ const InventoryHistorySection: React.FC<{
             continue;
           }
 
-          // Calculate new stock (deduct the import quantity) trên ĐÚNG chi nhánh
-          // của giao dịch.
-          const txBranchId = tx.branch_id || branchId;
+          // Calculate new stock (deduct the import quantity)
           const currentStock = partData.stock || {};
           const branchStock = currentStock[txBranchId] || 0;
           const newBranchStock = Math.max(0, branchStock - tx.quantity_change);
@@ -412,14 +408,10 @@ const InventoryHistorySection: React.FC<{
 
         if (debtError) console.warn(`Could not delete debt for ${receiptCode}:`, debtError);
 
-        // ✅ FIX: Delete associated cash transactions (Sổ quỹ).
-        // Schema khác nhau dùng cột notes HOẶC description -> tìm cả hai.
         const { error: cashError } = await supabase
           .from("cash_transactions")
           .delete()
-          .or(
-            `notes.ilike.%${receiptCode}%,description.ilike.%${receiptCode}%`
-          );
+          .or(`notes.ilike.%${receiptCode}%,description.ilike.%${receiptCode}%`);
 
         if (cashError) {
           console.warn(`Could not delete cash transaction for ${receiptCode}:`, cashError);
@@ -433,7 +425,7 @@ const InventoryHistorySection: React.FC<{
       queryClient.invalidateQueries({ queryKey: ["inventory_transactions"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryTransactions"] });
       queryClient.invalidateQueries({ queryKey: ["supplierDebts"] });
-      queryClient.invalidateQueries({ queryKey: ["cashTransactions"] }); // ✅ Refresh Cash Book
+      queryClient.invalidateQueries({ queryKey: ["cashTransactions"] });
       queryClient.invalidateQueries({ queryKey: ["partsRepo"] });
       queryClient.invalidateQueries({ queryKey: ["partsRepoPaged"] });
       queryClient.invalidateQueries({ queryKey: ["allPartsForTotals"] });

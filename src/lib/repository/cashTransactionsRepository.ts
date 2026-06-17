@@ -99,6 +99,8 @@ export async function fetchCashTransactions(params?: {
       paymentSourceId:
         row.paymentsource || row.paymentSource || row.paymentSourceId || "cash",
       branchId: row.branchid || row.branchId || row.branch_id,
+      saleId: row.saleid || row.sale_id || row.saleId || null,
+      workOrderId: row.workorderid || row.work_order_id || row.workOrderId || null,
       // Infer type from category if not present
       type:
         row.type ||
