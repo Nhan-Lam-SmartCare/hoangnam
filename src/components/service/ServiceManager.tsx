@@ -36,7 +36,10 @@ import {
   formatWorkOrderId,
   generateWorkOrderId,
 } from "../../utils/format";
-import { completeWorkOrderPayment } from "../../lib/repository/workOrdersRepository";
+import {
+  completeWorkOrderPayment,
+  recordWorkOrderPaymentTransactions,
+} from "../../lib/repository/workOrdersRepository";
 import { syncRepairOrderServices } from "../../lib/repository/repairLaborRepository";
 import {
   useCreateWorkOrderAtomicRepo,
@@ -1142,11 +1145,16 @@ export default function ServiceManager() {
           !responseData?.inventoryDeducted
         ) {
           try {
-            await completeWorkOrderPayment(
+            const deductResult = await completeWorkOrderPayment(
               orderId,
               paymentMethod || "cash",
               0 // Zero amount as it's already considered paid
             );
+            if (deductResult.ok && deductResult.data.usedFallback) {
+              showToast.warning(
+                "Đã lưu phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
+              );
+            }
           } catch (err) {
             console.error("[handleMobileSave] Error in fallback deduction:", err);
           }
@@ -1221,11 +1229,16 @@ export default function ServiceManager() {
           parts.length > 0
         ) {
           try {
-            await completeWorkOrderPayment(
+            const deductResult = await completeWorkOrderPayment(
               editingOrder.id,
               paymentMethod || "cash",
               0 // Số tiền = 0 vì đã thanh toán hết rồi, chỉ cần trừ kho
             );
+            if (deductResult.ok && deductResult.data.usedFallback) {
+              showToast.warning(
+                "Đã cập nhật phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
+              );
+            }
           } catch (err: any) {
             console.error("[handleMobileSave] Error deducting inventory:", err);
             showToast.warning(
@@ -1262,6 +1275,50 @@ export default function ServiceManager() {
         };
 
         showToast.success("Cập nhật phiếu sửa chữa thành công!");
+      }
+
+      // 🔹 Ghi sổ quỹ: thu đặt cọc + thu tiền sửa chữa.
+      // Luồng mobile trước đây bỏ sót bước này → doanh thu sửa chữa không vào sổ quỹ/báo cáo.
+      // Helper idempotent (chỉ ghi phần chênh lệch) nên an toàn khi lưu/sửa phiếu nhiều lần.
+      if (finalOrderId && (depositAmount > 0 || totalPaid > 0)) {
+        try {
+          const servicePayment = Math.max(0, totalPaid - depositAmount);
+          const createdTx = await recordWorkOrderPaymentTransactions({
+            orderId: finalOrderId,
+            customerName: customer.name,
+            branchId: currentBranchId,
+            paymentMethod: paymentMethod || "cash",
+            depositAmount,
+            servicePayment,
+            workOrderPrefix: storeSettings?.work_order_prefix,
+          });
+
+          if (createdTx.length > 0) {
+            setCashTransactions((prev: any[]) => [...prev, ...createdTx]);
+            const addedAmount = createdTx.reduce((sum, tx) => sum + tx.amount, 0);
+            const sourceId = paymentMethod || "cash";
+            setPaymentSources((prev: any[]) =>
+              prev.map((ps: any) =>
+                ps.id === sourceId
+                  ? {
+                      ...ps,
+                      balance: {
+                        ...ps.balance,
+                        [currentBranchId]:
+                          (ps.balance?.[currentBranchId] || 0) + addedAmount,
+                      },
+                    }
+                  : ps
+              )
+            );
+            queryClient.invalidateQueries({ queryKey: ["cashTransactions"] });
+          }
+        } catch (err) {
+          console.error("[handleMobileSave] Ghi sổ quỹ thất bại:", err);
+          showToast.warning(
+            "Đã lưu phiếu nhưng ghi sổ quỹ chưa thành công. Vui lòng kiểm tra lại sổ quỹ."
+          );
+        }
       }
 
       // 2. PARALLEL BACKGROUND TASKS (Fire and forget from user perspective)

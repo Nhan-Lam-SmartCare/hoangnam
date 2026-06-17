@@ -720,6 +720,162 @@ async function ensureManualPartExpenseOnPayment(
   }
 }
 
+export interface RecordedWorkOrderCashTx {
+  id: string;
+  type: "income";
+  category: "service_deposit" | "service_income";
+  amount: number;
+  date: string;
+  description: string;
+  branchId: string;
+  paymentSource?: string;
+  reference: string;
+}
+
+// Tổng số tiền đã ghi sổ quỹ cho 1 phiếu, gom theo nhóm thu (đặt cọc / thu sửa chữa).
+// Quét theo cả `reference` lẫn `workorderid` vì các luồng cũ ghi không nhất quán cột tham chiếu.
+async function sumRecordedWorkOrderIncome(
+  reference: string
+): Promise<{ deposit: number; income: number }> {
+  const seen = new Set<string>();
+  let deposit = 0;
+  let income = 0;
+
+  const accumulate = (rows: any[] | null | undefined) => {
+    for (const row of rows || []) {
+      const id = String(row?.id || "");
+      if (id) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+      }
+      if (String(row?.type || "").toLowerCase() !== "income") continue;
+      const amount = Number(row?.amount) || 0;
+      if (amount <= 0) continue;
+      const category = String(row?.category || "").trim().toLowerCase();
+      if (category === "service_deposit") deposit += amount;
+      else if (category === "service_income") income += amount;
+    }
+  };
+
+  // Một số schema không có cột `workorderid`/`workOrderId` → bỏ qua lỗi cột để vẫn idempotent.
+  for (const column of ["reference", "workorderid", "workOrderId"]) {
+    try {
+      const { data, error } = await supabase
+        .from("cash_transactions")
+        .select("id, amount, category, type")
+        .eq(column, reference)
+        .limit(500);
+      if (!error) accumulate(data);
+    } catch {
+      // noop: cột tham chiếu không tồn tại trong schema này
+    }
+  }
+
+  return { deposit, income };
+}
+
+/**
+ * Ghi giao dịch thu tiền của phiếu sửa chữa vào sổ quỹ: tiền đặt cọc (service_deposit)
+ * và tiền thu khi trả máy (service_income).
+ *
+ * Idempotent: so sánh số tiền đã ghi trong `cash_transactions` với số tiền mục tiêu và
+ * chỉ ghi phần chênh lệch. Nhờ vậy có thể gọi an toàn nhiều lần (lưu/sửa phiếu lặp lại)
+ * và không trùng với số liệu mà luồng desktop (useWorkOrderFormState) đã ghi.
+ *
+ * Trả về danh sách giao dịch vừa tạo để caller cập nhật state sổ quỹ tức thời.
+ */
+export async function recordWorkOrderPaymentTransactions(params: {
+  orderId: string;
+  customerName: string;
+  branchId: string;
+  paymentMethod?: string;
+  depositAmount?: number;
+  servicePayment?: number;
+  workOrderPrefix?: string;
+}): Promise<RecordedWorkOrderCashTx[]> {
+  const reference = String(params.orderId || "").trim();
+  if (!reference) return [];
+
+  const targetDeposit = Math.max(0, Number(params.depositAmount) || 0);
+  const targetIncome = Math.max(0, Number(params.servicePayment) || 0);
+  if (targetDeposit <= 0 && targetIncome <= 0) return [];
+
+  const branchId = String(params.branchId || "CN1");
+  const paymentSource = params.paymentMethod || "cash";
+  const customerName = params.customerName || "";
+
+  const { deposit: recordedDeposit, income: recordedIncome } =
+    await sumRecordedWorkOrderIncome(reference);
+
+  const orderSuffix =
+    (formatWorkOrderId(reference, params.workOrderPrefix) || reference)
+      .split("-")
+      .pop() || reference;
+
+  const created: RecordedWorkOrderCashTx[] = [];
+
+  const makeTxId = (prefix: string): string =>
+    typeof crypto !== "undefined" && (crypto as any).randomUUID
+      ? (crypto as any).randomUUID()
+      : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  const writeTx = async (
+    category: "service_deposit" | "service_income",
+    amount: number,
+    description: string
+  ) => {
+    if (amount <= 0) return;
+    const id = makeTxId(category === "service_deposit" ? "SVC-DEP" : "SVC-INC");
+    const date = new Date().toISOString();
+    const { ok, error } = await insertCashTransactionWithCreator({
+      id,
+      type: "income",
+      category,
+      amount,
+      date,
+      description,
+      reference,
+      workorderid: reference,
+      branchid: branchId,
+      paymentsource: paymentSource,
+    });
+    if (!ok) {
+      console.error(
+        "[recordWorkOrderPaymentTransactions] Ghi sổ quỹ thất bại",
+        { reference, category, amount, error }
+      );
+      return;
+    }
+    created.push({
+      id,
+      type: "income",
+      category,
+      amount,
+      date,
+      description,
+      branchId,
+      paymentSource,
+      reference,
+    });
+  };
+
+  const depositDelta = Math.max(0, targetDeposit - recordedDeposit);
+  await writeTx(
+    "service_deposit",
+    depositDelta,
+    `Đặt cọc sửa chữa #${orderSuffix} - ${customerName}`
+  );
+
+  const incomeDelta = Math.max(0, targetIncome - recordedIncome);
+  await writeTx(
+    "service_income",
+    incomeDelta,
+    `Thu tiền sửa chữa #${orderSuffix} - ${customerName}`
+  );
+
+  return created;
+}
+
 // Some deployments use camelCase columns, others use lowercase columns.
 // This helper writes technician/labor with multiple key variants so data is persisted reliably.
 async function syncTechnicianAndLaborFallback(
@@ -2028,6 +2184,7 @@ export async function completeWorkOrderPayment(
       paymentTransactionId?: string;
       newPaymentStatus?: string;
       inventoryDeducted?: boolean;
+      usedFallback?: boolean;
     }
   >
 > {
@@ -2096,8 +2253,10 @@ export async function completeWorkOrderPayment(
         });
       }
 
-      console.warn(
-        "[completeWorkOrderPayment] RPC work_order_complete_payment chưa tồn tại, đã dùng fallback update trực tiếp"
+      console.error(
+        "[completeWorkOrderPayment] ⚠️ RPC 'work_order_complete_payment' KHÔNG tồn tại trong database. " +
+          "Đã dùng fallback cập nhật trực tiếp: thanh toán được lưu NHƯNG TỒN KHO CHƯA ĐƯỢC TRỪ tự động. " +
+          "Cần chạy migration sql/2026-06-17_work_order_payment_consistency.sql (hoặc work_order_complete_payment.sql) để khôi phục trừ kho atomic."
       );
 
       const normalizedUpdatedOrder = normalizeWorkOrder(updatedRow);
@@ -2112,6 +2271,7 @@ export async function completeWorkOrderPayment(
         paymentTransactionId: undefined,
         newPaymentStatus: nextStatus,
         inventoryDeducted: false,
+        usedFallback: true,
       });
     };
 
@@ -2246,6 +2406,7 @@ export async function completeWorkOrderPayment(
       paymentTransactionId,
       newPaymentStatus,
       inventoryDeducted,
+      usedFallback: false,
     });
   } catch (e: any) {
     return failure({
