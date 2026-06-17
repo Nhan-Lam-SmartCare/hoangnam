@@ -64,6 +64,8 @@ function createDeps(initial?: Partial<State>) {
     currentBranchId: state.currentBranchId,
     parts: state.parts,
     sales: state.sales,
+    cashTransactions: state.cashTransactions,
+    customerDebts: state.customerDebts,
     setSales: vi.fn((updater: any) => {
       state.sales = typeof updater === "function" ? updater(state.sales) : updater;
       deps.sales = state.sales;

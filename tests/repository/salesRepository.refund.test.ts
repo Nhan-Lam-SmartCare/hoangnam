@@ -4,14 +4,17 @@ import { useFinanceActions } from "../../src/contexts/app/useFinanceActions";
 import { showToast } from "../../src/utils/toast";
 
 const mockFrom = vi.hoisted(() => vi.fn());
+const mockRpc = vi.hoisted(() => vi.fn());
+const mockGetUser = vi.hoisted(() => vi.fn());
 const mockSalesDeleteEq = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/supabaseClient", () => ({
   supabase: {
     auth: {
-      getUser: vi.fn(),
+      getUser: mockGetUser,
     },
     from: mockFrom,
+    rpc: mockRpc,
   },
 }));
 
@@ -61,6 +64,8 @@ function createDeps(initial?: Partial<State>) {
     currentBranchId: state.currentBranchId,
     parts: state.parts,
     sales: state.sales,
+    cashTransactions: state.cashTransactions,
+    customerDebts: state.customerDebts,
     setSales: vi.fn((updater: any) => {
       state.sales = typeof updater === "function" ? updater(state.sales) : updater;
       deps.sales = state.sales;
@@ -92,12 +97,45 @@ describe("salesRepository.refundSale compatibility", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     mockSalesDeleteEq.mockResolvedValue({ error: null });
+
+    // RPC: hoàn kho nguyên tử + đảo số dư nguồn tiền nguyên tử.
+    mockRpc.mockImplementation((rpcName: string, params: any) => {
+      if (rpcName === "sale_increment_stock_atomic") {
+        return Promise.resolve({ data: { success: true }, error: null });
+      }
+      if (rpcName === "adjust_payment_source_balance_atomic") {
+        return Promise.resolve({
+          data: {
+            id: params?.p_source_id || "cash",
+            balance: { [params?.p_branch_id || "CN1"]: 0 },
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
     mockFrom.mockImplementation((table: string) => {
       if (table === "sales") {
         return {
+          delete: () => ({ eq: mockSalesDeleteEq }),
+        };
+      }
+      if (table === "cash_transactions") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: { id: "CT-1", amount: 185000 },
+                  error: null,
+                }),
+            }),
+          }),
           delete: () => ({
-            eq: mockSalesDeleteEq,
+            eq: () => Promise.resolve({ error: null }),
           }),
         };
       }

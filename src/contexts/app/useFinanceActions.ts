@@ -1,10 +1,17 @@
 import { useCallback } from "react";
-import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
+import {
+  createCashTransaction,
+  deleteCashTransaction,
+} from "../../lib/repository/cashTransactionsRepository";
 import { updatePaymentSourceBalance } from "../../lib/repository/paymentSourcesRepository";
 import {
-  updatePart,
   decrementStockForSale,
+  incrementStockForReturn,
 } from "../../lib/repository/partsRepository";
+import {
+  createCustomerDebt,
+  deleteCustomerDebt,
+} from "../../lib/repository/debtsRepository";
 import { showToast } from "../../utils/toast";
 import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { supabase } from "../../supabaseClient";
@@ -21,6 +28,8 @@ type FinanceDeps = Pick<
   | "currentBranchId"
   | "parts"
   | "sales"
+  | "cashTransactions"
+  | "customerDebts"
   | "setSales"
   | "setParts"
   | "setCashTransactions"
@@ -64,6 +73,8 @@ export function useFinanceActions(
     currentBranchId,
     parts,
     sales,
+    cashTransactions,
+    customerDebts,
     setSales,
     setParts,
     setCashTransactions,
@@ -117,6 +128,55 @@ export function useFinanceActions(
         cashTransactionId: undefined,
       };
 
+      // Số tiền khách thực trả (kẹp trong [0, total]); phần còn lại ghi công nợ.
+      const actualPaidAmount =
+        data.paidAmount !== undefined
+          ? Math.max(0, Math.min(total, data.paidAmount))
+          : total;
+
+      const saleItems = data.items.map((it) => ({
+        partId: it.partId,
+        quantity: it.quantity,
+      }));
+
+      // Hoàn tác cập nhật lạc quan khi ghi CSDL thất bại (chống "đơn ma").
+      const rollbackOptimistic = () => {
+        setSales((prev) => prev.filter((s) => s.id !== saleId));
+        setParts((prev) =>
+          prev.map((p) => {
+            const soldQty = data.items
+              .filter((i) => i.partId === p.id)
+              .reduce((s, i) => s + i.quantity, 0);
+            if (!soldQty) return p;
+            return {
+              ...p,
+              stock: {
+                ...p.stock,
+                [currentBranchId]: (p.stock[currentBranchId] || 0) + soldQty,
+              },
+            };
+          })
+        );
+        if (actualPaidAmount > 0) {
+          setCashTransactions((prev) => prev.filter((ct) => ct.saleId !== saleId));
+          setPaymentSources((prev) =>
+            prev.map((ps) =>
+              ps.id === data.paymentMethod
+                ? {
+                    ...ps,
+                    balance: {
+                      ...ps.balance,
+                      [currentBranchId]:
+                        (ps.balance[currentBranchId] || 0) - actualPaidAmount,
+                    },
+                  }
+                : ps
+            )
+          );
+        }
+        setCartItems(data.items);
+      };
+
       const persistence = (async (): Promise<{ ok: boolean }> => {
         const { data: userData } = await supabase.auth.getUser();
         const currentUser = userData?.user;
@@ -125,6 +185,35 @@ export function useFinanceActions(
           currentUser?.email ||
           newSale.userName;
 
+        // Xác định customer id thật (ưu tiên id, sau đó tra theo phone) để gắn
+        // công nợ và cập nhật thống kê đúng khách hàng.
+        let resolvedCustomerId: string | null = newSale.customer.id || null;
+        if (!resolvedCustomerId && newSale.customer.phone) {
+          const { data: existingCustomers } = await supabase
+            .from("customers")
+            .select("id")
+            .eq("phone", newSale.customer.phone)
+            .limit(1);
+          if (existingCustomers && existingCustomers.length > 0) {
+            resolvedCustomerId = existingCustomers[0].id;
+          }
+        }
+
+        // 1) Trừ kho nguyên tử TRƯỚC khi lưu đơn để chống bán âm/oversell: nếu
+        //    không đủ tồn thì hủy luôn, không tạo phiếu (không còn "đơn lưu mà
+        //    kho không trừ").
+        const decRes = await decrementStockForSale(saleItems, newSale.branchId);
+        if (!decRes.ok) {
+          rollbackOptimistic();
+          showToast.error(
+            `Không thể tạo đơn (kho): ${mapRepoErrorForUser(decRes.error)}`
+          );
+          return { ok: false };
+        }
+        const stockFailedParts =
+          decRes.data.mode === "fallback" ? decRes.data.failedParts || [] : [];
+
+        // 2) Lưu đơn. Nếu lỗi, cộng trả lại số kho vừa trừ rồi rollback state.
         const payload = {
           id: newSale.id,
           date: newSale.date,
@@ -134,8 +223,8 @@ export function useFinanceActions(
           total: newSale.total,
           customer: newSale.customer,
           paymentmethod: newSale.paymentMethod,
-          userid: newSale.userId,
-          username: newSale.userName,
+          userid: currentUser?.id || newSale.userId,
+          username: issuedBy,
           branchid: newSale.branchId,
           branch_id: newSale.branchId,
           branchId: newSale.branchId,
@@ -146,33 +235,24 @@ export function useFinanceActions(
 
         const { error } = await supabase.from("sales").insert([payload]);
         if (error) {
+          await incrementStockForReturn(saleItems, newSale.branchId);
+          rollbackOptimistic();
           const mappedError = {
             code: "supabase" as const,
             message: error.message || "Lỗi CSDL khi lưu đơn bán",
           };
-          showToast.warning(
-            `Đã tạo đơn tại máy nhưng lưu CSDL thất bại: ${mapRepoErrorForUser(mappedError)}`
+          showToast.error(
+            `Lưu đơn thất bại, đã hoàn kho: ${mapRepoErrorForUser(mappedError)}`
           );
           return { ok: false };
         }
 
-        // Trừ kho nguyên tử qua RPC (chống bán âm khi nhiều thiết bị bán cùng lúc).
-        const decRes = await decrementStockForSale(
-          data.items.map((it) => ({ partId: it.partId, quantity: it.quantity })),
-          newSale.branchId
-        );
-        if (!decRes.ok) {
+        if (stockFailedParts.length > 0) {
           showToast.warning(
-            `Đơn đã lưu nhưng chưa trừ kho CSDL: ${mapRepoErrorForUser(decRes.error)}`
-          );
-        } else if (decRes.data.failedParts && decRes.data.failedParts.length > 0) {
-          showToast.warning(
-            `Đơn đã lưu nhưng chưa trừ kho CSDL cho: ${decRes.data.failedParts.join(", ")}`
+            `Đơn đã lưu nhưng chưa trừ kho CSDL cho: ${stockFailedParts.join(", ")}`
           );
         }
 
-        const actualPaidAmount = data.paidAmount !== undefined ? data.paidAmount : total;
-        
         let cashResId: string | undefined = undefined;
 
         if (actualPaidAmount > 0) {
@@ -218,8 +298,6 @@ export function useFinanceActions(
 
         const remainingAmount = total - actualPaidAmount;
         if (remainingAmount > 0) {
-          const safeCustomerId =
-            newSale.customer.phone || newSale.customer.id || `CUST-ANON-${Date.now()}`;
           const safeCustomerName =
             newSale.customer.name?.trim() ||
             newSale.customer.phone ||
@@ -233,28 +311,31 @@ export function useFinanceActions(
             });
           }
 
-          const debtId = `DEBT-${Date.now()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-          const { error: debtError } = await supabase
-            .from("customer_debts")
-            .insert({
-              id: debtId,
-              customer_id: safeCustomerId,
-              customer_name: safeCustomerName,
-              phone: newSale.customer.phone || null,
-              description: description,
-              total_amount: total,
-              paid_amount: actualPaidAmount,
-              remaining_amount: remainingAmount,
-              created_date: new Date().toISOString().split("T")[0],
-              branch_id: newSale.branchId,
-              reference_id: newSale.id,
-            });
+          // Dùng repository chuẩn (cột sale_id + id CDEBT-SALE-...) để công nợ
+          // liên kết đúng phiếu bán và gắn đúng customer id.
+          const debtRes = await createCustomerDebt({
+            customerId:
+              resolvedCustomerId ||
+              newSale.customer.phone ||
+              `CUST-ANON-${saleId}`,
+            customerName: safeCustomerName,
+            phone: newSale.customer.phone,
+            description,
+            totalAmount: total,
+            paidAmount: actualPaidAmount,
+            remainingAmount,
+            createdDate: new Date().toISOString().split("T")[0],
+            branchId: newSale.branchId,
+            saleId: newSale.id,
+          } as any);
 
-          if (debtError) {
-            console.error("Error creating customer debt for sale:", debtError);
+          if (!debtRes.ok) {
+            console.error("Error creating customer debt for sale:", debtRes.error);
             showToast.error("Đơn bán đã lưu nhưng không thể tạo công nợ tự động.");
           } else {
-            showToast.success(`Đã tạo công nợ ${remainingAmount.toLocaleString()}đ cho ${safeCustomerName}`);
+            showToast.success(
+              `Đã tạo công nợ ${remainingAmount.toLocaleString()}đ cho ${safeCustomerName}`
+            );
           }
         }
 
@@ -273,7 +354,9 @@ export function useFinanceActions(
               customer_name: newSale.customer.name,
               customer_phone: newSale.customer.phone || null,
               device_model: item.partName,
-              imei_serial: item.sku || null,
+              // SKU dùng chung cho mọi đơn vị, không phải số serial duy nhất ->
+              // để trống tránh hiểu nhầm là IMEI/serial.
+              imei_serial: null,
               warranty_start_date: today.toISOString().slice(0, 10),
               warranty_end_date: end.toISOString().slice(0, 10),
               warranty_period_months: months,
@@ -306,53 +389,34 @@ export function useFinanceActions(
           }
         }
 
-        // Cập nhật thông tin khách hàng (Tổng chi tiêu, Số lần mua, Hạng)
-        if (newSale.customer.phone || newSale.customer.id) {
+        // Cập nhật thống kê khách hàng (Tổng chi tiêu, Số lần mua, Hạng).
+        // Lưu ý: vẫn là read-modify-write phía client (#8) — fix nguyên tử nằm
+        // ở RPC sale_create_atomic (sql/2026-06-17_sale_create_atomic.sql).
+        if (resolvedCustomerId) {
           try {
-            let customerIdToUpdate = newSale.customer.id;
-            
-            if (!customerIdToUpdate && newSale.customer.phone) {
-              const { data: existingCustomers } = await supabase
-                .from("customers")
-                .select("id, totalspent, visitcount")
-                .eq("phone", newSale.customer.phone)
-                .limit(1);
-                
-              if (existingCustomers && existingCustomers.length > 0) {
-                customerIdToUpdate = existingCustomers[0].id;
-              }
-            }
+            const { data: currentStats } = await supabase
+              .from("customers")
+              .select("totalspent, visitcount")
+              .eq("id", resolvedCustomerId)
+              .single();
 
-            if (customerIdToUpdate) {
-              // Get current stats to increment
-              const { data: currentStats } = await supabase
-                .from("customers")
-                .select("totalspent, visitcount")
-                .eq("id", customerIdToUpdate)
-                .single();
+            const newTotalSpent = Number(currentStats?.totalspent || 0) + total;
+            const newVisitCount = Number(currentStats?.visitcount || 0) + 1;
 
-              const currentTotalSpent = Number(currentStats?.totalspent || 0);
-              const currentVisitCount = Number(currentStats?.visitcount || 0);
-              
-              const newTotalSpent = currentTotalSpent + total;
-              const newVisitCount = currentVisitCount + 1;
-              
-              // Simple segmentation logic based on total spent
-              let newSegment = "New";
-              if (newTotalSpent > 10000000) newSegment = "VIP";
-              else if (newTotalSpent > 3000000) newSegment = "Loyal";
-              else if (newVisitCount > 1) newSegment = "Potential";
+            let newSegment = "New";
+            if (newTotalSpent > 10000000) newSegment = "VIP";
+            else if (newTotalSpent > 3000000) newSegment = "Loyal";
+            else if (newVisitCount > 1) newSegment = "Potential";
 
-              await supabase
-                .from("customers")
-                .update({
-                  totalspent: newTotalSpent,
-                  visitcount: newVisitCount,
-                  lastvisit: new Date().toISOString(),
-                  segment: newSegment
-                })
-                .eq("id", customerIdToUpdate);
-            }
+            await supabase
+              .from("customers")
+              .update({
+                totalspent: newTotalSpent,
+                visitcount: newVisitCount,
+                lastvisit: new Date().toISOString(),
+                segment: newSegment,
+              })
+              .eq("id", resolvedCustomerId);
           } catch (e) {
             console.error("Lỗi cập nhật số liệu khách hàng:", e);
           }
@@ -379,33 +443,38 @@ export function useFinanceActions(
         })
       );
 
-      const ctId = `CT-${Date.now()}`;
-      const cashTx: CashTransaction = {
-        id: ctId,
-        type: "income",
-        date: new Date().toISOString(),
-        amount: total,
-        notes: data.note || "Thu tiền bán hàng",
-        paymentSourceId: data.paymentMethod,
-        branchId: currentBranchId,
-        category: "sale_income",
-        saleId,
-      };
-      setCashTransactions((prev) => [cashTx, ...prev]);
+      // Chỉ ghi nhận tiền vào sổ quỹ/số dư theo SỐ THỰC THU (phần còn lại là
+      // công nợ), khớp với những gì persistence ghi xuống CSDL (#2).
+      if (actualPaidAmount > 0) {
+        const ctId = `CT-${Date.now()}`;
+        const cashTx: CashTransaction = {
+          id: ctId,
+          type: "income",
+          date: new Date().toISOString(),
+          amount: actualPaidAmount,
+          notes: data.note || "Thu tiền bán hàng",
+          paymentSourceId: data.paymentMethod,
+          branchId: currentBranchId,
+          category: "sale_income",
+          saleId,
+        };
+        setCashTransactions((prev) => [cashTx, ...prev]);
 
-      setPaymentSources((prev) =>
-        prev.map((ps) =>
-          ps.id === data.paymentMethod
-            ? {
-                ...ps,
-                balance: {
-                  ...ps.balance,
-                  [currentBranchId]: (ps.balance[currentBranchId] || 0) + total,
-                },
-              }
-            : ps
-        )
-      );
+        setPaymentSources((prev) =>
+          prev.map((ps) =>
+            ps.id === data.paymentMethod
+              ? {
+                  ...ps,
+                  balance: {
+                    ...ps.balance,
+                    [currentBranchId]:
+                      (ps.balance[currentBranchId] || 0) + actualPaidAmount,
+                  },
+                }
+              : ps
+          )
+        );
+      }
 
       clearCart();
 
@@ -415,6 +484,7 @@ export function useFinanceActions(
       clearCart,
       currentBranchId,
       parts,
+      setCartItems,
       setCashTransactions,
       setParts,
       setPaymentSources,
@@ -426,6 +496,13 @@ export function useFinanceActions(
     (saleId: string) => {
       const sale = sales.find((s) => s.id === saleId);
       if (!sale) return;
+
+      // Các giao dịch sổ quỹ thực tế gắn với đơn (nguồn sự thật để hoàn tiền
+      // ĐÚNG số đã thu — không hoàn theo sale.total khi đơn còn nợ) (#4).
+      const linkedTx = cashTransactions.filter((ct) => ct.saleId === saleId);
+      const linkedDebts = customerDebts.filter(
+        (d) => (d as any).saleId === saleId
+      );
 
       void (async () => {
         const { error } = await supabase.from("sales").delete().eq("id", saleId);
@@ -440,35 +517,84 @@ export function useFinanceActions(
           return;
         }
 
-        const restockByPart = sale.items.reduce<Record<string, number>>((acc, item) => {
-          acc[item.partId] = (acc[item.partId] || 0) + item.quantity;
-          return acc;
-        }, {});
-
-        const stockUpdateErrors: string[] = [];
-        for (const [partId, qty] of Object.entries(restockByPart)) {
-          const part = parts.find((p) => p.id === partId);
-          if (!part) continue;
-
-          const currentStock = Number(part.stock?.[currentBranchId] || 0);
-          const nextStock = Math.max(0, currentStock + qty);
-          const nextStockMap = {
-            ...(part.stock || {}),
-            [currentBranchId]: nextStock,
-          };
-
-          const updateRes = await updatePart(partId, { stock: nextStockMap });
-          if (!updateRes.ok) {
-            stockUpdateErrors.push(part.name || partId);
-          }
-        }
-
-        if (stockUpdateErrors.length > 0) {
+        // 1) Hoàn kho nguyên tử (RPC, fallback read-modify-write) (#5).
+        const incRes = await incrementStockForReturn(
+          sale.items.map((it) => ({ partId: it.partId, quantity: it.quantity })),
+          currentBranchId
+        );
+        if (!incRes.ok) {
           showToast.warning(
-            `Đã xóa đơn nhưng chưa hoàn kho CSDL cho: ${stockUpdateErrors.join(", ")}`
+            `Đã xóa đơn nhưng chưa hoàn kho CSDL: ${mapRepoErrorForUser(incRes.error)}`
+          );
+        } else if (
+          incRes.data.mode === "fallback" &&
+          incRes.data.failedParts &&
+          incRes.data.failedParts.length > 0
+        ) {
+          showToast.warning(
+            `Đã xóa đơn nhưng chưa hoàn kho CSDL cho: ${incRes.data.failedParts.join(", ")}`
           );
         }
 
+        // 2) Hoàn tiền THẬT vào CSDL: xóa giao dịch sổ quỹ + đảo số dư nguồn tiền
+        //    theo đúng số đã thu, dùng RPC nguyên tử có sẵn (#3, #4).
+        const refundBySource: Record<string, number> = {};
+        let refundFailed = false;
+        for (const tx of linkedTx) {
+          const srcId = tx.paymentSourceId || sale.paymentMethod;
+          const amt = Number(tx.amount || 0);
+          const delRes = await deleteCashTransaction(tx.id);
+          if (!delRes.ok) {
+            refundFailed = true;
+            continue;
+          }
+          if (amt > 0) {
+            const balRes = await updatePaymentSourceBalance(
+              srcId,
+              currentBranchId,
+              -amt
+            );
+            if (!balRes.ok) {
+              refundFailed = true;
+              continue;
+            }
+            refundBySource[srcId] = (refundBySource[srcId] || 0) + amt;
+          }
+        }
+        if (refundFailed) {
+          showToast.warning(
+            "Đã xóa đơn nhưng hoàn tiền/sổ quỹ chưa hoàn tất trên CSDL."
+          );
+        }
+
+        // 3) Xóa công nợ liên kết với đơn (nếu có) (#4).
+        for (const d of linkedDebts) {
+          await deleteCustomerDebt(d.id);
+        }
+
+        // 4) Đảo thống kê khách hàng (best-effort) (#4).
+        if (sale.customer?.id) {
+          try {
+            const { data: cur } = await supabase
+              .from("customers")
+              .select("totalspent, visitcount")
+              .eq("id", sale.customer.id)
+              .single();
+            if (cur) {
+              await supabase
+                .from("customers")
+                .update({
+                  totalspent: Math.max(0, Number(cur.totalspent || 0) - sale.total),
+                  visitcount: Math.max(0, Number(cur.visitcount || 0) - 1),
+                })
+                .eq("id", sale.customer.id);
+            }
+          } catch (e) {
+            console.error("Lỗi đảo thống kê khách hàng khi xóa đơn:", e);
+          }
+        }
+
+        // 5) Cập nhật state cục bộ theo SỐ THỰC đã hoàn.
         setSales((prev) => prev.filter((s) => s.id !== saleId));
 
         setParts((prev) =>
@@ -490,24 +616,41 @@ export function useFinanceActions(
         setCashTransactions((prev) => prev.filter((ct) => ct.saleId !== saleId));
 
         setPaymentSources((prev) =>
-          prev.map((ps) =>
-            ps.id === sale.paymentMethod
-              ? {
-                  ...ps,
-                  balance: {
-                    ...ps.balance,
-                    [currentBranchId]:
-                      (ps.balance[currentBranchId] || 0) - sale.total,
-                  },
-                }
-              : ps
-          )
+          prev.map((ps) => {
+            const refund = refundBySource[ps.id] || 0;
+            if (!refund) return ps;
+            return {
+              ...ps,
+              balance: {
+                ...ps.balance,
+                [currentBranchId]: (ps.balance[currentBranchId] || 0) - refund,
+              },
+            };
+          })
         );
 
-        showToast.success("Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công.");
+        if (linkedDebts.length > 0) {
+          setCustomerDebts((prev) =>
+            prev.filter((d) => (d as any).saleId !== saleId)
+          );
+        }
+
+        showToast.success(
+          "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
+        );
       })();
     },
-    [currentBranchId, parts, sales, setCashTransactions, setParts, setPaymentSources, setSales]
+    [
+      currentBranchId,
+      sales,
+      cashTransactions,
+      customerDebts,
+      setCashTransactions,
+      setCustomerDebts,
+      setParts,
+      setPaymentSources,
+      setSales,
+    ]
   );
 
   const recordInventoryTransaction = useCallback(

@@ -228,6 +228,8 @@ export function useAppActions(state: AppState): AppActions {
     currentBranchId,
     parts,
     sales,
+    cashTransactions: state.cashTransactions,
+    customerDebts: state.customerDebts,
     setSales,
     setParts,
     setCashTransactions,

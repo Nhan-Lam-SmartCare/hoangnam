@@ -421,6 +421,115 @@ export async function decrementStockForSale(
   }
 }
 
+/**
+ * Hoàn kho nguyên tử khi hủy/hoàn một phiếu bán hàng (cộng trả lại tồn kho).
+ *
+ * Ưu tiên RPC `sale_increment_stock_atomic` (khóa hàng + cộng kho trong cùng
+ * transaction) để tránh race condition read-modify-write khi nhiều thiết bị thao
+ * tác cùng lúc. Nếu RPC chưa được cài trên CSDL, tự fallback về read-modify-write
+ * từng phụ tùng (giữ tương thích với schema cũ).
+ */
+export async function incrementStockForReturn(
+  items: Array<{ partId: string; quantity: number }>,
+  branchId: string
+): Promise<RepoResult<{ mode: "rpc" | "fallback"; failedParts?: string[] }>> {
+  const aggregated = items.reduce<Record<string, number>>((acc, it) => {
+    if (!it.partId || !(it.quantity > 0)) return acc;
+    acc[it.partId] = (acc[it.partId] || 0) + it.quantity;
+    return acc;
+  }, {});
+
+  const payloadItems = Object.entries(aggregated).map(([partId, quantity]) => ({
+    partId,
+    quantity,
+  }));
+
+  if (payloadItems.length === 0) {
+    return success({ mode: "rpc" });
+  }
+
+  const isMissingRpc = (err: any) => {
+    const code = String(err?.code || "").toUpperCase();
+    const text = `${err?.message || ""} ${err?.details || ""}`.toLowerCase();
+    return code === "PGRST202" || text.includes("sale_increment_stock_atomic");
+  };
+
+  const runFallback = async (): Promise<
+    RepoResult<{ mode: "rpc" | "fallback"; failedParts?: string[] }>
+  > => {
+    const failedParts: string[] = [];
+    for (const { partId, quantity } of payloadItems) {
+      const { data: row, error: readErr } = await supabase
+        .from(PARTS_TABLE)
+        .select("stock, name")
+        .eq("id", partId)
+        .single();
+      if (readErr || !row) {
+        failedParts.push(partId);
+        continue;
+      }
+      const stockMap = ((row as any).stock || {}) as Record<string, number>;
+      const current = Number(stockMap[branchId] || 0);
+      const nextStockMap = {
+        ...stockMap,
+        [branchId]: Math.max(0, current + quantity),
+      };
+      const { error: updErr } = await supabase
+        .from(PARTS_TABLE)
+        .update({ stock: nextStockMap })
+        .eq("id", partId);
+      if (updErr) {
+        failedParts.push((row as any).name || partId);
+      }
+    }
+    return success({ mode: "fallback", failedParts });
+  };
+
+  try {
+    // supabase.rpc có thể chưa tồn tại trong môi trường test/cũ -> bọc try/catch.
+    if (typeof (supabase as any).rpc !== "function") {
+      return await runFallback();
+    }
+
+    const { data, error } = await supabase.rpc("sale_increment_stock_atomic", {
+      p_items: payloadItems,
+      p_branch_id: branchId,
+    });
+
+    if (error) {
+      if (isMissingRpc(error)) {
+        return await runFallback();
+      }
+      return failure({
+        code: "supabase",
+        message: error.message || "Hoàn kho thất bại",
+        cause: error,
+      });
+    }
+
+    if (data && data.success === false) {
+      return failure({
+        code: "validation",
+        message: data.message || "Hoàn kho thất bại",
+        cause: data,
+      });
+    }
+
+    return success({ mode: "rpc" });
+  } catch (e: any) {
+    // RPC không khả dụng (vd: môi trường test mock thiếu .rpc) -> thử fallback.
+    try {
+      return await runFallback();
+    } catch (inner: any) {
+      return failure({
+        code: "network",
+        message: "Lỗi kết nối khi hoàn kho",
+        cause: inner || e,
+      });
+    }
+  }
+}
+
 // Batch rename category using one SQL update
 export async function renameCategory(
   oldName: string,

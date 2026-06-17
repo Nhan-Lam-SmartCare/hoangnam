@@ -245,12 +245,12 @@ export const BottomNav: React.FC = () => {
 
   return (
     <>
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#1e1e2d] border-t border-slate-200 dark:border-slate-800 safe-area-bottom shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#1e1e2d]/95 border-t border-slate-100 dark:border-slate-800/80 safe-area-bottom shadow-[0_-8px_30px_rgba(0,0,0,0.06)]">
         {/* Backdrop blur effect for modern look */}
-        <div className="absolute inset-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg -z-10"></div>
+        <div className="absolute inset-0 bg-white/80 dark:bg-[#1e1e2d]/80 backdrop-blur-xl -z-10"></div>
 
         <div
-          className={`grid gap-1 px-2 py-2 ${navItems.length === 3
+          className={`grid gap-1 px-2 py-1.5 ${navItems.length === 3
             ? "grid-cols-3"
             : navItems.length === 4
               ? "grid-cols-4"
@@ -262,30 +262,32 @@ export const BottomNav: React.FC = () => {
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             const colorKey = item.color as ColorKey;
+            const colors = NAV_COLORS[colorKey] || NAV_COLORS.slate;
 
             return (
               <Link
                 key={item.label}
                 to={item.to}
                 onClick={item.onClick}
-                className={`flex flex-col items-center gap-1 px-1 py-2 rounded-lg transition-all duration-200 ${isActive && !item.onClick
-                  ? `${NAV_COLORS[colorKey].bg} ${NAV_COLORS[colorKey].text}`
-                  : "text-slate-500 dark:text-slate-400 active:scale-95"
-                  }`}
+                className="flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-95"
               >
                 <div
-                  className={`transition-transform ${isActive ? "scale-105" : ""
+                  className={`flex items-center justify-center w-12 h-7 rounded-full mx-auto transition-all duration-300 ${isActive && !item.onClick
+                    ? `${colors.bg} ${colors.text} scale-105`
+                    : "text-slate-500 dark:text-slate-400 bg-transparent"
                     }`}
                 >
                   {React.cloneElement(
                     item.icon as React.ReactElement<{ className?: string }>,
                     {
-                      className: "w-6 h-6",
+                      className: "w-5 h-5",
                     }
                   )}
                 </div>
                 <span
-                  className={`text-[9px] font-medium truncate w-full text-center ${isActive ? "font-semibold" : ""
+                  className={`text-[9px] sm:text-[10px] tracking-tight mt-1 transition-colors duration-200 truncate w-full text-center ${isActive && !item.onClick
+                    ? "text-slate-900 dark:text-white font-bold"
+                    : "text-slate-500 dark:text-slate-400 font-medium"
                     }`}
                 >
                   {item.label}

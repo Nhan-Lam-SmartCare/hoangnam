@@ -17,6 +17,8 @@ import {
   Save,
   UserPlus,
   X,
+  Package,
+  History,
 } from "lucide-react";
 import { useAppContext } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -146,10 +148,7 @@ const SalesManager: React.FC = () => {
   const [pageSize, setPageSize] = useState(12);
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
-  const [rightTab, setRightTab] = useState<"checkout" | "history">("checkout");
-  const [mobileStep, setMobileStep] = useState<"products" | "checkout">(
-    "products"
-  );
+  const [activeTab, setActiveTab] = useState<"products" | "cart" | "history">("products");
     const enablePartsPaging =
     (import.meta.env.VITE_SALES_PARTS_PAGED || "false").toLowerCase() === "true";
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -238,10 +237,10 @@ const SalesManager: React.FC = () => {
   }, [historyQuery, sales.length]);
 
   useEffect(() => {
-    if (cartItems.length === 0 && mobileStep === "checkout") {
-      setMobileStep("products");
+    if (cartItems.length === 0 && activeTab === "cart") {
+      setActiveTab("products");
     }
-  }, [cartItems.length, mobileStep]);
+  }, [cartItems.length, activeTab]);
 
   // B5: nạp đơn đang giữ theo chi nhánh
   useEffect(() => {
@@ -733,7 +732,7 @@ Cam on quy khach da tin tuong!
     };
     setHeldOrders((prev) => [held, ...prev]);
     resetSaleForm();
-    setMobileStep("products");
+    setActiveTab("products");
     showToast.success("Đã giữ đơn. Bạn có thể mở lại bất cứ lúc nào.");
   };
 
@@ -756,7 +755,7 @@ Cam on quy khach da tin tuong!
     setSelectedCustomerId(held.selectedCustomerId);
     setPaidAmount("full");
     setHeldOrders((prev) => prev.filter((h) => h.id !== held.id));
-    setRightTab("checkout");
+    setActiveTab("cart");
     showToast.success("Đã mở lại đơn giữ.");
   };
 
@@ -857,7 +856,7 @@ Cam on quy khach da tin tuong!
       setCustomerSearch("Khách lẻ");
       setCustomerPhone("");
       setSelectedCustomerId(null);
-      setMobileStep("products");
+      setActiveTab("products");
 
       if (result.ok) {
         if (autoPrintInvoice) {
@@ -968,32 +967,62 @@ Cam on quy khach da tin tuong!
     <div className={`${ui.pageBg} sales-screen`}>
       <div className={ui.header}>
         <div className="max-w-[1400px] mx-auto w-full flex flex-wrap items-center justify-between gap-4">
-            <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                        <ShoppingCart className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    Bán hàng tại quầy
-                </h1>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 ml-[50px]">
-                    Điểm bán thông minh
-                </p>
-            </div>
-            
-            <div className="flex items-center gap-2 text-xs font-bold">
-                <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                    Sản phẩm: {filteredParts.length}
-                </span>
-                <span className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
-                    Giỏ hàng: {cartItems.length}
-                </span>
-            </div>
+          <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-full sm:w-auto">
+            <button
+              onClick={() => setActiveTab("products")}
+              className={`flex-1 sm:flex-initial px-2 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${
+                activeTab === "products"
+                  ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Sản phẩm
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs font-bold ${
+                activeTab === "products"
+                  ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                  : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+              }`}>
+                {filteredParts.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("cart")}
+              className={`flex-1 sm:flex-initial px-2 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${
+                activeTab === "cart"
+                  ? "bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Giỏ hàng
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] sm:text-xs font-bold ${
+                activeTab === "cart"
+                  ? "bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                  : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+              }`}>
+                {cartItems.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex-1 sm:flex-initial px-2 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${
+                activeTab === "history"
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Lịch sử bán hàng</span>
+              <span className="inline sm:hidden">Lịch sử</span>
+            </button>
+          </div>
         </div>
       </div>
       <div className="relative grid max-w-[1400px] mx-auto px-4 grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
         <section
           className={`${ui.leftPanel} transition-all duration-300 ease-out md:translate-x-0 md:opacity-100 md:pointer-events-auto md:static ${
-            mobileStep === "products"
+            activeTab === "products"
               ? "translate-x-0 opacity-100"
               : "absolute inset-0 -translate-x-full opacity-0 pointer-events-none"
           }`}
@@ -1152,66 +1181,56 @@ Cam on quy khach da tin tuong!
 
         <section
           className={`${ui.rightPanel} transition-all duration-300 ease-out md:translate-x-0 md:opacity-100 md:pointer-events-auto md:static ${
-            mobileStep === "checkout"
+            activeTab !== "products"
               ? "translate-x-0 opacity-100"
               : "absolute inset-0 translate-x-full opacity-0 pointer-events-none"
           }`}
         >
-          <div className="md:hidden">
-            <button
-              onClick={() => setMobileStep("products")}
-              className="mb-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 dark:text-slate-300"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Quay lại chọn sản phẩm
-            </button>
-          </div>
-          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 p-4 mb-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-400/70 font-bold mb-1">
-                  Giao dịch nhanh
-                </p>
-                <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-base">
-                  <ReceiptText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  Quản lý bán hàng
-                </h2>
-              </div>
-              <div className="text-right">
-                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Giỏ hàng</div>
-                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                  {cartItems.length}
+          {(activeTab === "products" || activeTab === "cart") && (
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10 p-4 mb-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-700/70 dark:text-emerald-400/70 font-bold mb-1">
+                    Đơn hàng hiện tại
+                  </p>
+                  <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-base">
+                    <ShoppingCart className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    Thông tin thanh toán
+                  </h2>
+                </div>
+                <div className="text-right">
+                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Sản phẩm</div>
+                  <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                    {cartItems.length}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
-            <button
-              type="button"
-              onClick={() => setRightTab("checkout")}
-              className={`h-9 rounded-lg text-sm font-bold transition-all ${
-                rightTab === "checkout"
-                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              Thanh toán
-            </button>
-            <button
-              type="button"
-              onClick={() => setRightTab("history")}
-              className={`h-9 rounded-lg text-sm font-bold transition-all ${
-                rightTab === "history"
-                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              Lịch sử bán hàng
-            </button>
-          </div>
+          {activeTab === "history" && (
+            <div className="rounded-2xl border border-blue-200 dark:border-blue-500/20 bg-blue-50/50 dark:bg-blue-500/10 p-4 mb-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-blue-700/70 dark:text-blue-400/70 font-bold mb-1">
+                    Tra cứu giao dịch
+                  </p>
+                  <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-base">
+                    <History className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    Lịch sử bán hàng
+                  </h2>
+                </div>
+                <div className="text-right">
+                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Tổng hóa đơn</div>
+                  <div className="text-xl font-black text-blue-600 dark:text-blue-400">
+                    {sales.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {rightTab === "checkout" && (
+          {(activeTab === "products" || activeTab === "cart") && (
           <>
           <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1 mb-4">
             {cartItems.map((item) => (
@@ -1603,11 +1622,8 @@ Cam on quy khach da tin tuong!
           </>
           )}
 
-          {rightTab === "history" && (
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2 mt-3">
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Lịch sử bán hàng
-            </h3>
+          {activeTab === "history" && (
+          <div className="space-y-2">
 
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -1736,7 +1752,7 @@ Cam on quy khach da tin tuong!
         </section>
       </div>
 
-      {mobileStep === "products" && cartItems.length > 0 && (
+      {activeTab === "products" && cartItems.length > 0 && (
         <div
           className="md:hidden fixed left-3 right-3 bottom-20 z-[9999]"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -1744,8 +1760,7 @@ Cam on quy khach da tin tuong!
           <button
             onClick={() => {
               if (!cartItems.length) return;
-              setRightTab("checkout");
-              setMobileStep("checkout");
+              setActiveTab("cart");
             }}
             className="w-full rounded-2xl border px-4 py-3 transition bg-slate-900/95 dark:bg-emerald-700 text-white shadow-xl border-white/10"
           >
@@ -1764,8 +1779,7 @@ Cam on quy khach da tin tuong!
         </div>
       )}
 
-      {mobileStep === "checkout" &&
-        rightTab === "checkout" &&
+      {activeTab === "cart" &&
         cartItems.length > 0 && (
         <div
           className="md:hidden fixed left-3 right-3 bottom-20 z-[9999]"

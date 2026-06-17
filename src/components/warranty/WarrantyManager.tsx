@@ -338,73 +338,77 @@ export const WarrantyManager: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#151521] pb-20">
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1e1e2d]/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-4">
+            <div className="sticky top-0 z-20 bg-white/90 dark:bg-[#1e1e2d]/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-3 sm:py-4">
                 <div className="max-w-6xl mx-auto">
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                                    <Shield className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                                </div>
-                                Quản Lý Bảo Hành
-                            </h1>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 ml-[50px]">
-                                {activeTab === "cards"
-                                    ? `Tổng cộng ${filteredCards?.length || 0} phiếu`
-                                    : `Tổng cộng ${filteredClaims?.length || 0} yêu cầu`}
-                            </p>
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex-1 sm:flex-initial flex items-center gap-2.5">
+                            <div className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 items-center justify-center shrink-0">
+                                <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div className="flex-1 sm:flex-initial flex bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800/60 shadow-inner w-full sm:w-auto">
+                                <button
+                                    onClick={() => setActiveTab("cards")}
+                                    className={`px-3 py-1.5 sm:px-5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all duration-200 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 ${
+                                        activeTab === "cards"
+                                            ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/50 dark:border-slate-700/30"
+                                            : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    }`}
+                                >
+                                    Phiếu bảo hành
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                                        activeTab === "cards"
+                                            ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                            : "bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                    }`}>
+                                        {filteredCards?.length || 0}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("claims")}
+                                    className={`px-3 py-1.5 sm:px-5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all duration-200 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 ${
+                                        activeTab === "claims"
+                                            ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/50 dark:border-slate-700/30"
+                                            : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    }`}
+                                >
+                                    Tiếp nhận
+                                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                                        activeTab === "claims"
+                                            ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                            : "bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                                    }`}>
+                                        {filteredClaims?.length || 0}
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                         {activeTab === "cards" && (
                             <button
                                 onClick={() => setShowCreateModal(true)}
-                                className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-sm shadow-emerald-500/20 active:scale-95"
+                                className="shrink-0 h-9 w-9 sm:h-10 sm:w-auto sm:px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/10 active:scale-95"
+                                title="Tạo phiếu mới"
                             >
                                 <Plus className="w-4 h-4" />
-                                Tạo phiếu mới
+                                <span className="hidden sm:inline">Tạo phiếu mới</span>
                             </button>
                         )}
                     </div>
 
-                    {/* Tabs & Search Row */}
-                    <div className="flex flex-col md:flex-row gap-3 relative z-10">
-                        <div className="flex bg-slate-100/80 dark:bg-slate-900/60 p-1 rounded-xl shrink-0 border border-slate-200/40 dark:border-slate-800/60 shadow-inner">
-                            <button
-                                onClick={() => setActiveTab("cards")}
-                                className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 flex-1 md:flex-none text-center hover:scale-[1.02] active:scale-95 ${
-                                    activeTab === "cards"
-                                        ? "bg-white dark:bg-[#2a2a3c] text-emerald-600 dark:text-emerald-400 shadow-md border border-slate-200/20 dark:border-slate-800/30"
-                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                }`}
-                            >
-                                Phiếu bảo hành
-                            </button>
-                            <button
-                                onClick={() => setActiveTab("claims")}
-                                className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 flex-1 md:flex-none text-center hover:scale-[1.02] active:scale-95 ${
-                                    activeTab === "claims"
-                                        ? "bg-white dark:bg-[#2a2a3c] text-emerald-600 dark:text-emerald-400 shadow-md border border-slate-200/20 dark:border-slate-800/30"
-                                        : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                }`}
-                            >
-                                Tiếp nhận
-                            </button>
-                        </div>
-
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Tìm theo tên khách, SĐT, thiết bị, IMEI..."
-                                className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-900 dark:text-white placeholder-slate-400/80 focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-300 text-sm font-semibold"
-                            />
-                        </div>
+                    {/* Search Row */}
+                    <div className="relative mt-3 z-10">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Tìm theo tên khách, SĐT, thiết bị, IMEI..."
+                            className="w-full pl-9 pr-4 py-2 bg-slate-100/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-xl text-slate-900 dark:text-white placeholder-slate-400/80 focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-300 text-xs sm:text-sm font-semibold"
+                        />
                     </div>
 
                     {/* Status Filter - Swipeable container */}
                     {activeTab === "cards" && (
-                        <div className="flex overflow-x-auto flex-nowrap gap-2 mt-4 pl-1 pb-2 hide-scrollbar-mobile custom-scrollbar-scientific scroll-smooth">
+                        <div className="flex overflow-x-auto flex-nowrap gap-1.5 mt-3 pl-1 pb-1.5 hide-scrollbar-mobile custom-scrollbar-scientific scroll-smooth">
                             {[
                                 { value: "all", label: "Tất cả" },
                                 { value: "active", label: "Còn hạn" },
@@ -417,7 +421,7 @@ export const WarrantyManager: React.FC = () => {
                                     <button
                                         key={filter.value}
                                         onClick={() => setStatusFilter(filter.value as any)}
-                                        className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all duration-200 border ${
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all duration-200 border ${
                                             isActive
                                                 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.12)] scale-[1.03]"
                                                 : "bg-white dark:bg-[#1e1e2d] border-slate-200/60 dark:border-slate-800/80 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 hover:scale-[1.01] active:scale-95"
@@ -454,39 +458,39 @@ export const WarrantyManager: React.FC = () => {
                             );
 
                             return (
-                                <div key={group.key} className="glass-card-premium rounded-2xl border border-slate-200/50 dark:border-slate-700/60 shadow-sm transition-all duration-300 hover:shadow-md mb-4 relative z-10">
+                                <div key={group.key} className="glass-card-premium rounded-2xl border border-slate-200/50 dark:border-slate-700/60 shadow-sm transition-all duration-300 hover:shadow-md mb-3 relative z-10">
                                     <button
                                         onClick={() => setExpandedCustomerKeys(prev => ({...prev, [group.key]: !isExpanded}))}
-                                        className={`w-full px-4 sm:px-6 py-4.5 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors duration-200 text-left active:scale-[0.99] rounded-t-2xl ${!isExpanded ? 'rounded-b-2xl' : ''}`}
+                                        className={`w-full px-3.5 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors duration-200 text-left active:scale-[0.99] rounded-t-2xl ${!isExpanded ? 'rounded-b-2xl' : ''}`}
                                     >
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 border border-emerald-500/20 dark:border-emerald-400/30 flex items-center justify-center shrink-0 shadow-inner relative mt-0.5">
-                                                <User className="w-5.5 h-5.5 text-emerald-600 dark:text-emerald-400" />
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20 border border-emerald-500/20 dark:border-emerald-400/30 flex items-center justify-center shrink-0 shadow-inner relative">
+                                                <User className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-emerald-600 dark:text-emerald-400" />
                                                 {counts.active ? (
-                                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1e1e2d] pulse-glow-green" />
+                                                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-[#1e1e2d] bg-emerald-500 pulse-glow-green" />
                                                 ) : counts.claimed ? (
-                                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 rounded-full border-2 border-white dark:border-[#1e1e2d] animate-pulse" />
+                                                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-[#1e1e2d] bg-amber-500 animate-pulse" />
                                                 ) : (
-                                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-2 border-white dark:border-[#1e1e2d]" />
+                                                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-[#1e1e2d] bg-slate-400" />
                                                 )}
                                             </div>
                                             <div className="text-left">
-                                                <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                                                <div className="text-sm sm:text-lg font-bold text-slate-900 dark:text-white">
                                                     {group.name}
                                                 </div>
-                                                <div className="text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                                                <div className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                                    <Phone className="w-3 h-3 text-slate-400" />
                                                     {group.phone}
                                                 </div>
-                                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                                    {counts.active ? <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-xs font-bold border border-emerald-500/20 dark:border-emerald-500/10">{counts.active} còn hạn</span> : null}
-                                                    {counts.expired ? <span className="px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-600 dark:text-slate-400 text-[10px] sm:text-xs font-bold border border-slate-500/20">{counts.expired} hết hạn</span> : null}
-                                                    {counts.claimed ? <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] sm:text-xs font-bold border border-amber-500/20">{counts.claimed} đang xử lý</span> : null}
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                    {counts.active ? <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20 dark:border-emerald-500/10">{counts.active} còn hạn</span> : null}
+                                                    {counts.expired ? <span className="px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-600 dark:text-slate-400 text-[10px] font-bold border border-slate-500/20">{counts.expired} hết hạn</span> : null}
+                                                    {counts.claimed ? <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold border border-amber-500/20">{counts.claimed} đang xử lý</span> : null}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="text-slate-400 bg-slate-100/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-2.5 shrink-0 transition-transform duration-300 shadow-sm active:scale-90">
-                                            <ChevronDown className={`w-4.5 h-4.5 transition-transform duration-300 ${isExpanded ? "rotate-180 text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} />
+                                        <div className="text-slate-400 bg-slate-100/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-2 shrink-0 transition-transform duration-300 shadow-sm active:scale-90">
+                                            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? "rotate-180 text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} />
                                         </div>
                                     </button>
                                     

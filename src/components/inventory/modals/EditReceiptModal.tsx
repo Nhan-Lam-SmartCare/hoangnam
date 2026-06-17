@@ -99,11 +99,14 @@ const EditReceiptModal: React.FC<{
   useEffect(() => {
     const fetchPaymentInfo = async () => {
       try {
-        // Find the transaction related to this receipt
+        // Find the transaction related to this receipt.
+        // Schema khác nhau dùng cột notes HOẶC description -> tìm cả hai.
         const { data } = await supabase
           .from("cash_transactions")
           .select("paymentsource") // Note: lowercase in DB
-          .ilike("description", `%${receipt.receiptCode}%`)
+          .or(
+            `notes.ilike.%${receipt.receiptCode}%,description.ilike.%${receipt.receiptCode}%`
+          )
           .maybeSingle();
 
         if (data && (data.paymentsource === "bank" || data.paymentsource === "transfer")) {
