@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchEmployees,
+  fetchEmployeesDirectory,
   createEmployee,
   updateEmployee,
   deleteEmployee,
@@ -9,11 +10,28 @@ import type { Employee } from "../types";
 import { showToast } from "../utils/toast";
 import { mapRepoErrorForUser } from "../utils/errorMapping";
 
+// Full employee records INCLUDING salary. Only call from owner/manager screens
+// (Settings/Payroll/Employees). RLS locks the base table to owner/manager.
 export function useEmployeesRepo() {
   return useQuery({
     queryKey: ["employees"],
     queryFn: async () => {
       const result = await fetchEmployees();
+      if (!result.ok) {
+        throw new Error(mapRepoErrorForUser(result.error));
+      }
+      return result.data;
+    },
+  });
+}
+
+// Salary-free directory (id/name/status/branch...). Safe for staff-facing UIs
+// such as the work-order worker dropdown.
+export function useEmployeesDirectoryRepo() {
+  return useQuery({
+    queryKey: ["employees", "directory"],
+    queryFn: async () => {
+      const result = await fetchEmployeesDirectory();
       if (!result.ok) {
         throw new Error(mapRepoErrorForUser(result.error));
       }

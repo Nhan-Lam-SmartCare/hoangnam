@@ -11,7 +11,7 @@ export async function fetchCustomerDebts(): Promise<
     const { data, error } = await supabase
       .from("customer_debts")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_date", { ascending: false });
 
     if (error)
       return failure({
@@ -294,7 +294,7 @@ export async function fetchSupplierDebts(): Promise<
     const { data, error } = await supabase
       .from("supplier_debts")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_date", { ascending: false });
 
     if (error)
       return failure({

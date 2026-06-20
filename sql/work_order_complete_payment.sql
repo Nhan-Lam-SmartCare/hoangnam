@@ -39,6 +39,8 @@ DECLARE
   v_branch_id TEXT := 'CN1';
   v_parts JSONB := '[]'::jsonb;
   v_inventory_deducted BOOLEAN := FALSE;
+  v_wo_status TEXT := '';
+  v_is_completion BOOLEAN := FALSE;
 
   v_set_clause TEXT := '';
   v_col_exists BOOLEAN := FALSE;
@@ -92,6 +94,16 @@ BEGIN
 
   v_parts := COALESCE(v_row_json -> 'partsUsed', v_row_json -> 'partsused', '[]'::jsonb);
   v_inventory_deducted := COALESCE((v_row_json ->> 'inventory_deducted')::boolean, FALSE);
+
+  -- #3: Trừ kho khi phiếu đã hoàn tất/trả máy (phụ tùng đã dùng), không đợi
+  -- thu đủ tiền. So khớp cả dạng có dấu lẫn không dấu của trạng thái.
+  v_wo_status := lower(COALESCE(v_row_json ->> 'status', ''));
+  v_is_completion := v_wo_status IN (
+    'trả máy', 'tra may',
+    'đã sửa xong', 'da sua xong',
+    'hoàn tất', 'hoan tat',
+    'completed'
+  );
 
   -- Build dynamic update clause for mixed schemas
   -- payment status
@@ -229,8 +241,8 @@ BEGIN
     EXECUTE 'UPDATE public.work_orders SET ' || v_set_clause || ' WHERE id = ' || quote_literal(p_order_id);
   END IF;
 
-  -- Deduct stock once when order becomes fully paid
-  IF v_new_status = 'paid' AND NOT v_inventory_deducted THEN
+  -- Deduct stock once when order becomes fully paid OR is completed/handed over
+  IF (v_new_status = 'paid' OR v_is_completion) AND NOT v_inventory_deducted THEN
     -- Validate stock first
     FOR v_item IN SELECT value FROM jsonb_array_elements(COALESCE(v_parts, '[]'::jsonb))
     LOOP
@@ -311,7 +323,7 @@ BEGIN
     'workOrder', v_row_json,
     'paymentTransactionId', NULL,
     'newPaymentStatus', v_new_status,
-    'inventoryDeducted', (v_new_status = 'paid')
+    'inventoryDeducted', (v_new_status = 'paid' OR v_is_completion)
   );
 END;
 $$;

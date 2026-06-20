@@ -305,8 +305,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
   };
 
   const subtotal = receiptItems.reduce(
-    (sum, item) =>
-      sum + item.quantity * item.importPrice + (item.laborCost || 0),
+    (sum, item) => sum + item.quantity * item.importPrice,
     0
   );
 
@@ -744,8 +743,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                           </div>
                           <div className="font-extrabold text-sm text-slate-900 dark:text-slate-100 pt-0.5">
                             {formatCurrency(
-                              item.quantity * item.importPrice +
-                                (item.laborCost || 0)
+                              item.quantity * item.importPrice
                             )} đ
                           </div>
                         </div>

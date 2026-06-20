@@ -62,5 +62,31 @@ describe("Permissions", () => {
         expect(canDo(role, "debt.view")).toBe(false);
       });
     });
+
+    describe("per-action permission overrides", () => {
+      it("grants a restricted action when override is true for a staff profile", () => {
+        const profile = { role: "staff" as UserRole, permissions: { "finance.view": true } };
+        expect(canDo(profile, "finance.view")).toBe(true);
+      });
+
+      it("revokes a default-allowed action when override is false", () => {
+        const profile = { role: "manager" as UserRole, permissions: { "settings.update": false } };
+        expect(canDo(profile, "settings.update")).toBe(false);
+      });
+
+      it("falls back to role policy when no override is present", () => {
+        const profile = { role: "staff" as UserRole, permissions: { "sale.create": true } };
+        // sale.create overridden true; reports.view not overridden -> role policy (false)
+        expect(canDo(profile, "reports.view")).toBe(false);
+      });
+
+      it("ignores non-boolean override values", () => {
+        const profile = {
+          role: "staff" as UserRole,
+          permissions: { "finance.view": "yes" as unknown as boolean },
+        };
+        expect(canDo(profile, "finance.view")).toBe(false);
+      });
+    });
   });
 });

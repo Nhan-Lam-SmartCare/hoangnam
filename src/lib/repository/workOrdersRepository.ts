@@ -2,6 +2,7 @@ import { supabase } from "../../supabaseClient";
 import type { WorkOrder, StockWarning } from "../../types";
 import { RepoResult, success, failure } from "./types";
 import { formatWorkOrderId } from "../../utils/format";
+import { updatePaymentSourceBalance } from "./paymentSourcesRepository";
 
 const WORK_ORDERS_TABLE = "work_orders";
 const ADDITIONAL_SERVICES_MARKER = "[ADDITIONAL_SERVICES]:";
@@ -347,6 +348,55 @@ async function autoCreateWarrantyCardsForWorkOrder(order: WorkOrder): Promise<nu
   return rowsToInsert.length;
 }
 
+async function updateCustomerMetricsAtomic(
+  customerId: string,
+  paymentAmount: number,
+  isFirstPayment: boolean
+): Promise<void> {
+  if (paymentAmount <= 0) return;
+  try {
+    const { error } = await supabase.rpc("update_customer_metrics_atomic", {
+      p_customer_id: customerId,
+      p_payment_amount: paymentAmount,
+      p_is_first_payment: isFirstPayment,
+    });
+
+    if (error) {
+      console.warn("[updateCustomerMetricsAtomic] RPC failed, using read-modify-write fallback", error);
+      const { data: currentStats } = await supabase
+        .from("customers")
+        .select("totalspent, visitcount")
+        .eq("id", customerId)
+        .single();
+
+      if (currentStats) {
+        const currentTotalSpent = Number(currentStats.totalspent || 0);
+        const currentVisitCount = Number(currentStats.visitcount || 0);
+        
+        const newTotalSpent = currentTotalSpent + paymentAmount;
+        const newVisitCount = isFirstPayment ? currentVisitCount + 1 : currentVisitCount;
+        
+        let newSegment = "New";
+        if (newTotalSpent > 10000000) newSegment = "VIP";
+        else if (newTotalSpent > 3000000) newSegment = "Loyal";
+        else if (newVisitCount > 1) newSegment = "Potential";
+
+        await supabase
+          .from("customers")
+          .update({
+            totalspent: newTotalSpent,
+            visitcount: newVisitCount,
+            lastvisit: new Date().toISOString(),
+            segment: newSegment
+          })
+          .eq("id", customerId);
+      }
+    }
+  } catch (err) {
+    console.warn("Lỗi cập nhật số liệu khách hàng:", err);
+  }
+}
+
 async function updateCustomerMetricsOnPayment(
   order: WorkOrder,
   paymentAmount: number,
@@ -358,11 +408,10 @@ async function updateCustomerMetricsOnPayment(
   try {
     let customerIdToUpdate = null;
     
-    // Find customer by phone
     if (order.customerPhone) {
       const { data: existingCustomers } = await supabase
         .from("customers")
-        .select("id, totalspent, visitcount")
+        .select("id")
         .eq("phone", order.customerPhone)
         .limit(1);
         
@@ -372,37 +421,10 @@ async function updateCustomerMetricsOnPayment(
     }
 
     if (customerIdToUpdate) {
-      const { data: currentStats } = await supabase
-        .from("customers")
-        .select("totalspent, visitcount")
-        .eq("id", customerIdToUpdate)
-        .single();
-
-      const currentTotalSpent = Number(currentStats?.totalspent || 0);
-      const currentVisitCount = Number(currentStats?.visitcount || 0);
-      
-      const newTotalSpent = currentTotalSpent + paymentAmount;
-      const newVisitCount = isFirstPayment ? currentVisitCount + 1 : currentVisitCount;
-      
-      let newSegment = "New";
-      if (newTotalSpent > 10000000) newSegment = "VIP";
-      else if (newTotalSpent > 3000000) newSegment = "Loyal";
-      else if (newVisitCount > 1) newSegment = "Potential";
-
-      await supabase
-        .from("customers")
-        .update({
-          totalspent: newTotalSpent,
-          visitcount: newVisitCount,
-          lastvisit: new Date().toISOString(),
-          segment: newSegment
-        })
-        .eq("id", customerIdToUpdate);
+      await updateCustomerMetricsAtomic(customerIdToUpdate, paymentAmount, isFirstPayment);
     }
     
-    // Also update Vehicle km if provided
     if (order.vehicleId && order.currentKm && order.currentKm > 0) {
-       // Need to fetch customer's vehicles to update
        if (customerIdToUpdate) {
          const { data: custData } = await supabase.from("customers").select("vehicles").eq("id", customerIdToUpdate).single();
          if (custData && custData.vehicles) {
@@ -846,6 +868,10 @@ export async function recordWorkOrderPaymentTransactions(params: {
       );
       return;
     }
+
+    // Atomically update the payment source balance in DB
+    await updatePaymentSourceBalance(paymentSource, branchId, amount);
+
     created.push({
       id,
       type: "income",
@@ -1181,6 +1207,374 @@ export async function fetchWorkOrdersFiltered(options?: {
   }
 }
 
+export async function deductStockForWorkOrder(
+  orderId: string,
+  partsUsed: any[],
+  branchId: string
+): Promise<boolean> {
+  try {
+    const { data: orderRow } = await supabase
+      .from(WORK_ORDERS_TABLE)
+      .select("inventory_deducted, inventoryDeducted")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    const alreadyDeducted =
+      Boolean(orderRow?.inventory_deducted) ||
+      Boolean(orderRow?.inventoryDeducted);
+
+    if (alreadyDeducted) {
+      return true;
+    }
+
+    const nowIso = new Date().toISOString();
+    let deductSuccess = true;
+
+    for (const part of partsUsed) {
+      const partId = getPartIdFromOrderItem(part);
+      const qty = Math.max(0, Number(part?.quantity || 0));
+      if (!partId || qty <= 0) continue;
+
+      const { data: partRow, error: partFetchError } = await supabase
+        .from("parts")
+        .select("id, name, stock")
+        .eq("id", partId)
+        .single();
+
+      if (partFetchError || !partRow) {
+        console.warn("[deductStockForWorkOrder] Skip deduct: part not found", partId);
+        continue;
+      }
+
+      const currentStock = (partRow as any).stock || {};
+      const nextStock = {
+        ...currentStock,
+        [branchId]: Math.max(0, Number(currentStock?.[branchId] || 0) - qty),
+      };
+
+      const { error: partUpdateError } = await supabase
+        .from("parts")
+        .update({ stock: nextStock })
+        .eq("id", partId);
+
+      if (partUpdateError) {
+        console.warn("[deductStockForWorkOrder] Failed to update part stock", partId, partUpdateError);
+        deductSuccess = false;
+        continue;
+      }
+
+      await supabase.from("inventory_transactions").insert([
+        {
+          id: typeof crypto !== "undefined" && (crypto as any).randomUUID
+            ? (crypto as any).randomUUID()
+            : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+          type: "Xuất kho",
+          partId,
+          partName: String(part?.partName || (partRow as any).name || "Phụ tùng"),
+          quantity: qty,
+          date: nowIso,
+          branchId,
+          notes: `Xuất kho sửa chữa - Phiếu #${orderId}`,
+          workOrderId: orderId,
+        },
+      ]);
+    }
+
+    if (deductSuccess) {
+      await supabase
+        .from(WORK_ORDERS_TABLE)
+        .update({ inventory_deducted: true, inventoryDeducted: true })
+        .eq("id", orderId);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error("[deductStockForWorkOrder] Error:", err);
+    return false;
+  }
+}
+
+export async function adjustStockForUpdatedParts(
+  orderId: string,
+  oldParts: any[],
+  newParts: any[],
+  branchId: string
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  
+  const oldMap = new Map<string, { qty: number; name: string }>();
+  for (const part of oldParts) {
+    const partId = getPartIdFromOrderItem(part);
+    if (!partId) continue;
+    const qty = Number(part?.quantity || 0);
+    const name = String(part?.partName || part?.part_name || "");
+    oldMap.set(partId, { qty, name });
+  }
+
+  const newMap = new Map<string, { qty: number; name: string }>();
+  for (const part of newParts) {
+    const partId = getPartIdFromOrderItem(part);
+    if (!partId) continue;
+    const qty = Number(part?.quantity || 0);
+    const name = String(part?.partName || part?.part_name || "");
+    newMap.set(partId, { qty, name });
+  }
+
+  const allPartIds = new Set([...oldMap.keys(), ...newMap.keys()]);
+
+  for (const partId of allPartIds) {
+    const oldVal = oldMap.get(partId) || { qty: 0, name: "" };
+    const newVal = newMap.get(partId) || { qty: 0, name: "" };
+    const delta = newVal.qty - oldVal.qty;
+
+    if (delta === 0) continue;
+
+    try {
+      const { data: partRow, error: partFetchError } = await supabase
+        .from("parts")
+        .select("id, name, stock")
+        .eq("id", partId)
+        .single();
+
+      if (partFetchError || !partRow) {
+        console.warn("[adjustStockForUpdatedParts] Skip adjust: part not found", partId);
+        continue;
+      }
+
+      const currentStock = (partRow as any).stock || {};
+      const nextStock = {
+        ...currentStock,
+        [branchId]: Math.max(0, Number(currentStock?.[branchId] || 0) - delta),
+      };
+
+      await supabase
+        .from("parts")
+        .update({ stock: nextStock })
+        .eq("id", partId);
+
+      await supabase.from("inventory_transactions").insert([
+        {
+          id: typeof crypto !== "undefined" && (crypto as any).randomUUID
+            ? (crypto as any).randomUUID()
+            : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+          type: delta > 0 ? "Xuất kho" : "Nhập kho",
+          partId,
+          partName: newVal.name || oldVal.name || (partRow as any).name || "Phụ tùng",
+          quantity: Math.abs(delta),
+          date: nowIso,
+          branchId,
+          notes: delta > 0 
+            ? `Xuất kho bổ sung do sửa đổi phiếu #${orderId}`
+            : `Nhập hoàn kho do giảm phụ tùng ở phiếu #${orderId}`,
+          workOrderId: orderId,
+        },
+      ]);
+    } catch (err) {
+      console.error("[adjustStockForUpdatedParts] Error adjusting part:", partId, err);
+    }
+  }
+}
+
+export async function syncAdditionalServicesTransactions(
+  orderId: string,
+  additionalServices: any[],
+  branchId: string
+): Promise<void> {
+  if (!additionalServices || additionalServices.length === 0) return;
+
+  const totalOutsourcingCost = additionalServices.reduce(
+    (sum: number, service: any) => sum + (service.costPrice || 0) * service.quantity,
+    0
+  );
+
+  const negativeSalesPayment = additionalServices.reduce((sum: number, service: any) => {
+    if (service.price < 0 && (service.costPrice || 0) === 0) {
+      return sum + Math.abs(service.price * service.quantity);
+    }
+    return sum;
+  }, 0);
+
+  if (totalOutsourcingCost > 0) {
+    try {
+      const { data: existingTx } = await supabase
+        .from("cash_transactions")
+        .select("id")
+        .eq("reference", orderId)
+        .eq("category", "outsourcing")
+        .maybeSingle();
+
+      if (!existingTx) {
+        const outsourcingTxId = `EXPENSE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const { ok, error } = await insertCashTransactionWithCreator({
+          id: outsourcingTxId,
+          type: "expense",
+          category: "outsourcing",
+          amount: -totalOutsourcingCost,
+          date: new Date().toISOString(),
+          description: `Chi chi phí gia công ngoài - Phiếu #${orderId.split("-").pop()} - ${additionalServices
+            .map((s: any) => s.description || s.serviceName)
+            .join(", ")}`,
+          branchid: branchId,
+          paymentsource: "cash",
+          reference: orderId,
+        });
+
+        if (ok) {
+          await updatePaymentSourceBalance("cash", branchId, -totalOutsourcingCost);
+        } else {
+          console.error("[syncAdditionalServices] Outsourcing expense insert failed:", error);
+        }
+      }
+    } catch (err) {
+      console.error("[syncAdditionalServices] Outsourcing error:", err);
+    }
+  }
+
+  if (negativeSalesPayment > 0) {
+    try {
+      const negativeServices = additionalServices.filter((s: any) => s.price < 0 && (s.costPrice || 0) === 0);
+      const { data: existingNegTx } = await supabase
+        .from("cash_transactions")
+        .select("id")
+        .eq("reference", orderId)
+        .eq("category", "refund")
+        .maybeSingle();
+
+      if (!existingNegTx) {
+        const negativeSalesTxId = `EXPENSE-NEG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const { ok, error } = await insertCashTransactionWithCreator({
+          id: negativeSalesTxId,
+          type: "expense",
+          category: "refund",
+          amount: -negativeSalesPayment,
+          date: new Date().toISOString(),
+          description: `Chi tiền (giá bán âm) - Phiếu #${orderId.split("-").pop()} - ${negativeServices
+            .map((s: any) => s.description || s.serviceName)
+            .join(", ")}`,
+          branchid: branchId,
+          paymentsource: "cash",
+          reference: orderId,
+        });
+
+        if (ok) {
+          await updatePaymentSourceBalance("cash", branchId, -negativeSalesPayment);
+        } else {
+          console.error("[syncAdditionalServices] Negative sales insert failed:", error);
+        }
+      }
+    } catch (err) {
+      console.error("[syncAdditionalServices] Negative sales error:", err);
+    }
+  }
+}
+
+function buildDebtDescription(workOrder: WorkOrder): string {
+  const workOrderSuffix = workOrder.id.split("-").pop() || workOrder.id;
+  let description = `${workOrder.vehicleModel || "Xe"} (Phiếu sửa chữa #${workOrderSuffix})`;
+
+  if (workOrder.issueDescription) {
+    description += `\nVấn đề: ${workOrder.issueDescription}`;
+  }
+
+  if (workOrder.partsUsed && workOrder.partsUsed.length > 0) {
+    description += "\n\nPhụ tùng đã thay:";
+    workOrder.partsUsed.forEach((part: any) => {
+      description += `\n  - ${part.quantity} x ${part.partName || part.part_name || "Phụ tùng"} - ${(part.price * part.quantity).toLocaleString()}đ`;
+    });
+  }
+
+  if (workOrder.additionalServices && workOrder.additionalServices.length > 0) {
+    description += "\n\nDịch vụ:";
+    workOrder.additionalServices.forEach((service: any) => {
+      description += `\n  - ${service.quantity} x ${service.description || service.serviceName} - ${(service.price * service.quantity).toLocaleString()}đ`;
+    });
+  }
+
+  if (workOrder.laborCost && workOrder.laborCost > 0) {
+    description += `\n\nCông lao động: ${workOrder.laborCost.toLocaleString()}đ`;
+  }
+
+  if (workOrder.discount && workOrder.discount > 0) {
+    description += `\nGiảm giá: -${workOrder.discount.toLocaleString()}đ`;
+  }
+
+  return description;
+}
+
+export async function syncCustomerDebtForWorkOrder(
+  order: WorkOrder
+): Promise<void> {
+  const remainingAmount = Math.max(0, Number(order.remainingAmount || 0));
+  const totalAmount = Number(order.total || 0);
+  const paidAmount = Number(order.totalPaid || 0);
+
+  const completionStatusKey = normalizeStatusKey(order.status);
+  const isHandoverStatus = completionStatusKey === "tra may";
+
+  if (!isHandoverStatus || remainingAmount <= 0) {
+    try {
+      await supabase
+        .from("customer_debts")
+        .delete()
+        .eq("work_order_id", order.id);
+    } catch (err) {
+      console.warn("[syncCustomerDebt] Error deleting customer debt:", err);
+    }
+    return;
+  }
+
+  try {
+    const safeCustomerId = order.customerPhone || order.id || `CUST-ANON-${Date.now()}`;
+    const safeCustomerName = order.customerName?.trim() || order.customerPhone || "Khách vãng lai";
+    const description = buildDebtDescription(order);
+
+    const payload = {
+      customerId: safeCustomerId,
+      customerName: safeCustomerName,
+      phone: order.customerPhone || null,
+      licensePlate: order.licensePlate || null,
+      description: description,
+      totalAmount: totalAmount,
+      paidAmount: paidAmount,
+      remainingAmount: remainingAmount,
+      createdDate: new Date().toISOString().split("T")[0],
+      branchId: order.branchId || "CN1",
+      workOrderId: order.id,
+    };
+
+    const debtId = `CDEBT-WO-${order.id}`;
+    const newDebt = {
+      id: debtId,
+      customer_id: payload.customerId,
+      customer_name: payload.customerName,
+      phone: payload.phone,
+      license_plate: payload.licensePlate,
+      description: payload.description,
+      total_amount: payload.totalAmount,
+      paid_amount: payload.paidAmount,
+      remaining_amount: payload.remainingAmount,
+      created_date: payload.createdDate,
+      branch_id: payload.branchId,
+      work_order_id: payload.workOrderId,
+      sale_id: null,
+    };
+
+    const { data: existing } = await supabase
+      .from("customer_debts")
+      .select("id")
+      .eq("work_order_id", order.id)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from("customer_debts").update(newDebt).eq("id", existing.id);
+    } else {
+      await supabase.from("customer_debts").insert(newDebt);
+    }
+  } catch (err) {
+    console.error("[syncCustomerDebt] Error upserting customer debt:", err);
+  }
+}
+
 // Atomic variant: delegates to DB RPC to ensure stock decrement, inventory tx, cash tx, and work order insert happen in a single transaction.
 export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
   RepoResult<
@@ -1300,7 +1694,8 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       "customerPhone": customerPhone,
       "vehicleModel": vehicleModel,
       "licensePlate": licensePlate, // Stores Serial/IMEI
-      // Not storing vehicleId or currentKm as columns don't exist in setup script
+      vehicleId: input.vehicleId || null,
+      currentKm: input.currentKm || null,
 
       status: input.status || "Tiếp nhận",
       "laborCost": laborCost,
@@ -1408,6 +1803,8 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         customerPhone,
         vehicleModel,
         licensePlate,
+        vehicleId: input.vehicleId || null,
+        currentKm: input.currentKm || null,
         status: input.status || "Tiếp nhận",
         laborCost,
         discount: input.discount || 0,
@@ -1486,12 +1883,66 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       })
     );
 
-    return success({
-      ...normalizedOrder,
-      // Mock these as they are not returned by simple insert
-      inventoryTxCount: 0,
-      inventoryDeducted: false
+    // Sync all related data in repository fallback
+    const completionStatusKey = normalizeStatusKey(normalizedOrder.status);
+    const isCompletionStatus = [
+      "tra may",
+      "da sua xong",
+      "hoan tat",
+      "completed",
+    ].includes(completionStatusKey);
+    const isPaidStatus = normalizedOrder.paymentStatus === "paid";
+
+    let finalInventoryDeducted = false;
+    if (isCompletionStatus || isPaidStatus) {
+      finalInventoryDeducted = await deductStockForWorkOrder(normalizedOrder.id, partsUsed, branchId);
+    }
+
+    const createdTxs = await recordWorkOrderPaymentTransactions({
+      orderId: normalizedOrder.id,
+      customerName: normalizedOrder.customerName || "",
+      branchId: branchId,
+      paymentMethod: normalizedOrder.paymentMethod || "cash",
+      depositAmount: depositAmount,
+      servicePayment: additionalPayment,
     });
+
+    const depositTx = createdTxs.find(tx => tx.category === "service_deposit");
+    const paymentTx = createdTxs.find(tx => tx.category === "service_income");
+    const depositTransactionId = depositTx?.id;
+    const paymentTransactionId = paymentTx?.id;
+
+    if (depositTransactionId || paymentTransactionId) {
+      const updates: Record<string, any> = {};
+      if (depositTransactionId) {
+        updates.deposittransactionid = depositTransactionId;
+        updates.depositTransactionId = depositTransactionId;
+      }
+      if (paymentTransactionId) {
+        updates.cashtransactionid = paymentTransactionId;
+        updates.cashTransactionId = paymentTransactionId;
+        updates.paymentDate = new Date().toISOString();
+      }
+      await supabase.from(WORK_ORDERS_TABLE).update(updates).eq("id", normalizedOrder.id);
+    }
+
+    await syncAdditionalServicesTransactions(normalizedOrder.id, additionalServices, branchId);
+
+    const finalOrderToReturn = {
+      ...normalizedOrder,
+      depositTransactionId: depositTransactionId || normalizedOrder.depositTransactionId,
+      cashTransactionId: paymentTransactionId || normalizedOrder.cashTransactionId,
+      inventoryDeducted: finalInventoryDeducted,
+    };
+
+    await syncCustomerDebtForWorkOrder(finalOrderToReturn);
+
+    const totalPaidThisSession = depositAmount + additionalPayment;
+    if (totalPaidThisSession > 0) {
+      await updateCustomerMetricsOnPayment(finalOrderToReturn, totalPaidThisSession, true);
+    }
+
+    return success(finalOrderToReturn);
   } catch (e: any) {
     return failure({
       code: "network",
@@ -1517,6 +1968,17 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
         code: "validation",
         message: "Thiếu ID phiếu sửa chữa",
       });
+
+    // Fetch existing state of the work order before updating
+    const { data: oldRow } = await supabase
+      .from(WORK_ORDERS_TABLE)
+      .select("*")
+      .eq("id", input.id)
+      .maybeSingle();
+
+    const oldOrder = oldRow ? normalizeWorkOrder(oldRow) : null;
+    const oldParts = oldOrder?.partsUsed || [];
+    const oldDeducted = oldRow ? (Boolean(oldRow.inventory_deducted) || Boolean(oldRow.inventoryDeducted)) : false;
 
     // 🔹 FALLBACK: Use direct update since RPC function is missing/broken on user's DB
     // Map input to DB columns (based on supabase_complete_setup.sql)
@@ -1559,6 +2021,8 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       "customerPhone": input.customerPhone,
       "vehicleModel": input.vehicleModel,
       "licensePlate": input.licensePlate, // Stores Serial/IMEI
+      vehicleId: input.vehicleId,
+      currentKm: input.currentKm,
 
       status: input.status,
       "laborCost": input.laborCost,
@@ -1645,13 +2109,77 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       })
     );
 
-    return success({
-      ...normalizedOrder,
-      // Mock these as they are not returned by simple update
-      depositTransactionId: undefined,
-      paymentTransactionId: undefined,
-      stockWarnings: undefined
+    const completionStatusKey = normalizeStatusKey(normalizedOrder.status);
+    const isCompletionStatus = [
+      "tra may",
+      "da sua xong",
+      "hoan tat",
+      "completed",
+    ].includes(completionStatusKey);
+    const isPaidStatus = normalizedOrder.paymentStatus === "paid";
+    const branchId = normalizedOrder.branchId || "CN1";
+
+    let finalInventoryDeducted = oldDeducted;
+    if (isCompletionStatus || isPaidStatus) {
+      if (oldDeducted) {
+        await adjustStockForUpdatedParts(normalizedOrder.id, oldParts, partsToSave, branchId);
+      } else {
+        finalInventoryDeducted = await deductStockForWorkOrder(normalizedOrder.id, partsToSave, branchId);
+      }
+    }
+
+    // Sync cash transactions
+    const targetDeposit = normalizedOrder.depositAmount || 0;
+    const targetIncome = normalizedOrder.additionalPayment || 0;
+
+    const createdTxs = await recordWorkOrderPaymentTransactions({
+      orderId: normalizedOrder.id,
+      customerName: normalizedOrder.customerName || "",
+      branchId: branchId,
+      paymentMethod: normalizedOrder.paymentMethod || "cash",
+      depositAmount: targetDeposit,
+      servicePayment: targetIncome,
     });
+
+    const depositTx = createdTxs.find(tx => tx.category === "service_deposit");
+    const paymentTx = createdTxs.find(tx => tx.category === "service_income");
+    const depositTransactionId = depositTx?.id;
+    const paymentTransactionId = paymentTx?.id;
+
+    if (depositTransactionId || paymentTransactionId) {
+      const updates: Record<string, any> = {};
+      if (depositTransactionId) {
+        updates.deposittransactionid = depositTransactionId;
+        updates.depositTransactionId = depositTransactionId;
+      }
+      if (paymentTransactionId) {
+        updates.cashtransactionid = paymentTransactionId;
+        updates.cashTransactionId = paymentTransactionId;
+        updates.paymentDate = new Date().toISOString();
+      }
+      await supabase.from(WORK_ORDERS_TABLE).update(updates).eq("id", normalizedOrder.id);
+    }
+
+    await syncAdditionalServicesTransactions(normalizedOrder.id, additionalServicesToSave, branchId);
+
+    const finalOrderToReturn = {
+      ...normalizedOrder,
+      depositTransactionId: depositTransactionId || normalizedOrder.depositTransactionId,
+      cashTransactionId: paymentTransactionId || normalizedOrder.cashTransactionId,
+      inventoryDeducted: finalInventoryDeducted,
+    };
+
+    await syncCustomerDebtForWorkOrder(finalOrderToReturn);
+
+    // Update customer metrics
+    const oldPaid = oldOrder ? Number(oldOrder.totalPaid || 0) : 0;
+    const newPaid = Number(finalOrderToReturn.totalPaid || 0);
+    const paymentDelta = newPaid - oldPaid;
+    if (paymentDelta > 0) {
+      await updateCustomerMetricsOnPayment(finalOrderToReturn, paymentDelta, oldPaid === 0);
+    }
+
+    return success(finalOrderToReturn);
   } catch (e: any) {
     return failure({
       code: "network",
@@ -1702,6 +2230,22 @@ export async function updateWorkOrder(
 
 export async function deleteWorkOrder(id: string): Promise<RepoResult<void>> {
   try {
+    const { data: orderRow, error: fetchError } = await supabase
+      .from(WORK_ORDERS_TABLE)
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchError || !orderRow) {
+      return failure({
+        code: "supabase",
+        message: "Không tìm thấy phiếu sửa chữa để xóa",
+        cause: fetchError,
+      });
+    }
+
+    const order = normalizeWorkOrder(orderRow);
+
     const { error } = await supabase
       .from(WORK_ORDERS_TABLE)
       .delete()
@@ -1713,6 +2257,99 @@ export async function deleteWorkOrder(id: string): Promise<RepoResult<void>> {
         message: "Không thể xóa phiếu sửa chữa",
         cause: error,
       });
+
+    // 1) Rollback stock if inventory was deducted
+    const inventoryWasDeducted =
+      Boolean(orderRow.inventory_deducted) ||
+      Boolean(orderRow.inventoryDeducted);
+
+    const branchId = order.branchId || "CN1";
+    const nowIso = new Date().toISOString();
+
+    if (inventoryWasDeducted) {
+      const partsUsed = (order.partsUsed || []) as any[];
+      for (const part of partsUsed) {
+        const partId = getPartIdFromOrderItem(part);
+        const qty = Math.max(0, Number(part?.quantity || 0));
+        if (!partId || qty <= 0) continue;
+
+        try {
+          const { data: partRow, error: partFetchError } = await supabase
+            .from("parts")
+            .select("id,name,stock")
+            .eq("id", partId)
+            .single();
+
+          if (!partFetchError && partRow) {
+            const currentStock = (partRow as any).stock || {};
+            const nextStock = {
+              ...currentStock,
+              [branchId]: Number(currentStock?.[branchId] || 0) + qty,
+            };
+
+            await supabase
+              .from("parts")
+              .update({ stock: nextStock })
+              .eq("id", partId);
+
+            // Best-effort inventory history line
+            await supabase.from("inventory_transactions").insert([
+              {
+                id:
+                  typeof crypto !== "undefined" && (crypto as any).randomUUID
+                    ? (crypto as any).randomUUID()
+                    : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+                type: "Nhập kho",
+                partId,
+                partName: String(part?.partName || (partRow as any).name || "Phụ tùng"),
+                quantity: qty,
+                date: nowIso,
+                branchId,
+                notes: `Hoàn kho do xóa phiếu sửa chữa #${id}`,
+                workOrderId: id,
+              },
+            ]);
+          }
+        } catch (err) {
+          console.warn("[deleteWorkOrder:stock_rollback] Error restoring part stock:", partId, err);
+        }
+      }
+    }
+
+    // 2) Delete linked cash transactions & adjust balance
+    try {
+      const { data: dbLinkedTx } = await supabase
+        .from("cash_transactions")
+        .select("*")
+        .or(`workorderid.eq.${id},workOrderId.eq.${id},reference.eq.${id}`);
+      
+      const actualLinkedTx = dbLinkedTx || [];
+      for (const tx of actualLinkedTx) {
+        const srcId = tx.paymentsource || tx.paymentSource || tx.paymentSourceId || order.paymentMethod || "cash";
+        const txBranchId = tx.branchid || tx.branchId || branchId;
+        const amt = Number(tx.amount || 0);
+        const txType = tx.type || "";
+
+        await supabase.from("cash_transactions").delete().eq("id", tx.id);
+
+        if (amt > 0 && srcId) {
+          const delta = txType === "income" ? -amt : amt;
+          await updatePaymentSourceBalance(srcId, txBranchId, delta);
+        }
+      }
+    } catch (err) {
+      console.warn("[deleteWorkOrder:cash_cleanup] Error cleaning up linked cash transactions:", err);
+    }
+
+    // 3) Delete linked customer debts
+    try {
+      await supabase
+        .from("customer_debts")
+        .delete()
+        .or(`workorderid.eq.${id},workOrderId.eq.${id}`);
+    } catch (err) {
+      console.warn("[deleteWorkOrder:debts_cleanup] Error cleaning up linked customer debts:", err);
+    }
 
     // Audit
     let _userId: string | null = null;
@@ -1803,7 +2440,7 @@ export async function refundWorkOrder(
       if (inventoryWasDeducted) {
         const partsUsed = (currentOrder.partsUsed || []) as any[];
         for (const part of partsUsed) {
-          const partId = String(part?.partId || "").trim();
+          const partId = getPartIdFromOrderItem(part);
           const qty = Math.max(0, Number(part?.quantity || 0));
           if (!partId || qty <= 0) continue;
 
@@ -1937,44 +2574,7 @@ export async function refundWorkOrder(
         }
 
         if (cashTxInserted) {
-          const paymentSourceTables = ["payment_sources", "paymentsources"];
-          for (const tableName of paymentSourceTables) {
-            const { data: sourceRow, error: sourceFetchError } = await supabase
-              .from(tableName)
-              .select("id,balance")
-              .eq("id", currentOrder.paymentMethod)
-              .single();
-
-            if (sourceFetchError || !sourceRow) {
-              continue;
-            }
-
-            const currentBalance = (sourceRow as any).balance || {};
-            const nextBalance = {
-              ...currentBalance,
-              [branchId]: Number(currentBalance?.[branchId] || 0) - refundAmount,
-            };
-
-            const updateAttempts = [
-              { balance: nextBalance },
-              { balance: nextBalance, updated_at: nowIso },
-            ];
-
-            for (const payload of updateAttempts) {
-              const { error: sourceUpdateError } = await supabase
-                .from(tableName)
-                .update(payload)
-                .eq("id", currentOrder.paymentMethod);
-              if (!sourceUpdateError) {
-                break;
-              }
-              console.warn("[refundWorkOrder:fallback] Failed updating payment source balance", {
-                tableName,
-                sourceUpdateError,
-              });
-            }
-            break;
-          }
+          await updatePaymentSourceBalance(currentOrder.paymentMethod, branchId, -refundAmount);
         }
       }
 
@@ -2238,6 +2838,87 @@ export async function completeWorkOrderPayment(
         updates.paymentDate = new Date().toISOString();
       }
 
+      const branchId = currentOrder.branchId || "CN1";
+      const nowIso = new Date().toISOString();
+      const inventoryWasDeducted =
+        Boolean((existingRow as any).inventory_deducted) ||
+        Boolean((existingRow as any).inventoryDeducted);
+
+      // #3: Trừ kho khi đã trả đủ HOẶC phiếu đã hoàn tất/trả máy (phụ tùng đã dùng),
+      // không đợi thu đủ tiền. Cờ inventory_deducted chống trừ 2 lần.
+      const completionStatusKey = normalizeStatusKey(currentOrder.status);
+      const isCompletionStatus = [
+        "tra may",
+        "da sua xong",
+        "hoan tat",
+        "completed",
+      ].includes(completionStatusKey);
+
+      let deductSuccess = true;
+      if ((nextStatus === "paid" || isCompletionStatus) && !inventoryWasDeducted) {
+        const partsUsed = (currentOrder.partsUsed || []) as any[];
+        for (const part of partsUsed) {
+          const partId = getPartIdFromOrderItem(part);
+          const qty = Math.max(0, Number(part?.quantity || 0));
+          if (!partId || qty <= 0) continue;
+
+          const { data: partRow, error: partFetchError } = await supabase
+            .from("parts")
+            .select("id,name,stock")
+            .eq("id", partId)
+            .single();
+
+          if (partFetchError || !partRow) {
+            console.warn("[completeWorkOrderPayment:fallback] Skip deduct stock: part not found", {
+              partId,
+              partFetchError,
+            });
+            continue;
+          }
+
+          const currentStock = (partRow as any).stock || {};
+          const nextStock = {
+            ...currentStock,
+            [branchId]: Math.max(0, Number(currentStock?.[branchId] || 0) - qty),
+          };
+
+          const { error: partUpdateError } = await supabase
+            .from("parts")
+            .update({ stock: nextStock })
+            .eq("id", partId);
+
+          if (partUpdateError) {
+            console.warn("[completeWorkOrderPayment:fallback] Failed deducting part stock", {
+              partId,
+              partUpdateError,
+            });
+            deductSuccess = false;
+            continue;
+          }
+
+          // Best-effort inventory history line
+          await supabase.from("inventory_transactions").insert([
+            {
+              id:
+                typeof crypto !== "undefined" && (crypto as any).randomUUID
+                  ? (crypto as any).randomUUID()
+                  : `${Math.random().toString(36).slice(2)}-${Date.now()}`,
+              type: "Xuất kho",
+              partId,
+              partName: String(part?.partName || (partRow as any).name || "Phụ tùng"),
+              quantity: qty,
+              date: nowIso,
+              branchId,
+              notes: `Xuất kho sửa chữa - Phiếu #${orderId}`,
+              workOrderId: orderId,
+            },
+          ]);
+        }
+
+        updates.inventory_deducted = deductSuccess;
+        updates.inventoryDeducted = deductSuccess;
+      }
+
       const { data: updatedRow, error: updateError } = await supabase
         .from(WORK_ORDERS_TABLE)
         .update(updates)
@@ -2253,10 +2934,8 @@ export async function completeWorkOrderPayment(
         });
       }
 
-      console.error(
-        "[completeWorkOrderPayment] ⚠️ RPC 'work_order_complete_payment' KHÔNG tồn tại trong database. " +
-          "Đã dùng fallback cập nhật trực tiếp: thanh toán được lưu NHƯNG TỒN KHO CHƯA ĐƯỢC TRỪ tự động. " +
-          "Cần chạy migration sql/2026-06-17_work_order_payment_consistency.sql (hoặc work_order_complete_payment.sql) để khôi phục trừ kho atomic."
+      console.warn(
+        "[completeWorkOrderPayment] RPC work_order_complete_payment chưa tồn tại, đã dùng fallback update trực tiếp có trừ kho"
       );
 
       const normalizedUpdatedOrder = normalizeWorkOrder(updatedRow);
@@ -2270,7 +2949,7 @@ export async function completeWorkOrderPayment(
         ...normalizedUpdatedOrder,
         paymentTransactionId: undefined,
         newPaymentStatus: nextStatus,
-        inventoryDeducted: false,
+        inventoryDeducted: updates.inventoryDeducted || false,
         usedFallback: true,
       });
     };

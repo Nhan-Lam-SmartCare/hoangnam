@@ -3,6 +3,63 @@ import type { Employee } from "../../types";
 import { RepoResult, success, failure } from "./types";
 
 const EMPLOYEES_TABLE = "employees";
+// Salary-free view (no base_salary/allowances/bank/tax) for non-admin callers
+// such as the work-order worker dropdown. RLS on `employees` is locked to
+// owner/manager, so staff must read the directory instead.
+const EMPLOYEES_DIRECTORY_VIEW = "employees_directory";
+
+// Directory list WITHOUT salary/bank fields. Safe for staff (worker selection).
+// Falls back to the base table for older DBs where the view is not yet applied.
+export async function fetchEmployeesDirectory(): Promise<RepoResult<Employee[]>> {
+  const mapRow = (row: any): Employee =>
+    ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      position: row.position,
+      department: row.department,
+      status: row.status,
+      branchId: row.branch_id ?? row.branchId ?? row.branchid,
+      // Salary/bank fields are intentionally absent from the directory view.
+      baseSalary: 0,
+      startDate: row.start_date ?? "",
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }) as unknown as Employee;
+
+  try {
+    const { data, error } = await supabase
+      .from(EMPLOYEES_DIRECTORY_VIEW)
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (!error) {
+      return success((data || []).map(mapRow));
+    }
+
+    // Legacy DB without the view: fall back to base table (owner/manager only).
+    const fallback = await supabase
+      .from(EMPLOYEES_TABLE)
+      .select("id, name, phone, email, position, department, status, branch_id, created_at, updated_at")
+      .order("name", { ascending: true });
+
+    if (fallback.error)
+      return failure({
+        code: "supabase",
+        message: "Không thể tải danh bạ nhân viên",
+        cause: fallback.error,
+      });
+
+    return success((fallback.data || []).map(mapRow));
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối tới máy chủ",
+      cause: e,
+    });
+  }
+}
 
 export async function fetchEmployees(): Promise<RepoResult<Employee[]>> {
   try {

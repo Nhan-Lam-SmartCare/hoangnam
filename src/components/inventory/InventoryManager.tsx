@@ -912,7 +912,7 @@ const InventoryManagerNew: React.FC = () => {
                   paid_amount: 0,
                   remaining_amount: debtAmount,
                   description: `Nợ tiền nhập hàng (Phiếu ${receiptCode})${note ? ` - ${note}` : ""}`,
-                  created_at: new Date().toISOString(),
+                  created_date: new Date().toISOString(),
                 });
 
               if (debtError) {
@@ -1339,7 +1339,7 @@ const InventoryManagerNew: React.FC = () => {
           paid_amount: 0,
           remaining_amount: debtAmount,
           description: `Nợ tiền nhập hàng (Phiếu ${receiptCode} - Đã sửa)`,
-          created_at: new Date().toISOString(),
+          created_date: new Date().toISOString(),
         });
       }
 

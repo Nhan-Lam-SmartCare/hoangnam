@@ -266,6 +266,7 @@ export function useFinanceActions(
             notes: data.note || "Thu tiền bán hàng",
             saleId: newSale.id,
             recipient: newSale.customer?.name || "Khách lẻ",
+            skipBalanceUpdate: true,
           });
 
           if (!cashRes.ok) {
@@ -552,7 +553,7 @@ export function useFinanceActions(
         for (const tx of actualLinkedTx) {
           const srcId = tx.paymentsource || tx.paymentSource || tx.paymentSourceId || sale.paymentMethod;
           const amt = Number(tx.amount || 0);
-          const delRes = await deleteCashTransaction(tx.id);
+          const delRes = await deleteCashTransaction(tx.id, { skipBalanceUpdate: true });
           if (!delRes.ok) {
             refundFailed = true;
             continue;
@@ -714,6 +715,7 @@ export function useFinanceActions(
             category: "debt_collection",
             notes: `Thu hết nợ cho ${customerIds.length} khách hàng`,
             recipient: `Thu nợ ${customerIds.length} khách hàng`,
+            skipBalanceUpdate: true,
           });
           if (!cashRes.ok) {
             showToast.error(mapRepoErrorForUser(cashRes.error));
@@ -776,6 +778,7 @@ export function useFinanceActions(
             category: "debt_payment",
             notes: `Trả hết nợ cho ${supplierIds.length} nhà cung cấp`,
             recipient: `Trả nợ ${supplierIds.length} nhà cung cấp`,
+            skipBalanceUpdate: true,
           });
           if (!cashRes.ok) {
             showToast.error(mapRepoErrorForUser(cashRes.error));

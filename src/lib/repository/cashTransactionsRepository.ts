@@ -3,6 +3,7 @@ import type { CashTransaction } from "../../types";
 import { RepoResult, success, failure } from "./types";
 import { safeAudit } from "./auditLogsRepository";
 import { canonicalizeMotocareCashTxCategory } from "../finance/cashTxCategories";
+import { updatePaymentSourceBalance } from "./paymentSourcesRepository";
 
 const TABLE = "cash_transactions";
 const READ_TABLE = "cash_transactions_ledger";
@@ -22,6 +23,7 @@ export interface CreateCashTxInput {
   supplierId?: string;
   customerId?: string;
   recipient?: string; // human readable target
+  skipBalanceUpdate?: boolean;
 }
 
 // Fetch cash transactions (optional filters)
@@ -383,6 +385,23 @@ export async function createCashTransaction(
         });
       }
     } catch { }
+
+    if (!input.skipBalanceUpdate) {
+      const delta = input.type === "income" ? input.amount : -input.amount;
+      try {
+        const balRes = await updatePaymentSourceBalance(
+          created.paymentSourceId || "cash",
+          created.branchId,
+          delta
+        );
+        if (!balRes.ok) {
+          console.warn("[createCashTransaction] Failed to update payment source balance:", balRes.error);
+        }
+      } catch (err) {
+        console.warn("[createCashTransaction] Error updating payment source balance:", err);
+      }
+    }
+
     return success(created);
   } catch (e: any) {
     return failure({
@@ -487,7 +506,8 @@ export async function updateCashTransaction(
 
 // Delete cash transaction
 export async function deleteCashTransaction(
-  id: string
+  id: string,
+  options?: { skipBalanceUpdate?: boolean }
 ): Promise<RepoResult<{ id: string }>> {
   try {
     if (!id) {
@@ -525,6 +545,23 @@ export async function deleteCashTransaction(
         },
       });
     } catch { }
+
+    // Adjust balance
+    if (oldData && !options?.skipBalanceUpdate) {
+      const txType = oldData.type || "";
+      const txAmount = Number(oldData.amount || 0);
+      const paymentSourceId = oldData.paymentsource || oldData.paymentSource || oldData.paymentSourceId || "cash";
+      const branchId = oldData.branchid || oldData.branchId || "CN1";
+      const delta = txType === "income" ? -txAmount : txAmount;
+      try {
+        const balRes = await updatePaymentSourceBalance(paymentSourceId, branchId, delta);
+        if (!balRes.ok) {
+          console.warn("[deleteCashTransaction] Failed to update payment source balance:", balRes.error);
+        }
+      } catch (err) {
+        console.warn("[deleteCashTransaction] Error updating payment source balance:", err);
+      }
+    }
 
     return success({ id });
   } catch (e: any) {

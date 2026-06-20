@@ -271,15 +271,19 @@ export default async function handler(req, res) {
       userId,
       {
         email,
-        user_metadata: {
-          name,
+        // Security-sensitive fields (role/branch/permissions) go in app_metadata:
+        // user_metadata is self-editable via supabase.auth.updateUser(), so it must
+        // NOT be trusted for authorization.
+        app_metadata: {
           role,
           branch_id: branchId,
+          permissions,
+        },
+        user_metadata: {
+          name,
           department,
           position,
           base_salary: baseSalary,
-          custom_permissions: permissions,
-          permission_overrides: permissions,
         },
       }
     );

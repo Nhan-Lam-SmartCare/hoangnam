@@ -57,9 +57,12 @@ const FORCE_OWNER_EMAILS = (
   .split(",")
   .map((email: string) => email.trim().toLowerCase())
   .filter(Boolean);
+// Default OFF: forcing owner client-side desyncs the UI role from the DB role
+// (server/RLS never honor this), which is misleading and a foot-gun. Opt in
+// explicitly via VITE_FORCE_OWNER_ENABLED=true only for break-glass/dev.
 const FORCE_OWNER_ENABLED =
-  (import.meta.env.VITE_FORCE_OWNER_ENABLED || "true").toLowerCase() !==
-  "false";
+  (import.meta.env.VITE_FORCE_OWNER_ENABLED || "false").toLowerCase() ===
+  "true";
 
 const normalizeEmail = (email?: string | null) =>
   String(email || "").trim().toLowerCase();
@@ -72,12 +75,21 @@ const isForcedOwnerEmail = (email?: string | null) => {
   return candidates.includes(normalizeEmail(email));
 };
 
+// Permissions/role are authoritative ONLY from app_metadata (service-role-only)
+// or the profiles row. user_metadata is self-editable and must never be trusted
+// for authorization. We keep a user_metadata fallback solely for legacy accounts
+// created before the app_metadata migration.
 const getPermissionMetadata = (rawUser: any): Record<string, boolean> => {
-  const metadata = rawUser?.user_metadata || {};
+  const appMeta = rawUser?.app_metadata || {};
+  const userMeta = rawUser?.user_metadata || {};
   const candidates = [
-    metadata.permissions,
-    metadata.custom_permissions,
-    metadata.permission_overrides,
+    appMeta.permissions,
+    appMeta.custom_permissions,
+    appMeta.permission_overrides,
+    // Legacy fallback only:
+    userMeta.permissions,
+    userMeta.custom_permissions,
+    userMeta.permission_overrides,
   ];
 
   return candidates.reduce<Record<string, boolean>>((acc, value) => {
@@ -89,6 +101,19 @@ const getPermissionMetadata = (rawUser: any): Record<string, boolean> => {
     });
     return acc;
   }, {});
+};
+
+const getMetadataRole = (rawUser: any): UserRole | undefined => {
+  const appRole = rawUser?.app_metadata?.role;
+  if (appRole === "owner" || appRole === "manager" || appRole === "staff") {
+    return appRole;
+  }
+  // Legacy fallback only (pre app_metadata migration):
+  const legacyRole = rawUser?.user_metadata?.role;
+  if (legacyRole === "owner" || legacyRole === "manager" || legacyRole === "staff") {
+    return legacyRole;
+  }
+  return undefined;
 };
 
 async function fetchProfileFromSupabase(userId: string) {
@@ -156,23 +181,22 @@ async function loadUserProfileInternal(params: {
       ((data as any)?.permission_overrides as Record<string, boolean> | undefined) ||
       ((data as any)?.permissions as Record<string, boolean> | undefined) ||
       {};
+    // The DB profile row is the source of truth. app_metadata (service-role-only)
+    // fills gaps for legacy accounts whose profile lacks a permissions column.
+    const mergedPermissions = {
+      ...metadataPermissions,
+      ...profilePermissions,
+    };
+    const resolvedRole =
+      (data as any).role || getMetadataRole(authUser) || "staff";
     const normalizedProfile = {
       ...(data as any),
       role: isForcedOwnerEmail(resolvedEmail)
         ? ("owner" as const)
-        : (data as any).role,
-      permissions: {
-        ...profilePermissions,
-        ...metadataPermissions,
-      },
-      custom_permissions: {
-        ...profilePermissions,
-        ...metadataPermissions,
-      },
-      permission_overrides: {
-        ...profilePermissions,
-        ...metadataPermissions,
-      },
+        : resolvedRole,
+      permissions: mergedPermissions,
+      custom_permissions: mergedPermissions,
+      permission_overrides: mergedPermissions,
     };
     setProfile(normalizedProfile as UserProfile);
   } catch (error: any) {
@@ -186,7 +210,7 @@ async function loadUserProfileInternal(params: {
       email: userEmail || authUser?.email || "unknown",
       role: isForcedOwnerEmail(resolvedEmail)
         ? "owner"
-        : ((authUser?.user_metadata?.role as UserRole) || "staff"),
+        : (getMetadataRole(authUser) || "staff"),
       permissions: metadataPermissions,
       custom_permissions: metadataPermissions,
       permission_overrides: metadataPermissions,

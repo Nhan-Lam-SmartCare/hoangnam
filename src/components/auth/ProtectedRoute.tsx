@@ -4,11 +4,11 @@ import { useAuth } from "../../contexts/AuthContext";
 import LoadingSpinner from "../common/LoadingSpinner";
 import { showToast } from "../../utils/toast";
 import type { User } from "@supabase/supabase-js";
-import type { UserProfile } from "../../contexts/AuthContext";
+import type { UserProfile, UserRole } from "../../contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRoles?: ("owner" | "manager" | "staff" | "accountant")[];
+  requiredRoles?: UserRole[];
   allow?: (context: { user: User; profile: UserProfile }) => boolean;
   denyMessage?: string;
 }

@@ -171,7 +171,7 @@ describe("workOrdersRepository payment logic", () => {
       expect(res.ok).toBe(true);
       if (res.ok) {
         expect(res.data.usedFallback).toBe(true);
-        expect(res.data.inventoryDeducted).toBe(false);
+        expect(res.data.inventoryDeducted).toBe(true);
         expect(res.data.newPaymentStatus).toBe("paid");
       }
     });

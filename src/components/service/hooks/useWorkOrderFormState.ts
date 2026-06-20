@@ -8,28 +8,22 @@ import type {
   WorkOrder,
   Part,
   WorkOrderPart,
-  Vehicle,
 } from "../../../types";
 import {
-  formatCurrency,
   formatWorkOrderId,
   generateWorkOrderId,
   normalizeSearchText,
+  formatCurrency,
 } from "../../../utils/format";
 import {
   useCreateWorkOrderAtomicRepo,
   useUpdateWorkOrderAtomicRepo,
 } from "../../../hooks/useWorkOrdersRepository";
-import { completeWorkOrderPayment } from "../../../lib/repository/workOrdersRepository";
+import { useCreateCustomerDebtRepo } from "../../../hooks/useDebtsRepository";
 
 import { showToast } from "../../../utils/toast";
 import { supabase } from "../../../supabaseClient";
-import {
-  validatePhoneNumber,
-  validateDepositAmount,
-} from "../../../utils/validation";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
-import { useCreateCustomerDebtRepo } from "../../../hooks/useDebtsRepository";
 import { useWarrantyCards } from "../../../hooks/useWarrantyRepository";
 import { useServiceConfigs } from "../../../hooks/useRepairLabor";
 import { syncRepairOrderServices } from "../../../lib/repository/repairLaborRepository";
@@ -54,60 +48,6 @@ export interface StoreSettings {
   bank_branch?: string;
   work_order_prefix?: string;
 }
-
-const getMissingColumnFromSupabaseError = (err: any): string | null => {
-  const message = `${err?.message || ""} ${err?.details || ""}`;
-  const match = message.match(/'([^']+)'/i);
-  return match?.[1] || null;
-};
-
-const buildCashTxCreatorFields = (user: any): Record<string, any> => {
-  if (!user) return {};
-  const creatorId = user.id;
-  const creatorName =
-    user.user_metadata?.name ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.display_name ||
-    user.email?.split("@")?.[0] ||
-    null;
-
-  return {
-    userid: creatorId,
-    username: creatorName,
-    created_by: creatorId,
-    createdby: creatorId,
-    created_by_name: creatorName,
-    createdbyname: creatorName,
-    userId: creatorId,
-    userName: creatorName,
-    createdBy: creatorId,
-    createdByName: creatorName,
-  };
-};
-
-const insertCashTransactionWithCreator = async (payload: Record<string, any>) => {
-  const { data } = await supabase.auth.getUser();
-  const user = data?.user;
-  const creatorFields = buildCashTxCreatorFields(user);
-  let workingPayload = { ...payload, ...creatorFields };
-  let lastError: any = null;
-
-  for (let i = 0; i < 8; i += 1) {
-    const { error } = await supabase.from("cash_transactions").insert(workingPayload);
-    if (!error) return { ok: true, error: null as any };
-
-    const missingColumn = getMissingColumnFromSupabaseError(error);
-    if (missingColumn && missingColumn in workingPayload) {
-      delete workingPayload[missingColumn];
-      lastError = error;
-      continue;
-    }
-
-    return { ok: false, error };
-  }
-
-  return { ok: false, error: lastError };
-};
 
 export interface RepairServiceDraftWorker {
   worker_id: string;
@@ -1381,6 +1321,15 @@ export function useWorkOrderFormState({
         invalidateWorkOrders();
       }
 
+      if (workOrderData.status === "Trả máy" && workOrderData.remainingAmount > 0) {
+        await createCustomerDebtIfNeeded(
+          workOrderData as unknown as WorkOrder,
+          workOrderData.remainingAmount,
+          workOrderData.total,
+          existingPaid
+        );
+      }
+
       onSave(workOrderData as unknown as WorkOrder);
       showToast.success(order?.id ? "Đã cập nhật phiếu" : "Đã lưu phiếu thành công");
       onClose();
@@ -1524,320 +1473,25 @@ export function useWorkOrderFormState({
           } as any);
 
           const syncedRepairServices = await syncRepairServicesForOrder(orderId);
-
-          const depositTxId = responseData?.depositTransactionId;
-          const paymentTxId = responseData?.paymentTransactionId;
-
-          const finalOrder: WorkOrder = {
-            id: orderId,
-            customerName: formData.customerName || "",
-            customerPhone: formData.customerPhone || "",
-            vehicleModel: formData.vehicleModel || "",
-            licensePlate: formData.licensePlate || "",
-            currentKm: formData.currentKm,
-            issueDescription: formData.issueDescription || "",
-            technicianName: resolvedTechnicianName,
-            status: formData.status || "Tiếp nhận",
-            laborCost: effectiveLaborCost,
-            laborTotal: syncedRepairServices.reduce((sum: number, service: any) => sum + Number(service.laborAmount || 0), 0),
-            workerTotal: syncedRepairServices.reduce(
-              (sum: number, service: any) =>
-                sum +
-                (service.workers && service.workers.length > 0
-                  ? service.workers.reduce((workerSum: number, worker: any) => workerSum + Number(worker.workerAmount || 0), 0)
-                  : Number(service.workerAmount || 0)),
-              0
-            ),
-            discount: discount,
-            partsUsed: selectedParts,
+          const finalOrder = {
+            ...(responseData as any),
             repairServices: syncedRepairServices,
-            additionalServices: additionalServices.length > 0 ? additionalServices : undefined,
-            total: total,
-            branchId: currentBranchId,
-            depositAmount: depositAmount > 0 ? depositAmount : undefined,
-            depositDate: depositAmount > 0 ? new Date().toISOString() : undefined,
-            depositTransactionId: depositTxId,
-            paymentStatus: paymentStatus,
-            paymentMethod: formData.paymentMethod,
-            additionalPayment: additionalPaymentToApply > 0 ? additionalPaymentToApply : undefined,
-            totalPaid: totalPaidToApply > 0 ? totalPaidToApply : undefined,
-            remainingAmount: remainingAmountToApply,
-            cashTransactionId: paymentTxId,
-            paymentDate: paymentTxId ? new Date().toISOString() : undefined,
-            creationDate: new Date().toISOString(),
           };
 
-          if (depositTxId && depositAmount > 0) {
-            try {
-              const { ok: depositOk, error: depositDbError } = await insertCashTransactionWithCreator({
-                id: depositTxId,
-                type: "income",
-                category: "service_deposit",
-                amount: depositAmount,
-                date: new Date().toISOString(),
-                description: `Đặt cọc sửa chữa #${(
-                  formatWorkOrderId(orderId, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchid: currentBranchId,
-                paymentsource: formData.paymentMethod,
-                workorderid: orderId,
-              });
-              if (!depositOk) console.error("[WorkOrderFormState] deposit insert error:", depositDbError);
-            } catch (e) {
-              console.error("[WorkOrderFormState] deposit insert exception:", e);
-            }
-
-            setCashTransactions((prev: any[]) => [
-              ...prev,
-              {
-                id: depositTxId,
-                type: "income",
-                category: "service_deposit",
-                amount: depositAmount,
-                date: new Date().toISOString(),
-                description: `Đặt cọc sửa chữa #${(
-                  formatWorkOrderId(orderId, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchId: currentBranchId,
-                paymentSource: formData.paymentMethod,
-                reference: orderId,
-              },
-            ]);
-
-            setPaymentSources((prev: any[]) =>
-              prev.map((ps: any) => {
-                if (ps.id === formData.paymentMethod) {
-                  return {
-                    ...ps,
-                    balance: {
-                      ...ps.balance,
-                      [currentBranchId]: (ps.balance[currentBranchId] || 0) + depositAmount,
-                    },
-                  };
-                }
-                return ps;
-              })
-            );
+          if (invalidateWorkOrders) {
+            invalidateWorkOrders();
           }
 
-          if (paymentTxId && additionalPaymentToApply > 0) {
-            try {
-              const { ok: paymentOk, error: paymentDbError } = await insertCashTransactionWithCreator({
-                id: paymentTxId,
-                type: "income",
-                category: "service_income",
-                amount: additionalPaymentToApply,
-                date: new Date().toISOString(),
-                description: `Thu tiền sửa chữa #${(
-                  formatWorkOrderId(orderId, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchid: currentBranchId,
-                paymentsource: formData.paymentMethod,
-                workorderid: orderId,
-              });
-              if (!paymentOk) console.error("[WorkOrderFormState] payment insert error:", paymentDbError);
-            } catch (e) {
-              console.error("[WorkOrderFormState] payment insert exception:", e);
-            }
-
-            setCashTransactions((prev: any[]) => [
-              ...prev,
-              {
-                id: paymentTxId,
-                type: "income",
-                category: "service_income",
-                amount: additionalPaymentToApply,
-                date: new Date().toISOString(),
-                description: `Thu tiền sửa chữa #${(
-                  formatWorkOrderId(orderId, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchId: currentBranchId,
-                paymentSource: formData.paymentMethod,
-                reference: orderId,
-              },
-            ]);
-
-            setPaymentSources((prev: any[]) =>
-              prev.map((ps: any) => {
-                if (ps.id === formData.paymentMethod) {
-                  return {
-                    ...ps,
-                    balance: {
-                      ...ps.balance,
-                      [currentBranchId]: (ps.balance[currentBranchId] || 0) + additionalPaymentToApply,
-                    },
-                  };
-                }
-                return ps;
-              })
+          if (finalOrder.status === "Trả máy" && remainingAmountToApply > 0) {
+            await createCustomerDebtIfNeeded(
+              finalOrder,
+              remainingAmountToApply,
+              total,
+              totalPaidToApply
             );
-          }
-
-          if (additionalServices.length > 0) {
-            const totalOutsourcingCost = additionalServices.reduce(
-              (sum: number, service: any) => sum + (service.costPrice || 0) * service.quantity,
-              0
-            );
-
-            const negativeSalesPayment = additionalServices.reduce((sum: number, service: any) => {
-              if (service.price < 0 && (service.costPrice || 0) === 0) {
-                return sum + Math.abs(service.price * service.quantity);
-              }
-              return sum;
-            }, 0);
-
-            if (totalOutsourcingCost > 0) {
-              const outsourcingTxId = `EXPENSE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-              try {
-                const { data: existingTx } = await supabase
-                  .from("cash_transactions")
-                  .select("id")
-                  .eq("reference", orderId)
-                  .eq("category", "outsourcing")
-                  .maybeSingle();
-
-                if (!existingTx) {
-                  const { ok: expenseOk, error: expenseError } = await insertCashTransactionWithCreator({
-                    id: outsourcingTxId,
-                    type: "expense",
-                    category: "outsourcing",
-                    amount: -totalOutsourcingCost,
-                    date: new Date().toISOString(),
-                    description: `Chi phí gia công bên ngoài - Phiếu #${orderId.split("-").pop()} - ${additionalServices
-                      .map((s: any) => s.description)
-                      .join(", ")}`,
-                    branchid: currentBranchId,
-                    paymentsource: "cash",
-                    reference: orderId,
-                  });
-
-                  if (!expenseOk) {
-                    console.error("[Outsourcing] Insert FAILED:", expenseError);
-                  } else {
-                    setCashTransactions((prev: any[]) => [
-                      ...prev,
-                      {
-                        id: outsourcingTxId,
-                        type: "expense",
-                        category: "outsourcing",
-                        amount: -totalOutsourcingCost,
-                        date: new Date().toISOString(),
-                        description: `Chi phí gia công bên ngoài - Phiếu #${orderId.split("-").pop()}`,
-                        branchId: currentBranchId,
-                        paymentSource: "cash",
-                        reference: orderId,
-                      },
-                    ]);
-
-                    setPaymentSources((prev: any[]) =>
-                      prev.map((ps: any) => {
-                        if (ps.id === "cash") {
-                          return {
-                            ...ps,
-                            balance: {
-                              ...ps.balance,
-                              [currentBranchId]: (ps.balance[currentBranchId] || 0) - totalOutsourcingCost,
-                            },
-                          };
-                        }
-                        return ps;
-                      })
-                    );
-                  }
-                }
-              } catch (err) {
-                console.error("Error creating outsourcing expense:", err);
-              }
-            }
-
-            if (negativeSalesPayment > 0) {
-              const negativeSalesTxId = `EXPENSE-NEG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-              try {
-                const negativeServices = additionalServices.filter((s: any) => s.price < 0 && (s.costPrice || 0) === 0);
-                const { data: existingNegTx } = await supabase
-                  .from("cash_transactions")
-                  .select("id")
-                  .eq("reference", orderId)
-                  .eq("category", "refund")
-                  .maybeSingle();
-
-                if (!existingNegTx) {
-                  const { ok: negExpenseOk, error: negExpenseError } = await insertCashTransactionWithCreator({
-                    id: negativeSalesTxId,
-                    type: "expense",
-                    category: "refund",
-                    amount: -negativeSalesPayment,
-                    date: new Date().toISOString(),
-                    description: `Chi tiền (giá bán âm) - Phiếu #${orderId.split("-").pop()} - ${negativeServices
-                      .map((s: any) => s.description)
-                      .join(", ")}`,
-                    branchid: currentBranchId,
-                    paymentsource: "cash",
-                    reference: orderId,
-                  });
-
-                  if (!negExpenseOk) {
-                    console.error("[Negative Sales] Insert FAILED:", negExpenseError);
-                  } else {
-                    setCashTransactions((prev: any[]) => [
-                      ...prev,
-                      {
-                        id: negativeSalesTxId,
-                        type: "expense",
-                        category: "refund",
-                        amount: -negativeSalesPayment,
-                        date: new Date().toISOString(),
-                        description: `Chi tiền (giá bán âm) - Phiếu #${orderId.split("-").pop()}`,
-                        branchId: currentBranchId,
-                        paymentSource: "cash",
-                        reference: orderId,
-                      },
-                    ]);
-
-                    setPaymentSources((prev: any[]) =>
-                      prev.map((ps: any) => {
-                        if (ps.id === "cash") {
-                          return {
-                            ...ps,
-                            balance: {
-                              ...ps.balance,
-                              [currentBranchId]: (ps.balance[currentBranchId] || 0) - negativeSalesPayment,
-                            },
-                          };
-                        }
-                        return ps;
-                      })
-                    );
-                  }
-                }
-              } catch (err) {
-                console.error("Error creating negative sales expense:", err);
-              }
-            }
           }
 
           onSave(finalOrder);
-
-          if (paymentStatus === "paid" && selectedParts.length > 0 && !responseData?.inventoryDeducted) {
-            try {
-              const result = await completeWorkOrderPayment(orderId, formData.paymentMethod || "cash", 0);
-              if ("ok" in result && !result.ok) {
-                showToast.warning(
-                  "Đã lưu phiếu nhưng có lỗi khi trừ kho: " +
-                  ((((result as { error: any }).error)?.message) || "Lỗi không xác định")
-                );
-              }
-            } catch (error: any) {
-              console.error("[handleSave] Error deducting inventory:", error);
-            }
-          }
-
-          if (formData.status === "Trả máy" && remainingAmountToApply > 0) {
-            await createCustomerDebtIfNeeded(finalOrder, remainingAmountToApply, total, totalPaidToApply);
-          }
-
           onClose();
         } catch (error: any) {
           console.error("Error creating work order (atomic):", error);
@@ -1870,199 +1524,26 @@ export function useWorkOrderFormState({
             remainingAmount: remainingAmountToApply,
           } as any);
 
-          const workOrderRow = (responseData as any).workOrder;
           const syncedRepairServices = await syncRepairServicesForOrder(order.id);
-          const depositTxId = responseData?.depositTransactionId;
-          const paymentTxId = responseData?.paymentTransactionId;
-
-          const finalOrder: WorkOrder = workOrderRow
-            ? {
-                id: (workOrderRow as any).id || order.id,
-                customerName: (workOrderRow as any).customername || (workOrderRow as any).customerName || order.customerName,
-                customerPhone: (workOrderRow as any).customerphone || (workOrderRow as any).customerPhone || order.customerPhone,
-                vehicleModel: (workOrderRow as any).vehiclemodel || (workOrderRow as any).vehicleModel || order.vehicleModel,
-                licensePlate: (workOrderRow as any).licenseplate || (workOrderRow as any).licensePlate || order.licensePlate,
-                issueDescription: (workOrderRow as any).issuedescription || (workOrderRow as any).issueDescription || order.issueDescription || "",
-                technicianName: (workOrderRow as any).technicianname || (workOrderRow as any).technicianName || formData.technicianName || order.technicianName || "",
-                status: (workOrderRow as any).status || order.status,
-                laborCost: (workOrderRow as any).laborcost || (workOrderRow as any).laborCost || Number(formData.laborCost || 0) || effectiveLaborCost || 0,
-                laborTotal: (workOrderRow as any).labor_total || (workOrderRow as any).laborTotal || syncedRepairServices.reduce((sum: number, service: any) => sum + Number(service.laborAmount || 0), 0),
-                workerTotal: (workOrderRow as any).worker_total || (workOrderRow as any).workerTotal || syncedRepairServices.reduce(
-                  (sum: number, service: any) =>
-                    sum +
-                    (service.workers && service.workers.length > 0
-                      ? service.workers.reduce((workerSum: number, worker: any) => workerSum + Number(worker.workerAmount || 0), 0)
-                      : Number(service.workerAmount || 0)),
-                  0
-                ),
-                discount: (workOrderRow as any).discount || order.discount || 0,
-                partsUsed: (workOrderRow as any).partsused || (workOrderRow as any).partsUsed || order.partsUsed || [],
-                repairServices: syncedRepairServices,
-                additionalServices: additionalServices.length > 0 ? additionalServices : undefined,
-                total: (workOrderRow as any).total || order.total,
-                branchId: (workOrderRow as any).branchid || (workOrderRow as any).branchId || order.branchId,
-                depositAmount: (workOrderRow as any).depositamount || (workOrderRow as any).depositAmount || order.depositAmount,
-                depositDate: (workOrderRow as any).depositdate || (workOrderRow as any).depositDate || order.depositDate,
-                depositTransactionId: depositTxId || order.depositTransactionId,
-                paymentStatus: (workOrderRow as any).paymentstatus || (workOrderRow as any).paymentStatus || order.paymentStatus,
-                paymentMethod: (workOrderRow as any).paymentmethod || (workOrderRow as any).paymentMethod || order.paymentMethod,
-                additionalPayment: (workOrderRow as any).additionalpayment || (workOrderRow as any).additionalPayment || order.additionalPayment,
-                totalPaid: (workOrderRow as any).totalpaid || (workOrderRow as any).totalPaid || order.totalPaid,
-                remainingAmount: (workOrderRow as any).remainingamount || (workOrderRow as any).remainingAmount || order.remainingAmount,
-                cashTransactionId: paymentTxId || order.cashTransactionId,
-                paymentDate: (workOrderRow as any).paymentdate || (workOrderRow as any).paymentDate || order.paymentDate,
-                creationDate: (workOrderRow as any).creationdate || (workOrderRow as any).creationDate || order.creationDate,
-              }
-            : {
-                ...order,
-                customerName: formData.customerName || order.customerName,
-                customerPhone: formData.customerPhone || order.customerPhone,
-                vehicleModel: formData.vehicleModel || order.vehicleModel,
-                licensePlate: formData.licensePlate || order.licensePlate,
-                issueDescription: formData.issueDescription || order.issueDescription,
-                technicianName: resolvedTechnicianName || order.technicianName,
-                status: formData.status || order.status,
-                laborCost: effectiveLaborCost,
-                laborTotal: syncedRepairServices.reduce((sum: number, service: any) => sum + Number(service.laborAmount || 0), 0),
-                workerTotal: syncedRepairServices.reduce(
-                  (sum: number, service: any) =>
-                    sum +
-                    (service.workers && service.workers.length > 0
-                      ? service.workers.reduce((workerSum: number, worker: any) => workerSum + Number(worker.workerAmount || 0), 0)
-                      : Number(service.workerAmount || 0)),
-                  0
-                ),
-                discount: discount,
-                partsUsed: selectedParts,
-                repairServices: syncedRepairServices,
-                additionalServices: additionalServices.length > 0 ? additionalServices : undefined,
-                total: total,
-                depositAmount: depositAmount,
-                depositTransactionId: depositTxId || order.depositTransactionId,
-                paymentStatus: paymentStatus,
-                paymentMethod: formData.paymentMethod || order.paymentMethod,
-                additionalPayment: additionalPaymentToApply,
-                totalPaid: totalPaidToApply,
-                remainingAmount: remainingAmountToApply,
-                cashTransactionId: paymentTxId || order.cashTransactionId,
-                paymentDate: paymentTxId ? new Date().toISOString() : order.paymentDate,
-              };
-
-          if (depositTxId && depositAmount > order.depositAmount!) {
-            const additionalDeposit = depositAmount - (order.depositAmount || 0);
-            try {
-              const { ok: addDepositOk, error: addDepositErr } = await insertCashTransactionWithCreator({
-                id: depositTxId,
-                type: "income",
-                category: "service_deposit",
-                amount: additionalDeposit,
-                date: new Date().toISOString(),
-                description: `Đặt cọc bổ sung #${(
-                  formatWorkOrderId(order.id, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchid: currentBranchId,
-                paymentsource: formData.paymentMethod,
-                workorderid: order.id,
-              });
-              if (!addDepositOk) console.error("[WorkOrderFormState-update] deposit error:", addDepositErr);
-            } catch (e) {
-              console.error("[WorkOrderFormState-update] deposit exception:", e);
-            }
-
-            setCashTransactions((prev: any[]) => [
-              ...prev,
-              {
-                id: depositTxId,
-                type: "income",
-                category: "service_deposit",
-                amount: depositAmount - (order.depositAmount || 0),
-                date: new Date().toISOString(),
-                description: `Đặt cọc bổ sung #${(
-                  formatWorkOrderId(order.id, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchId: currentBranchId,
-                paymentSource: formData.paymentMethod,
-                reference: order.id,
-              },
-            ]);
-
-            setPaymentSources((prev: any[]) =>
-              prev.map((ps: any) => {
-                if (ps.id === formData.paymentMethod) {
-                  return {
-                    ...ps,
-                    balance: {
-                      ...ps.balance,
-                      [currentBranchId]: (ps.balance[currentBranchId] || 0) + (depositAmount - (order.depositAmount || 0)),
-                    },
-                  };
-                }
-                return ps;
-              })
-            );
-          }
-
-          if (paymentTxId && totalAdditionalPayment > (order.additionalPayment || 0)) {
-            const additionalPaymentAmount = totalAdditionalPayment - (order.additionalPayment || 0);
-
-            setCashTransactions((prev: any[]) => [
-              ...prev,
-              {
-                id: paymentTxId,
-                type: "income",
-                category: "service_income",
-                amount: additionalPaymentAmount,
-                date: new Date().toISOString(),
-                description: `Thu tiền bổ sung #${(
-                  formatWorkOrderId(order.id, storeSettings?.work_order_prefix) || ""
-                ).split("-").pop()} - ${formData.customerName}`,
-                branchId: currentBranchId,
-                paymentSource: formData.paymentMethod,
-                reference: order.id,
-              },
-            ]);
-
-            setPaymentSources((prev: any[]) =>
-              prev.map((ps: any) => {
-                if (ps.id === formData.paymentMethod) {
-                  return {
-                    ...ps,
-                    balance: {
-                      ...ps.balance,
-                      [currentBranchId]: (ps.balance[currentBranchId] || 0) + (totalAdditionalPayment - (order.additionalPayment || 0)),
-                    },
-                  };
-                }
-                return ps;
-              })
-            );
-          }
+          const finalOrder = {
+            ...((responseData as any)?.workOrder || responseData as any),
+            repairServices: syncedRepairServices,
+          };
 
           if (invalidateWorkOrders) {
             invalidateWorkOrders();
           }
 
+          if (finalOrder.status === "Trả máy" && remainingAmountToApply > 0) {
+            await createCustomerDebtIfNeeded(
+              finalOrder,
+              remainingAmountToApply,
+              total,
+              totalPaidToApply
+            );
+          }
+
           onSave(finalOrder);
-
-          const wasUnpaidOrPartial = order.paymentStatus !== "paid";
-          if (paymentStatus === "paid" && wasUnpaidOrPartial && selectedParts.length > 0) {
-            try {
-              const result = await completeWorkOrderPayment(order.id, formData.paymentMethod || "cash", 0);
-              if ("ok" in result && !result.ok) {
-                showToast.warning(
-                  "Đã cập nhật phiếu nhưng có lỗi khi trừ kho: " +
-                  ((((result as { error: any }).error)?.message) || "Lỗi không xác định")
-                );
-              }
-            } catch (error: any) {
-              console.error("[handleSave] Error deducting inventory:", error);
-            }
-          }
-
-          if (formData.status === "Trả máy" && remainingAmountToApply > 0) {
-            await createCustomerDebtIfNeeded(finalOrder, remainingAmountToApply, total, totalPaidToApply);
-          }
-
           onClose();
         } catch (error: any) {
           console.error("[handleSave] Error updating work order (atomic):", error);

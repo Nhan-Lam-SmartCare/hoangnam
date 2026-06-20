@@ -82,8 +82,8 @@ function applyLocalCustomerUpsert(
 }
 
 // eslint-disable-next-line complexity
-async function handleDuplicatePhoneCustomer(customer: CustomerInput): Promise<boolean> {
-  if (!customer.phone) return false;
+async function handleDuplicatePhoneCustomer(customer: CustomerInput): Promise<string | null> {
+  if (!customer.phone) return null;
 
   const { data: duplicates } = await supabase
     .from("customers")
@@ -91,7 +91,7 @@ async function handleDuplicatePhoneCustomer(customer: CustomerInput): Promise<bo
     .eq("phone", customer.phone)
     .limit(1);
 
-  if (!duplicates || duplicates.length === 0) return false;
+  if (!duplicates || duplicates.length === 0) return null;
 
   const existingId = duplicates[0].id;
   const existingVehicles = duplicates[0].vehicles || [];
@@ -132,7 +132,7 @@ async function handleDuplicatePhoneCustomer(customer: CustomerInput): Promise<bo
     console.error("Lỗi cập nhật khách hàng:", updateError);
   }
 
-  return true;
+  return existingId;
 }
 
 export function useCustomerActions(
@@ -192,10 +192,10 @@ export function useCustomerActions(
             showToast.error("Lỗi cập nhật khách hàng");
           }
         } else {
-          const handledDuplicate = await handleDuplicatePhoneCustomer(customer);
-          if (handledDuplicate) {
+          const matchedDuplicateId = await handleDuplicatePhoneCustomer(customer);
+          if (matchedDuplicateId) {
             showToast.success("Đã cập nhật khách hàng theo số điện thoại trùng");
-            applyLocalCustomerUpsert(setCustomers, customer, customerId);
+            applyLocalCustomerUpsert(setCustomers, { ...customer, id: matchedDuplicateId }, matchedDuplicateId);
             return;
           }
 

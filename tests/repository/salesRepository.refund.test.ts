@@ -129,13 +129,25 @@ describe("salesRepository.refundSale compatibility", () => {
             eq: () => ({
               single: () =>
                 Promise.resolve({
-                  data: { id: "CT-1", amount: 185000 },
+                  data: { id: "CT-1", amount: 185000, type: "income", paymentsource: "cash", branchid: "CN1" },
                   error: null,
                 }),
             }),
+            or: () =>
+              Promise.resolve({
+                data: [{ id: "CT-1", amount: 185000, type: "income", paymentsource: "cash", branchid: "CN1" }],
+                error: null,
+              }),
           }),
           delete: () => ({
             eq: () => Promise.resolve({ error: null }),
+          }),
+        };
+      }
+      if (table === "customer_debts" || table === "customerdebts") {
+        return {
+          select: () => ({
+            or: () => Promise.resolve({ data: [], error: null }),
           }),
         };
       }

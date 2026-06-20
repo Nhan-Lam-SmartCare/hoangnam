@@ -50,7 +50,7 @@ import {
 } from "../../hooks/useWorkOrdersRepository";
 import type { RepairTemplate } from "../../hooks/useRepairTemplatesRepository";
 import { usePartsRepo } from "../../hooks/usePartsRepository";
-import { useEmployeesRepo } from "../../hooks/useEmployeesRepository";
+import { useEmployeesDirectoryRepo } from "../../hooks/useEmployeesRepository";
 import {
   useCreateCustomerDebtRepo,
   useUpdateCustomerDebtRepo,
@@ -180,9 +180,9 @@ export default function ServiceManager() {
   // Fetch parts from Supabase
   const { data: fetchedParts, isLoading: partsLoading } = usePartsRepo();
 
-  // Fetch employees from Supabase
+  // Worker dropdown only needs the salary-free directory (staff-safe).
   const { data: fetchedEmployees, isLoading: _employeesLoading } =
-    useEmployeesRepo();
+    useEmployeesDirectoryRepo();
 
   // State for date range filter
   const [dateRangeDays, setDateRangeDays] = useState<number>(7); // Default 7 days

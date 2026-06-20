@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canDo } from '../../../utils/permissions';
 import { useSuppliers } from '../../../hooks/useSuppliers';
@@ -1134,8 +1134,7 @@ const GoodsReceiptModal: React.FC<{
                             </div>
                             <div className="text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
                               {formatCurrency(
-                                item.importPrice * item.quantity +
-                                (item.laborCost || 0)
+                                item.importPrice * item.quantity
                               )}
                             </div>
                           </div>

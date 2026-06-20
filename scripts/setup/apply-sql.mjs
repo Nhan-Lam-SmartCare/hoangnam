@@ -24,7 +24,7 @@ const sql = readFileSync(sqlFilePath, "utf8");
 
 console.log("⏳ Applying SQL...");
 
-const { data, error } = await supabase.rpc("exec_sql", { sql_string: sql });
+const { data, error } = await supabase.rpc("exec_sql", { sql_query: sql });
 
 if (error) {
   console.error("❌ Error applying SQL:", error);

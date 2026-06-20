@@ -319,12 +319,15 @@ const SalesManager: React.FC = () => {
     payload.items.forEach((it) => {
       // Name line
       itemLines += `${it.partName}\n`;
-      // Qty x Price = Total
+      // Qty x Price = Total (discounted)
       const qtyPrice = `${it.quantity} x ${formatCurrency(it.sellingPrice)}`;
-      const totalIt = formatCurrency(it.sellingPrice * it.quantity);
+      const totalIt = formatCurrency(it.sellingPrice * it.quantity - (it.discount || 0));
       const spacesCount = 32 - qtyPrice.length - totalIt.length;
       const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
       itemLines += `${qtyPrice}${spaces}${totalIt}\n`;
+      if (it.discount && it.discount > 0) {
+        itemLines += `  (Giam: -${formatCurrency(it.discount)})\n`;
+      }
     });
 
     const subtotalStr = formatCurrency(payload.subtotalValue);
@@ -387,10 +390,13 @@ Cam on quy khach da tin tuong!
         .map(
           (it) => `
             <tr>
-              <td>${escapeHtml(it.partName)}</td>
+              <td>
+                ${escapeHtml(it.partName)}
+                ${it.discount && it.discount > 0 ? `<div style="font-size: 7.5pt; color: #ef4444; margin-top: 1px;">(Giảm: -${formatCurrency(it.discount)} đ)</div>` : ""}
+              </td>
               <td style="text-align:center">${it.quantity}</td>
               <td style="text-align:right">${formatCurrency(it.sellingPrice)}</td>
-              <td style="text-align:right">${formatCurrency(it.sellingPrice * it.quantity)}</td>
+              <td style="text-align:right">${formatCurrency(it.sellingPrice * it.quantity - (it.discount || 0))}</td>
             </tr>`
         )
         .join("");
@@ -588,7 +594,11 @@ Cam on quy khach da tin tuong!
           showToast.warning(`Tồn kho chỉ còn ${item.stockSnapshot}.`);
           return item;
         }
-        return { ...item, quantity: nextQty };
+        return {
+          ...item,
+          quantity: nextQty,
+          discount: Math.min(item.discount || 0, item.sellingPrice * nextQty),
+        };
       })
     );
   };
@@ -1446,7 +1456,7 @@ Cam on quy khach da tin tuong!
                     min={0}
                     inputMode="numeric"
                     value={discount}
-                    onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                    onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
                     className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                   />
                 </label>
@@ -1529,7 +1539,7 @@ Cam on quy khach da tin tuong!
                   onClick={() => setPaidAmount("full")}
                   className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
                     paidAmount === "full"
-                      ? "bg-emerald-600 text-white border-emerald-600"
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
                       : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
                   }`}
                 >
@@ -1540,7 +1550,11 @@ Cam on quy khach da tin tuong!
                     key={amount}
                     type="button"
                     onClick={() => setPaidAmount(amount)}
-                    className="h-9 px-3 rounded-lg text-xs font-bold border border-slate-300/80 dark:border-slate-600 bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-emerald-400 transition"
+                    className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
+                      paidAmount === amount
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                        : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
+                    }`}
                   >
                     {formatCurrency(amount)}
                   </button>

@@ -92,16 +92,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          Ghi chú nội bộ
-        </label>
-        <textarea
-          rows={4}
-          placeholder="VD: Khách yêu cầu kiểm tra thêm hệ thống điện"
-          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none"
-        />
-      </div>
+
 
       {import.meta.env.VITE_ENABLE_WORKORDER_REPAIR_SECTION === "1" && (
         <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-4">
