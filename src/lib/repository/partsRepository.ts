@@ -371,9 +371,13 @@ export async function decrementStockForSale(
       }
       const stockMap = ((row as any).stock || {}) as Record<string, number>;
       const current = Number(stockMap[branchId] || 0);
+      if (current < quantity) {
+        failedParts.push((row as any).name || partId);
+        continue;
+      }
       const nextStockMap = {
         ...stockMap,
-        [branchId]: Math.max(0, current - quantity),
+        [branchId]: current - quantity,
       };
       const { error: updErr } = await supabase
         .from(PARTS_TABLE)

@@ -57,6 +57,57 @@ const parseWarrantyMonths = (input?: string | null): number => {
   return value;
 };
 
+/** Tạo phiếu bảo hành tự động cho sản phẩm có warranty trong đơn bán (non-critical). */
+async function createWarrantyCardsForSale(
+  sale: Sale,
+  allParts: { id: string; warrantyPeriod?: string | null }[],
+  issuedBy: string
+): Promise<void> {
+  const warrantyRows: Array<Record<string, unknown>> = [];
+  for (const item of sale.items) {
+    const part = allParts.find((p) => p.id === item.partId);
+    const months = parseWarrantyMonths(part?.warrantyPeriod);
+    if (months <= 0) continue;
+
+    const today = new Date();
+    const end = new Date(today);
+    end.setMonth(end.getMonth() + months);
+
+    for (let i = 0; i < item.quantity; i += 1) {
+      warrantyRows.push({
+        customer_name: sale.customer.name,
+        customer_phone: sale.customer.phone || null,
+        device_model: item.partName,
+        imei_serial: null,
+        warranty_start_date: today.toISOString().slice(0, 10),
+        warranty_end_date: end.toISOString().slice(0, 10),
+        warranty_period_months: months,
+        warranty_type: "standard",
+        covered_parts: ["Lỗi kỹ thuật do nhà sản xuất"],
+        coverage_terms:
+          "Không áp dụng cho rơi vỡ, ngấm nước, can thiệp bên ngoài",
+        issued_by: issuedBy,
+        branch_id: sale.branchId,
+        status: "active",
+        notes: `Tự động tạo từ phiếu bán ${sale.id} - ${item.partName} (${i + 1}/${item.quantity})`,
+      });
+    }
+  }
+
+  if (warrantyRows.length > 0) {
+    const { error: warrantyError } = await supabase
+      .from("warranty_cards")
+      .insert(warrantyRows);
+
+    if (warrantyError) {
+      console.warn(
+        "Tạo phiếu bảo hành tự động thất bại:",
+        warrantyError.message
+      );
+    }
+  }
+}
+
 // eslint-disable-next-line max-lines-per-function
 export function useFinanceActions(
   deps: FinanceDeps
@@ -185,8 +236,7 @@ export function useFinanceActions(
           currentUser?.email ||
           newSale.userName;
 
-        // Xác định customer id thật (ưu tiên id, sau đó tra theo phone) để gắn
-        // công nợ và cập nhật thống kê đúng khách hàng.
+        // Xác định customer id thật (ưu tiên id, sau đó tra theo phone).
         let resolvedCustomerId: string | null = newSale.customer.id || null;
         if (!resolvedCustomerId && newSale.customer.phone) {
           const { data: existingCustomers } = await supabase
@@ -199,9 +249,89 @@ export function useFinanceActions(
           }
         }
 
-        // 1) Trừ kho nguyên tử TRƯỚC khi lưu đơn để chống bán âm/oversell: nếu
-        //    không đủ tồn thì hủy luôn, không tạo phiếu (không còn "đơn lưu mà
-        //    kho không trừ").
+        const cashTxId = `CT-${saleId}`;
+
+        // ── Thử gọi RPC nguyên tử trước ──────────────────────────────────
+        const rpcPayload = {
+          p_sale: {
+            id: newSale.id,
+            date: newSale.date,
+            items: newSale.items,
+            subtotal: newSale.subtotal,
+            discount: newSale.discount,
+            total: newSale.total,
+            customer: newSale.customer,
+            paymentMethod: newSale.paymentMethod,
+            userId: currentUser?.id || newSale.userId,
+            userName: issuedBy,
+            note: data.note || null,
+            customerId: resolvedCustomerId,
+          },
+          p_items: saleItems,
+          p_branch_id: newSale.branchId,
+          p_paid_amount: actualPaidAmount,
+          p_cash_tx_id: cashTxId,
+        };
+
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          "sale_create_atomic",
+          rpcPayload
+        );
+
+        // Nếu RPC tồn tại và trả kết quả
+        if (!rpcError && rpcResult) {
+          const result = typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
+
+          if (!result.success) {
+            rollbackOptimistic();
+            // Hiển thị chi tiết sản phẩm thiếu kho nếu có
+            if (result.insufficient && Array.isArray(result.insufficient)) {
+              const details = result.insufficient
+                .map((i: any) => {
+                  const part = parts.find((p) => p.id === i.partId);
+                  return `${part?.name || i.partId}: cần ${i.requested}, còn ${i.available}`;
+                })
+                .join("; ");
+              showToast.error(`Không đủ tồn kho: ${details}`);
+            } else {
+              showToast.error(
+                `Không thể tạo đơn: ${result.message || "Lỗi không xác định"}`
+              );
+            }
+            return { ok: false };
+          }
+
+          // RPC thành công — tạo warranty cards (non-critical, chạy sau)
+          await createWarrantyCardsForSale(newSale, parts, issuedBy);
+
+          return { ok: true };
+        }
+
+        // ── Fallback: RPC chưa deploy (404/PGRST202) — dùng luồng từng bước ──
+        if (rpcError) {
+          const isRpcMissing =
+            rpcError.code === "PGRST202" ||
+            rpcError.message?.includes("could not find") ||
+            (rpcError as any).status === 404;
+
+          if (!isRpcMissing) {
+            // Lỗi thật (không phải thiếu function) → rollback
+            rollbackOptimistic();
+            showToast.error(
+              `Lỗi tạo đơn bán: ${rpcError.message || "Lỗi CSDL"}`
+            );
+            return { ok: false };
+          }
+
+          // Fallback: chạy từng bước (phòng thủ cho DB chưa apply migration)
+          console.warn(
+            "[finalizeSale] RPC sale_create_atomic chưa có, dùng fallback từng bước"
+          );
+        }
+
+        // ── FALLBACK: Luồng từng bước (giữ tương thích ngược) ────────────
+
+        // 1) Trừ kho
         const decRes = await decrementStockForSale(saleItems, newSale.branchId);
         if (!decRes.ok) {
           rollbackOptimistic();
@@ -213,7 +343,7 @@ export function useFinanceActions(
         const stockFailedParts =
           decRes.data.mode === "fallback" ? decRes.data.failedParts || [] : [];
 
-        // 2) Lưu đơn. Nếu lỗi, cộng trả lại số kho vừa trừ rồi rollback state.
+        // 2) Lưu đơn
         const payload = {
           id: newSale.id,
           date: newSale.date,
@@ -253,8 +383,7 @@ export function useFinanceActions(
           );
         }
 
-        let cashResId: string | undefined = undefined;
-
+        // 3) Ghi sổ quỹ + cập nhật số dư
         if (actualPaidAmount > 0) {
           const cashRes = await createCashTransaction({
             type: "income",
@@ -274,7 +403,6 @@ export function useFinanceActions(
               `Đơn bán đã lưu nhưng chưa ghi sổ quỹ: ${mapRepoErrorForUser(cashRes.error)}`
             );
           } else {
-            cashResId = cashRes.data.id;
             const effectivePaymentSourceId =
               cashRes.data.paymentSourceId || newSale.paymentMethod;
             const balRes = await updatePaymentSourceBalance(
@@ -292,11 +420,12 @@ export function useFinanceActions(
 
             await supabase
               .from("sales")
-              .update({ cashtransactionid: cashResId })
+              .update({ cashtransactionid: cashRes.data.id })
               .eq("id", newSale.id);
           }
         }
 
+        // 4) Công nợ
         const remainingAmount = total - actualPaidAmount;
         if (remainingAmount > 0) {
           const safeCustomerName =
@@ -304,16 +433,6 @@ export function useFinanceActions(
             newSale.customer.phone ||
             "Khách lẻ";
 
-          let description = `Mua hàng (Hóa đơn #${newSale.id})`;
-          if (newSale.items.length > 0) {
-            description += "\n\nSản phẩm:";
-            newSale.items.forEach((item) => {
-              description += `\n  - ${item.quantity} x ${item.partName} - ${(item.sellingPrice * item.quantity).toLocaleString()}đ`;
-            });
-          }
-
-          // Dùng repository chuẩn (cột sale_id + id CDEBT-SALE-...) để công nợ
-          // liên kết đúng phiếu bán và gắn đúng customer id.
           const debtRes = await createCustomerDebt({
             customerId:
               resolvedCustomerId ||
@@ -321,7 +440,7 @@ export function useFinanceActions(
               `CUST-ANON-${saleId}`,
             customerName: safeCustomerName,
             phone: newSale.customer.phone,
-            description,
+            description: `Mua hàng (Hóa đơn #${newSale.id})`,
             totalAmount: total,
             paidAmount: actualPaidAmount,
             remainingAmount,
@@ -340,59 +459,7 @@ export function useFinanceActions(
           }
         }
 
-        const warrantyRows: Array<Record<string, unknown>> = [];
-        for (const item of newSale.items) {
-          const part = parts.find((p) => p.id === item.partId);
-          const months = parseWarrantyMonths(part?.warrantyPeriod);
-          if (months <= 0) continue;
-
-          const today = new Date();
-          const end = new Date(today);
-          end.setMonth(end.getMonth() + months);
-
-          for (let i = 0; i < item.quantity; i += 1) {
-            warrantyRows.push({
-              customer_name: newSale.customer.name,
-              customer_phone: newSale.customer.phone || null,
-              device_model: item.partName,
-              // SKU dùng chung cho mọi đơn vị, không phải số serial duy nhất ->
-              // để trống tránh hiểu nhầm là IMEI/serial.
-              imei_serial: null,
-              warranty_start_date: today.toISOString().slice(0, 10),
-              warranty_end_date: end.toISOString().slice(0, 10),
-              warranty_period_months: months,
-              warranty_type: "standard",
-              covered_parts: ["Lỗi kỹ thuật do nhà sản xuất"],
-              coverage_terms: "Không áp dụng cho rơi vỡ, ngấm nước, can thiệp bên ngoài",
-              issued_by: issuedBy,
-              branch_id: newSale.branchId,
-              status: "active",
-              notes: `Tự động tạo từ phiếu bán ${newSale.id} - ${item.partName} (${i + 1}/${item.quantity})`,
-            });
-          }
-        }
-
-        if (warrantyRows.length > 0) {
-          const { error: warrantyError } = await supabase
-            .from("warranty_cards")
-            .insert(warrantyRows);
-
-          if (warrantyError) {
-            const mappedWarrantyError = {
-              code: "supabase" as const,
-              message: warrantyError.message || "Lỗi CSDL khi tạo phiếu bảo hành tự động",
-            };
-            showToast.warning(
-              `Đơn đã lưu nhưng tạo phiếu bảo hành tự động thất bại: ${mapRepoErrorForUser(
-                mappedWarrantyError
-              )}`
-            );
-          }
-        }
-
-        // Cập nhật thống kê khách hàng (Tổng chi tiêu, Số lần mua, Hạng).
-        // Lưu ý: vẫn là read-modify-write phía client (#8) — fix nguyên tử nằm
-        // ở RPC sale_create_atomic (sql/2026-06-17_sale_create_atomic.sql).
+        // 5) Cập nhật thống kê khách hàng
         if (resolvedCustomerId) {
           try {
             const { data: currentStats } = await supabase
@@ -422,6 +489,9 @@ export function useFinanceActions(
             console.error("Lỗi cập nhật số liệu khách hàng:", e);
           }
         }
+
+        // 6) Warranty cards (fallback path)
+        await createWarrantyCardsForSale(newSale, parts, issuedBy);
 
         return { ok: true };
       })();

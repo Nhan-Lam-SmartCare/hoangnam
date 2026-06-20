@@ -1140,7 +1140,7 @@ export default function ServiceManager() {
 
         // 🔹 FIX Mobile: Fallback inventory deduction if atomic didn't do it
         if (
-          paymentStatus === "paid" &&
+          (paymentStatus === "paid" || status === "Trả máy") &&
           parts.length > 0 &&
           !responseData?.inventoryDeducted
         ) {
@@ -1221,11 +1221,12 @@ export default function ServiceManager() {
           remainingAmount: remainingAmount,
         } as any);
 
-        // 🔹 FIX Mobile: Nếu cập nhật phiếu thành paymentStatus = 'paid', gọi complete_payment để trừ kho
+        // 🔹 FIX Mobile: Nếu cập nhật phiếu thành paymentStatus = 'paid' hoặc status = 'Trả máy', gọi complete_payment để trừ kho
         const wasUnpaidOrPartial = editingOrder.paymentStatus !== "paid";
+        const wasNotInventoryDeducted = !editingOrder.inventoryDeducted;
         if (
-          paymentStatus === "paid" &&
-          wasUnpaidOrPartial &&
+          (paymentStatus === "paid" || status === "Trả máy") &&
+          (wasUnpaidOrPartial || wasNotInventoryDeducted) &&
           parts.length > 0
         ) {
           try {

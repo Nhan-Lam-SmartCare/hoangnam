@@ -20,6 +20,7 @@ import {
   useUpdateWorkOrderAtomicRepo,
 } from "../../../hooks/useWorkOrdersRepository";
 import { useCreateCustomerDebtRepo } from "../../../hooks/useDebtsRepository";
+import { completeWorkOrderPayment } from "../../../lib/repository/workOrdersRepository";
 
 import { showToast } from "../../../utils/toast";
 import { supabase } from "../../../supabaseClient";
@@ -35,6 +36,17 @@ import {
 import { compressImage } from "../../../utils/imageCompressor";
 import { uploadDevicePhoto, deleteDevicePhoto } from "../../../lib/storage/devicePhotosStorage";
 
+import {
+  RepairServiceDraftWorker,
+  RepairServiceDraft,
+  createEmptyRepairServiceDraft,
+  mapRepairServiceToDraft,
+  getWarrantyText,
+  getPartLaborBase as sharedGetPartLaborBase,
+  getPartWarranty as sharedGetPartWarranty,
+  getIntegratedLaborByQuantity as sharedGetIntegratedLaborByQuantity,
+} from "./useWorkOrderSharedLogic";
+
 export interface StoreSettings {
   store_name?: string;
   address?: string;
@@ -48,77 +60,6 @@ export interface StoreSettings {
   bank_branch?: string;
   work_order_prefix?: string;
 }
-
-export interface RepairServiceDraftWorker {
-  worker_id: string;
-  worker_name?: string;
-  share_percent: number;
-}
-
-export interface RepairServiceDraft {
-  id: string;
-  serviceId?: string;
-  serviceName: string;
-  laborCalcType: ServiceConfig["laborCalcType"];
-  laborFixedAmount: number;
-  laborPercentOfCost: number;
-  minimumLaborAmount: number;
-  defaultWorkerSharePercent: number;
-  manualLabor: number;
-  relatedItemIds: string[];
-  workers: RepairServiceDraftWorker[];
-  isBillable: boolean;
-  isPayableToWorker: boolean;
-  note: string;
-}
-
-export const createEmptyRepairServiceDraft = (): RepairServiceDraft => ({
-  id: `labor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  serviceName: "",
-  laborCalcType: "fixed",
-  laborFixedAmount: 0,
-  laborPercentOfCost: 0,
-  minimumLaborAmount: 0,
-  defaultWorkerSharePercent: 30,
-  manualLabor: 0,
-  relatedItemIds: [],
-  workers: [],
-  isBillable: true,
-  isPayableToWorker: true,
-  note: "",
-});
-
-export const mapRepairServiceToDraft = (service: RepairOrderService): RepairServiceDraft => ({
-  id: service.id,
-  serviceId: service.serviceId,
-  serviceName: service.serviceName,
-  laborCalcType: service.laborCalcType,
-  laborFixedAmount: service.laborFixedAmount,
-  laborPercentOfCost: service.laborPercentOfCost,
-  minimumLaborAmount: service.minimumLaborAmount,
-  defaultWorkerSharePercent: service.workerSharePercent || 30,
-  manualLabor: service.laborCalcType === "manual" ? service.laborAmount : service.laborFixedAmount,
-  relatedItemIds: (service.relatedItems || []).map((item: any) => item.partId),
-  workers: (service.workers || []).map((worker: any) => ({
-    worker_id: worker.workerId,
-    worker_name: worker.workerName || "",
-    share_percent: worker.sharePercent,
-  })),
-  isBillable: service.isBillable,
-  isPayableToWorker: service.isPayableToWorker,
-  note: service.note || "",
-});
-
-const getWarrantyText = (part: Part | null | undefined): string => {
-  if (!part) return "";
-  return String(
-    (part as any).warrantyPeriod ??
-      (part as any).warrantyperiod ??
-      (part as any).warranty_period ??
-      (part as any).warranty ??
-      ""
-  ).trim();
-};
 
 export interface UseWorkOrderFormStateProps {
   order: WorkOrder;
@@ -680,24 +621,9 @@ export function useWorkOrderFormState({
     return result.data;
   };
 
-  const getPartLaborBase = (partId: string) => {
-    const partRef = parts.find((p: any) => p.id === partId);
-    return (
-      Number((partRef as any)?.laborCost?.[currentBranchId]) ||
-      Number(partRef?.wholesalePrice?.[currentBranchId]) ||
-      0
-    );
-  };
-
-  const getPartWarranty = (partId: string) => {
-    const partRef = parts.find((p: any) => p.id === partId);
-    return getWarrantyText(partRef);
-  };
-
-  const getIntegratedLaborByQuantity = (laborBase: number, quantity: number) => {
-    if (laborBase <= 0 || quantity <= 0) return 0;
-    return laborBase * (1 + 0.5 * (quantity - 1));
-  };
+  const getPartLaborBase = (partId: string) => sharedGetPartLaborBase(partId, parts, currentBranchId);
+  const getPartWarranty = (partId: string) => sharedGetPartWarranty(partId, parts);
+  const getIntegratedLaborByQuantity = (laborBase: number, quantity: number) => sharedGetIntegratedLaborByQuantity(laborBase, quantity);
 
   const partsTotal = selectedParts.reduce(
     (sum: number, p: any) => sum + (p.price || 0) * (p.quantity || 0),
@@ -720,7 +646,7 @@ export function useWorkOrderFormState({
   }, 0);
   
   const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
-  const subtotal = partsTotal + servicesTotal + effectiveLaborCost;
+  const subtotal = partsTotal + servicesTotal + effectiveLaborCost + repairLaborTotal;
   const discount = formData.discount || 0;
   const total = Math.max(0, subtotal - discount);
 
@@ -1478,6 +1404,28 @@ export function useWorkOrderFormState({
             repairServices: syncedRepairServices,
           };
 
+          // 🔹 FIX Desktop: completeWorkOrderPayment to deduct stock
+          if (
+            (paymentStatus === "paid" || (formData.status || "Tiếp nhận") === "Trả máy") &&
+            selectedParts.length > 0 &&
+            !(responseData as any)?.inventoryDeducted
+          ) {
+            try {
+              const deductResult = await completeWorkOrderPayment(
+                orderId,
+                formData.paymentMethod || "cash",
+                0
+              );
+              if (deductResult.ok && deductResult.data.usedFallback) {
+                showToast.warning(
+                  "Đã lưu phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
+                );
+              }
+            } catch (err) {
+              console.error("[handleSave] Error in completeWorkOrderPayment:", err);
+            }
+          }
+
           if (invalidateWorkOrders) {
             invalidateWorkOrders();
           }
@@ -1529,6 +1477,30 @@ export function useWorkOrderFormState({
             ...((responseData as any)?.workOrder || responseData as any),
             repairServices: syncedRepairServices,
           };
+
+          // 🔹 FIX Desktop: completeWorkOrderPayment to deduct stock if paid or completed
+          const wasUnpaidOrPartial = order.paymentStatus !== "paid";
+          const wasNotInventoryDeducted = !order.inventoryDeducted;
+          if (
+            (paymentStatus === "paid" || (formData.status || "Tiếp nhận") === "Trả máy") &&
+            (wasUnpaidOrPartial || wasNotInventoryDeducted) &&
+            selectedParts.length > 0
+          ) {
+            try {
+              const deductResult = await completeWorkOrderPayment(
+                order.id,
+                formData.paymentMethod || "cash",
+                0
+              );
+              if (deductResult.ok && deductResult.data.usedFallback) {
+                showToast.warning(
+                  "Đã cập nhật phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
+                );
+              }
+            } catch (err: any) {
+              console.error("[handleSave] Error in completeWorkOrderPayment (update):", err);
+            }
+          }
 
           if (invalidateWorkOrders) {
             invalidateWorkOrders();

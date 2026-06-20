@@ -893,8 +893,10 @@ const CustomerManager: React.FC = () => {
                   <span>Tải lên DS</span>
                 </button>
                 <button
-                  className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors whitespace-nowrap shadow-sm text-sm"
-                  onClick={() => alert("Tính năng đang phát triển")}
+                  disabled
+                  className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg font-medium whitespace-nowrap shadow-sm text-sm opacity-50 cursor-not-allowed"
+                  onClick={() => showToast.info("Tính năng đang phát triển")}
+                  title="Nhắc BD (Coming soon)"
                 >
                   <svg
                     className="w-4 h-4"
@@ -909,7 +911,7 @@ const CustomerManager: React.FC = () => {
                       d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                     />
                   </svg>
-                  <span>Nhắc BD</span>
+                  <span>Nhắc BD (Coming soon)</span>
                 </button>
                 <button
                   onClick={() => setEditCustomer({} as Customer)}
@@ -1557,14 +1559,15 @@ const CustomerManager: React.FC = () => {
                     Upload danh sách
                   </button>
                   <button
+                    disabled
                     onClick={() => {
                       setShowActionSheet(false);
-                      alert("Tính năng đang phát triển");
+                      showToast.info("Tính năng đang phát triển");
                     }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-500 dark:border-slate-700 dark:bg-slate-700/40 dark:text-slate-200"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-400 opacity-50 cursor-not-allowed dark:border-slate-700 dark:bg-slate-700/40 dark:text-slate-500"
                   >
                     <svg
-                      className="h-5 w-5 text-orange-500"
+                      className="h-5 w-5 text-orange-400"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1576,7 +1579,7 @@ const CustomerManager: React.FC = () => {
                         d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                       />
                     </svg>
-                    Nhắc bảo dưỡng
+                    Nhắc bảo dưỡng (Coming soon)
                   </button>
                   <button
                     onClick={() => {

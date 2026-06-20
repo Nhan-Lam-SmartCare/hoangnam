@@ -194,6 +194,17 @@ const InventoryManagerNew: React.FC = () => {
     }
   }, [searchParams, setSearchParams]); // Re-run when URL changes
 
+  // Read tab parameter from URL query params
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (
+      tabParam &&
+      ["stock", "categories", "history", "purchase-orders"].includes(tabParam)
+    ) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   const {
     data: pagedResult,
     isLoading: partsLoading,
@@ -1651,9 +1662,10 @@ const InventoryManagerNew: React.FC = () => {
             <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700 px-1 py-0.5">
               {canTransferInventory && (
                 <button
+                  disabled
                   onClick={handleTransferInventory}
-                  className="p-1.5 rounded-md text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-white dark:bg-slate-800 transition"
-                  title="Chuyển kho"
+                  className="p-1.5 rounded-md text-slate-600 dark:text-slate-300 opacity-40 cursor-not-allowed transition"
+                  title="Chuyển kho (Coming soon)"
                 >
                   <Repeat className="w-3.5 h-3.5" />
                 </button>

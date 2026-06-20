@@ -88,9 +88,10 @@ export function ExternalPartsDesktopTable({
                         </a>
                       )}
                       <button
+                        disabled
                         onClick={() => onAddToInventory(part)}
-                        className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
-                        title="Thêm vào kho"
+                        className="p-2 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed rounded-lg"
+                        title="Thêm vào kho (Coming soon)"
                       >
                         <Plus className="w-4 h-4" />
                       </button>

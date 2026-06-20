@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react'; // Refresh
+import React, { useState, useMemo } from 'react'; // Refresh
 import { useQueryClient } from '@tanstack/react-query';
 import { showToast } from '../../../utils/toast';
 import { supabase } from '../../../supabaseClient';
@@ -253,12 +253,13 @@ const InventoryHistoryModal: React.FC<{
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
+                          disabled
                           onClick={() => {
                             // TODO: Implement edit functionality
                             showToast.info("Tính năng đang phát triển");
                           }}
-                          className="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded transition-colors"
-                          title="Chỉnh sửa"
+                          className="p-1.5 text-slate-400 opacity-50 cursor-not-allowed rounded"
+                          title="Chỉnh sửa (Coming soon)"
                         >
                           <svg
                             className="w-4 h-4"

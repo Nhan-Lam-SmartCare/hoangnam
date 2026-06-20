@@ -180,46 +180,34 @@ export const useDashboardData = (
         for (let i = 6; i >= 0; i--) {
             const date = new Date();
             date.setDate(date.getDate() - i);
-            const dateStr = date.toISOString().slice(0, 10);
 
-            // Sales revenue
-            const daySales = sales.filter((s) => s.date.slice(0, 10) === dateStr);
-            const salesRevenue = daySales.reduce((sum, s) => sum + s.total, 0);
+            const start = new Date(date);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(date);
+            end.setHours(23, 59, 59, 999);
 
-            // Work Orders revenue (đã thanh toán)
-            const dayWorkOrders = workOrders.filter((wo: any) => {
-                const woDate =
-                    wo.creationDate?.slice(0, 10) || wo.creationdate?.slice(0, 10);
-                const isPaid =
-                    wo.paymentStatus === "paid" ||
-                    wo.paymentstatus === "paid" ||
-                    wo.paymentStatus === "partial" ||
-                    wo.paymentstatus === "partial";
-                return woDate === dateStr && isPaid;
+            const daySummary = calculateFinancialSummary({
+                sales,
+                workOrders,
+                parts,
+                cashTransactions,
+                branchId: currentBranchId,
+                start,
+                end,
             });
-            const woRevenue = dayWorkOrders.reduce(
-                (sum, wo: any) => sum + (wo.totalPaid || wo.totalpaid || wo.total || 0),
-                0
-            );
-
-            const revenue = salesRevenue + woRevenue;
-
-            const expense = cashTransactions
-                .filter((t) => t.type === "expense" && t.date.slice(0, 10) === dateStr)
-                .reduce((sum, t) => sum + t.amount, 0);
 
             data.push({
                 date: date.toLocaleDateString("vi-VN", {
                     day: "2-digit",
                     month: "2-digit",
                 }),
-                revenue,
-                expense,
-                profit: revenue - expense, // FIXME: This profit calc is simplified for the chart, ideally should be grossProfit - expense
+                revenue: daySummary.combinedRevenue,
+                expense: daySummary.cashExpense,
+                profit: daySummary.netProfit,
             });
         }
         return data;
-    }, [sales, workOrders, cashTransactions]);
+    }, [sales, workOrders, parts, cashTransactions, currentBranchId]);
 
     // Dữ liệu thu chi (lọc theo filter)
     const incomeExpenseData = useMemo(() => {

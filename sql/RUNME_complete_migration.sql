@@ -433,7 +433,7 @@ BEGIN
       IF v_part_id IS NULL OR v_part_id = '' OR v_qty <= 0 THEN CONTINUE; END IF;
       SELECT stock INTO v_stock_json FROM public.parts WHERE id = v_part_id FOR UPDATE;
       v_current_stock := COALESCE((v_stock_json->>v_branch_id)::numeric, 0);
-      UPDATE public.parts SET stock = jsonb_set(COALESCE(stock,'{}'::jsonb), ARRAY[v_branch_id], to_jsonb(GREATEST(0, v_current_stock - v_qty)), TRUE) WHERE id = v_part_id;
+      UPDATE public.parts SET stock = jsonb_set(COALESCE(stock,'{}'::jsonb), ARRAY[v_branch_id], to_jsonb(v_current_stock - v_qty), TRUE) WHERE id = v_part_id;
     END LOOP;
     UPDATE public.work_orders SET inventory_deducted = TRUE WHERE id = p_order_id;
   END IF;

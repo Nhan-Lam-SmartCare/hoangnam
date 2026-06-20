@@ -272,6 +272,7 @@ export interface WorkOrder {
   refunded_at?: string; // Timestamp when refunded (snake_case to match DB)
   refund_transaction_id?: string; // Link to refund transaction (snake_case to match DB)
   refund_reason?: string; // Reason for refund (snake_case to match DB)
+  inventoryDeducted?: boolean;
 }
 
 export interface InventoryTransaction {

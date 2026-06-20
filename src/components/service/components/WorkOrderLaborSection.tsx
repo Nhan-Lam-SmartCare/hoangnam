@@ -8,8 +8,8 @@ import {
   buildDefaultWorkerSplit,
   splitWorkerAmount,
 } from "../../../lib/services/repairLaborService";
-import type { RepairServiceDraft, RepairServiceDraftWorker } from "../hooks/useWorkOrderFormState";
-import { createEmptyRepairServiceDraft } from "../hooks/useWorkOrderFormState";
+import type { RepairServiceDraft, RepairServiceDraftWorker } from "../hooks/useWorkOrderSharedLogic";
+import { createEmptyRepairServiceDraft } from "../hooks/useWorkOrderSharedLogic";
 
 interface WorkOrderLaborSectionProps {
   formData: Partial<WorkOrder>;
@@ -106,7 +106,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
               </p>
             </div>
             <div className="text-right">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Tổng cộng khách trả</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Tổng tiền công sửa</div>
               <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 {formatCurrency(repairLaborTotal)}
               </div>
@@ -284,7 +284,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                               ...newRepairServiceDraft,
                               relatedItemIds: e.target.checked
                                 ? [...newRepairServiceDraft.relatedItemIds, part.partId]
-                                : newRepairServiceDraft.relatedItemIds.filter((id) => id !== part.partId),
+                                : newRepairServiceDraft.relatedItemIds.filter((id: string) => id !== part.partId),
                             })
                           }
                         />
@@ -326,7 +326,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                     Nếu chưa gán, hệ thống sẽ dùng kỹ thuật viên chính và % mặc định của dịch vụ.
                   </div>
                 )}
-                {newRepairServiceDraft.workers.map((worker, index) => (
+                {newRepairServiceDraft.workers.map((worker: RepairServiceDraftWorker, index: number) => (
                   <div key={`${worker.worker_id}-${index}`} className="grid grid-cols-[1fr,120px,32px] gap-2">
                     <select
                       value={worker.worker_id}
@@ -334,7 +334,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                         const selectedEmployee = employeeOptions.find((employee) => employee.id === e.target.value);
                         setNewRepairServiceDraft({
                           ...newRepairServiceDraft,
-                          workers: newRepairServiceDraft.workers.map((item, itemIndex) =>
+                          workers: newRepairServiceDraft.workers.map((item: RepairServiceDraftWorker, itemIndex: number) =>
                             itemIndex === index
                               ? {
                                   ...item,
@@ -361,7 +361,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                       onChange={(value) =>
                         setNewRepairServiceDraft({
                           ...newRepairServiceDraft,
-                          workers: newRepairServiceDraft.workers.map((item, itemIndex) =>
+                          workers: newRepairServiceDraft.workers.map((item: RepairServiceDraftWorker, itemIndex: number) =>
                             itemIndex === index ? { ...item, share_percent: value } : item
                           ),
                         })
@@ -373,7 +373,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                       onClick={() =>
                         setNewRepairServiceDraft({
                           ...newRepairServiceDraft,
-                          workers: newRepairServiceDraft.workers.filter((_, itemIndex) => itemIndex !== index),
+                          workers: newRepairServiceDraft.workers.filter((_: any, itemIndex: number) => itemIndex !== index),
                         })
                       }
                       className="text-red-500 hover:text-red-700"
@@ -470,7 +470,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                 )}
                 {repairServices.map((service) => {
                   const relatedCost = service.relatedItemIds.reduce(
-                    (sum, partId) => sum + getSelectedPartCost(partId),
+                    (sum: number, partId: string) => sum + getSelectedPartCost(partId),
                     0
                   );
                   const laborAmount = getRepairServiceLaborAmount(service);

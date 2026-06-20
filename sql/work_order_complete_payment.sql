@@ -302,7 +302,7 @@ BEGIN
       SET stock = jsonb_set(
         COALESCE(stock, '{}'::jsonb),
         ARRAY[v_branch_id],
-        to_jsonb(GREATEST(0, v_current_stock - v_qty)),
+        to_jsonb(v_current_stock - v_qty),
         TRUE
       )
       WHERE id = v_part_id;

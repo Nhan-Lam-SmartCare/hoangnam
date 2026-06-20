@@ -27,55 +27,15 @@ import type {
   Vehicle,
 } from "../../../types";
 
-export interface RepairServiceDraftWorker {
-  worker_id: string;
-  worker_name?: string;
-  share_percent: number;
-}
-
-export interface RepairServiceDraft {
-  id: string;
-  serviceId?: string;
-  serviceName: string;
-  laborCalcType: ServiceConfig["laborCalcType"];
-  laborFixedAmount: number;
-  laborPercentOfCost: number;
-  minimumLaborAmount: number;
-  defaultWorkerSharePercent: number;
-  manualLabor: number;
-  relatedItemIds: string[];
-  workers: RepairServiceDraftWorker[];
-  isBillable: boolean;
-  isPayableToWorker: boolean;
-  note: string;
-}
-
-export const createEmptyRepairServiceDraft = (): RepairServiceDraft => ({
-  id: `mobile-labor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  serviceName: "",
-  laborCalcType: "fixed",
-  laborFixedAmount: 0,
-  laborPercentOfCost: 0,
-  minimumLaborAmount: 0,
-  defaultWorkerSharePercent: 30,
-  manualLabor: 0,
-  relatedItemIds: [],
-  workers: [],
-  isBillable: true,
-  isPayableToWorker: true,
-  note: "",
-});
-
-const getWarrantyText = (part: Part | null | undefined): string => {
-  if (!part) return "";
-  return String(
-    (part as any).warrantyPeriod ??
-      (part as any).warrantyperiod ??
-      (part as any).warranty_period ??
-      (part as any).warranty ??
-      ""
-  ).trim();
-};
+import {
+  RepairServiceDraftWorker,
+  RepairServiceDraft,
+  createEmptyRepairServiceDraft,
+  getWarrantyText,
+  getPartLaborBase as sharedGetPartLaborBase,
+  getPartWarranty as sharedGetPartWarranty,
+  getIntegratedLaborByQuantity as sharedGetIntegratedLaborByQuantity,
+} from "./useWorkOrderSharedLogic";
 
 export interface UseWorkOrderMobileFormStateProps {
   isOpen: boolean;
@@ -536,17 +496,11 @@ export function useWorkOrderMobileFormState({
   }, [selectedParts]);
 
   const getPartLaborBase = useCallback((partId: string) => {
-    const partRef = parts.find((p) => p.id === partId);
-    return (
-      Number((partRef as any)?.laborCost?.[currentBranchId]) ||
-      Number(partRef?.wholesalePrice?.[currentBranchId]) ||
-      0
-    );
+    return sharedGetPartLaborBase(partId, parts, currentBranchId);
   }, [parts, currentBranchId]);
 
   const getPartWarranty = useCallback((partId: string) => {
-    const partRef = parts.find((p) => p.id === partId);
-    return getWarrantyText(partRef);
+    return sharedGetPartWarranty(partId, parts);
   }, [parts]);
 
   const getWarrantyForWorkOrderPart = useCallback((part: any): string => {
@@ -587,10 +541,9 @@ export function useWorkOrderMobileFormState({
     return "";
   }, [parts]);
 
-  const getIntegratedLaborByQuantity = (laborBase: number, quantity: number) => {
-    if (laborBase <= 0 || quantity <= 0) return 0;
-    return laborBase * (1 + 0.5 * (quantity - 1));
-  };
+  const getIntegratedLaborByQuantity = useCallback((laborBase: number, quantity: number) => {
+    return sharedGetIntegratedLaborByQuantity(laborBase, quantity);
+  }, []);
 
   const getRepairServiceLaborAmount = useCallback((service: RepairServiceDraft) =>
     calculateLabor(
@@ -775,7 +728,7 @@ export function useWorkOrderMobileFormState({
 
   const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
 
-  const subtotal = partsTotal + servicesTotal + effectiveLaborCost;
+  const subtotal = partsTotal + servicesTotal + effectiveLaborCost + _repairLaborTotal;
 
   const discountAmount = useMemo(() => {
     if (discountType === "percent") {

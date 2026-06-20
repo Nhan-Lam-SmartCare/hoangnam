@@ -266,7 +266,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
     }
   };
 
-  // Hide bottom navigation when modal is open
+  // Hide bottom navigation when modal is open and handle Escape key
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add("hide-bottom-nav");
@@ -274,17 +274,33 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
       document.body.classList.remove("hide-bottom-nav");
     }
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
     return () => {
       document.body.classList.remove("hide-bottom-nav");
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   // VIEW MODE - Hiển thị chi tiết phiếu (không cho chỉnh sửa)
   if (viewMode && workOrder) {
     return (
-      <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center">
+      <div
+        className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="work-order-view-title"
+      >
         {/* Mobile Full Screen */}
         <div className="md:hidden w-full h-full bg-slate-50 dark:bg-[#151521] flex flex-col transition-colors">
           {/* Header */}
@@ -298,7 +314,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                 <X className="w-5 h-5" />
               </button>
               <div>
-                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h2 id="work-order-view-title" className="text-sm font-bold text-slate-900 dark:text-white">
                   Chi tiết phiếu
                 </h2>
                 <div className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-medium">
@@ -699,7 +715,12 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
 
   // EDIT MODE - Form chỉnh sửa (code mới dùng sub-components)
   return (
-    <div className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center">
+    <div
+      className="fixed inset-0 bg-black/50 z-[100] flex items-end md:items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chỉnh sửa phiếu sửa chữa"
+    >
       {/* Mobile Full Screen */}
       <div className="md:hidden w-full h-full bg-slate-50 dark:bg-[#151521] flex flex-col transition-colors">
         {/* Header containing Tabs Navigation */}

@@ -95,6 +95,17 @@ const GoodsReceiptModal: React.FC<{
   // Auto-save key cho localStorage
   const DRAFT_KEY = `goods_receipt_draft_${currentBranchId}`;
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Khôi phục dữ liệu từ localStorage khi mở modal
   useEffect(() => {
     if (isOpen) {
@@ -489,7 +500,12 @@ const GoodsReceiptModal: React.FC<{
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="goods-receipt-title"
+      >
         <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 w-full max-w-7xl h-[92vh] rounded-2xl shadow-2xl overflow-hidden flex">
           {/* Left Panel - Product Browser (50%) */}
           <div className="w-1/2 flex flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-r border-slate-200/50 dark:border-slate-700/50">
@@ -515,7 +531,7 @@ const GoodsReceiptModal: React.FC<{
                   </svg>
                 </button>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h2 id="goods-receipt-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
                     Danh mục sản phẩm
                   </h2>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">

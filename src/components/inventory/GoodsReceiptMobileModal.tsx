@@ -325,7 +325,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
   };
 
   const handleSaveDraft = () => {
-    alert("Chức năng lưu nháp đang phát triển");
+    showToast.info("Chức năng lưu nháp đang phát triển");
   };
 
   if (!isOpen) return null;
@@ -922,10 +922,11 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
               <div className="p-3 bg-white dark:bg-[#1e1e2d] border-t border-slate-200 dark:border-slate-800 space-y-2 flex-shrink-0">
                 <div className="flex gap-2.5">
                   <button
+                    disabled
                     onClick={handleSaveDraft}
-                    className="flex-1 py-3 border border-slate-250 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-transparent rounded-xl font-bold text-sm active:scale-98 transition-transform"
+                    className="flex-1 py-3 border border-slate-250 dark:border-slate-700 text-slate-400 dark:text-slate-500 bg-transparent rounded-xl font-bold text-sm opacity-50 cursor-not-allowed"
                   >
-                    💾 Lưu nháp
+                    💾 Lưu nháp (Coming soon)
                   </button>
                   <button
                     onClick={onSave}

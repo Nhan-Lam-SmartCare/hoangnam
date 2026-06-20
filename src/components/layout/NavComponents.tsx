@@ -15,7 +15,8 @@ import {
   User,
   Crown,
   Settings,
-  CircleUser
+  CircleUser,
+  ClipboardList
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
@@ -108,7 +109,9 @@ export const MobileDrawerLink: React.FC<{
   onClick?: () => void;
 }> = ({ to, icon, label, color, onClick }) => {
   const location = useLocation();
-  const isActive = location.pathname === to;
+  const isActive = to.includes("?")
+    ? location.pathname + location.search === to
+    : location.pathname === to;
   const colorConfig = NAV_COLORS[color as ColorKey] || NAV_COLORS.slate;
 
   return (
@@ -134,7 +137,9 @@ export const MobileNavLink: React.FC<{
   onClick?: () => void;
 }> = ({ to, icon, label, onClick }) => {
   const location = useLocation();
-  const isActive = location.pathname === to;
+  const isActive = to.includes("?")
+    ? location.pathname + location.search === to
+    : location.pathname === to;
 
   return (
     <Link
@@ -159,7 +164,9 @@ export const NavLink: React.FC<{
   colorKey: ColorKey;
 }> = ({ to, icon, label, colorKey: _colorKey }) => {
   const location = useLocation();
-  const isActive = location.pathname === to;
+  const isActive = to.includes("?")
+    ? location.pathname + location.search === to
+    : location.pathname === to;
 
   return (
     <Link
@@ -260,7 +267,9 @@ export const BottomNav: React.FC = () => {
             }`}
         >
           {navItems.map((item) => {
-            const isActive = location.pathname === item.to;
+            const isActive = item.to.includes("?")
+              ? location.pathname + location.search === item.to
+              : location.pathname === item.to;
             const colorKey = item.color as ColorKey;
             const colors = NAV_COLORS[colorKey] || NAV_COLORS.slate;
 
@@ -384,13 +393,22 @@ export const BottomNav: React.FC = () => {
                     />
                   )}
                   {canViewInventory && (
-                    <MobileDrawerLink
-                      to="/inventory"
-                      icon={<Boxes className="w-5 h-5" />}
-                      label="Kho hàng & Vật tư"
-                      color="amber"
-                      onClick={() => setShowMenu(false)}
-                    />
+                    <>
+                      <MobileDrawerLink
+                        to="/inventory"
+                        icon={<Boxes className="w-5 h-5" />}
+                        label="Kho hàng & Vật tư"
+                        color="amber"
+                        onClick={() => setShowMenu(false)}
+                      />
+                      <MobileDrawerLink
+                        to="/inventory?tab=purchase-orders"
+                        icon={<ClipboardList className="w-5 h-5" />}
+                        label="Đơn đặt hàng (PO)"
+                        color="amber"
+                        onClick={() => setShowMenu(false)}
+                      />
+                    </>
                   )}
                   <MobileDrawerLink
                     to="/warranty"

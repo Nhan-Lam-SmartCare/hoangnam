@@ -1893,10 +1893,7 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     ].includes(completionStatusKey);
     const isPaidStatus = normalizedOrder.paymentStatus === "paid";
 
-    let finalInventoryDeducted = false;
-    if (isCompletionStatus || isPaidStatus) {
-      finalInventoryDeducted = await deductStockForWorkOrder(normalizedOrder.id, partsUsed, branchId);
-    }
+    const finalInventoryDeducted = false;
 
     const createdTxs = await recordWorkOrderPaymentTransactions({
       orderId: normalizedOrder.id,
@@ -2120,12 +2117,8 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
     const branchId = normalizedOrder.branchId || "CN1";
 
     let finalInventoryDeducted = oldDeducted;
-    if (isCompletionStatus || isPaidStatus) {
-      if (oldDeducted) {
-        await adjustStockForUpdatedParts(normalizedOrder.id, oldParts, partsToSave, branchId);
-      } else {
-        finalInventoryDeducted = await deductStockForWorkOrder(normalizedOrder.id, partsToSave, branchId);
-      }
+    if (oldDeducted) {
+      await adjustStockForUpdatedParts(normalizedOrder.id, oldParts, partsToSave, branchId);
     }
 
     // Sync cash transactions
