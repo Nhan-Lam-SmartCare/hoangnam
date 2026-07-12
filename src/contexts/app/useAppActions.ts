@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { supabase } from "../../supabaseClient";
+import { upsertPayrollRecord as upsertPayrollRecordRepo } from "../../lib/repository/payrollRepository";
 import { showToast } from "../../utils/toast";
 import type {
   Employee,
@@ -135,34 +135,10 @@ export function useAppActions(state: AppState): AppActions {
 
   const upsertPayrollRecord = useCallback(
     async (record: PayrollRecord) => {
-      const dbData = {
-        id: record.id,
-        employee_id: record.employeeId,
-        employee_name: record.employeeName,
-        month: record.month,
-        base_salary: record.baseSalary,
-        allowances: record.allowances,
-        bonus: record.bonus,
-        deduction: record.deduction,
-        work_days: record.workDays,
-        standard_work_days: record.standardWorkDays,
-        social_insurance: record.socialInsurance,
-        health_insurance: record.healthInsurance,
-        unemployment_insurance: record.unemploymentInsurance,
-        personal_income_tax: record.personalIncomeTax,
-        net_salary: record.netSalary,
-        payment_status: record.paymentStatus,
-        payment_date: record.paymentDate,
-        payment_method: record.paymentMethod,
-        notes: record.notes,
-        branch_id: record.branchId,
-        created_at: record.created_at || new Date().toISOString(),
-      };
+      const res = await upsertPayrollRecordRepo(record);
 
-      const { error } = await supabase.from("payroll_records").upsert(dbData);
-
-      if (error) {
-        console.error("Error upserting payroll record:", error);
+      if (!res.ok) {
+        console.error("Error upserting payroll record:", res.error.cause);
         showToast.error("Lỗi lưu bảng lương");
         return;
       }

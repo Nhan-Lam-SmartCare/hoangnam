@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS public.categories (
   name TEXT NOT NULL UNIQUE,
   icon TEXT,
   color TEXT,
+  markup_percent INTEGER DEFAULT 50,
+  rounding_rule TEXT DEFAULT 'integer',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

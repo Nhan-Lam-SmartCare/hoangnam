@@ -122,7 +122,7 @@ export const usePrinter = () => {
       console.error('Error printing via Bluetooth:', err);
       return false;
     }
-  }, [isNative]);
+  }, [isNative, connectedAddress]);
 
   // Print html via WiFi / System Print
   const printViaWiFi = useCallback(async (html: string) => {

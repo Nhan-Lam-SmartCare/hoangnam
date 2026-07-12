@@ -1041,6 +1041,16 @@ export function useWorkOrderFormState({
       return;
     }
 
+    // Validate workers' share percent total does not exceed 100%
+    for (const service of repairServices || []) {
+      const workers = service.workers || [];
+      const totalShare = workers.reduce((sum: number, w: any) => sum + Number(w.share_percent || w.sharePercent || 0), 0);
+      if (totalShare > 100) {
+        showToast.error(`Tổng phần trăm chia thợ cho dịch vụ "${service.serviceName}" vượt quá 100% (${totalShare}%)`);
+        return;
+      }
+    }
+
     const blockedMessageEarly = getBlockedDeepEditMessage(Number(order?.additionalPayment || 0));
     if (blockedMessageEarly) {
       showToast.error(blockedMessageEarly);
@@ -1287,6 +1297,16 @@ export function useWorkOrderFormState({
       if (!phoneRegex.test(formData.customerPhone.trim())) {
         showToast.error("Số điện thoại không hợp lệ! (cần 10-11 chữ số)");
         return;
+      }
+
+      // Validate workers' share percent total does not exceed 100%
+      for (const service of repairServices || []) {
+        const workers = service.workers || [];
+        const totalShare = workers.reduce((sum: number, w: any) => sum + Number(w.share_percent || w.sharePercent || 0), 0);
+        if (totalShare > 100) {
+          showToast.error(`Tổng phần trăm chia thợ cho dịch vụ "${service.serviceName}" vượt quá 100% (${totalShare}%)`);
+          return;
+        }
       }
 
       const additionalPaymentPreview =

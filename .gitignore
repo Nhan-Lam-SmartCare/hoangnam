@@ -55,3 +55,7 @@ check_*.ts
 build_log.txt
 *_block.txt
 *.legacy.tsx
+
+# Vite temp files
+vite.config.ts.timestamp-*
+*.timestamp-*.mjs

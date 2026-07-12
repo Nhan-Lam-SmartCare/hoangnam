@@ -52,6 +52,10 @@ export function splitWorkerAmount(
   share_percent: number;
   worker_amount: number;
 }> {
+  const totalPercent = (workers || []).reduce((sum, w) => sum + Number(w.share_percent || 0), 0);
+  if (totalPercent > 100) {
+    console.warn(`[splitWorkerAmount] Total share percent ${totalPercent}% exceeds 100%!`);
+  }
   return workers.map((worker) => ({
     worker_id: worker.worker_id,
     worker_name: worker.worker_name,
@@ -119,6 +123,7 @@ export function computeMonthlySalarySummary(input: {
   employee?: Employee | null;
   bonus?: number;
   penalty?: number;
+  advance?: number;
 }): WorkerMonthlySalary {
   const totalWorkerAmount = roundMoney(
     input.serviceWorkers.reduce((sum, worker) => sum + Number(worker.workerAmount || 0), 0)
@@ -126,6 +131,7 @@ export function computeMonthlySalarySummary(input: {
   const baseSalary = Number(input.employee?.baseSalary || 0);
   const bonus = Number(input.bonus || 0);
   const penalty = Number(input.penalty || 0);
+  const advance = Number(input.advance || 0);
 
   return {
     workerId: input.workerId,
@@ -135,7 +141,8 @@ export function computeMonthlySalarySummary(input: {
     baseSalary,
     bonus,
     penalty,
-    finalSalary: roundMoney(baseSalary + totalWorkerAmount + bonus - penalty),
+    advance,
+    finalSalary: roundMoney(baseSalary + totalWorkerAmount + bonus - penalty - advance),
   };
 }
 

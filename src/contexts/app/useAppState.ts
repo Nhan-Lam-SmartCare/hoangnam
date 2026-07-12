@@ -16,7 +16,8 @@ import type {
   WorkOrder,
   CartItem,
 } from "../../types";
-import { supabase } from "../../supabaseClient";
+import { fetchPaymentSources as fetchPaymentSourcesRepo } from "../../lib/repository/paymentSourcesRepository";
+import { fetchPayrollRecords } from "../../lib/repository/payrollRepository";
 import type { AppState } from "./types";
 
 const PAYROLL_TABLE_DISABLED_KEY = "motocare-schema-missing-payroll-records";
@@ -35,16 +36,6 @@ function setLocalFlag(key: string): void {
   } catch {
     // Ignore localStorage write errors
   }
-}
-
-function isMissingTableError(error: any): boolean {
-  const details = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
-  return (
-    error?.status === 404 ||
-    error?.code === "PGRST205" ||
-    details.includes("does not exist") ||
-    details.includes("could not find")
-  );
 }
 
 function getInitialData() {
@@ -118,9 +109,8 @@ export function useAppState(): AppState {
   useEffect(() => {
     const fetchPaymentSources = async () => {
       try {
-        const paymentSourcesRes = await supabase.from("payment_sources").select("*");
-
-        if (!paymentSourcesRes.error && paymentSourcesRes.data) {
+        const paymentSourcesRes = await fetchPaymentSourcesRepo();
+        if (paymentSourcesRes.ok) {
           setPaymentSources(paymentSourcesRes.data);
         }
 
@@ -129,41 +119,16 @@ export function useAppState(): AppState {
           return;
         }
 
-        const payrollRes = await supabase.from("payroll_records").select("*");
+        const payrollRes = await fetchPayrollRecords();
 
-        if (payrollRes.error) {
-          if (isMissingTableError(payrollRes.error)) {
+        if (!payrollRes.ok) {
+          if (payrollRes.error.code === "not_found") {
             setLocalFlag(PAYROLL_TABLE_DISABLED_KEY);
           }
           return;
         }
 
-        if (payrollRes.data) {
-          const mappedPayroll = payrollRes.data.map((r) => ({
-            id: r.id,
-            employeeId: r.employee_id,
-            employeeName: r.employee_name,
-            month: r.month,
-            baseSalary: r.base_salary,
-            allowances: r.allowances,
-            bonus: r.bonus,
-            deduction: r.deduction,
-            workDays: r.work_days,
-            standardWorkDays: r.standard_work_days,
-            socialInsurance: r.social_insurance,
-            healthInsurance: r.health_insurance,
-            unemploymentInsurance: r.unemployment_insurance,
-            personalIncomeTax: r.personal_income_tax,
-            netSalary: r.net_salary,
-            paymentStatus: r.payment_status,
-            paymentDate: r.payment_date,
-            paymentMethod: r.payment_method,
-            notes: r.notes,
-            branchId: r.branch_id,
-            created_at: r.created_at,
-          }));
-          setPayrollRecords(mappedPayroll);
-        }
+        setPayrollRecords(payrollRes.data);
       } catch (err) {
         console.error("Failed to fetch initial data from Supabase:", err);
       }

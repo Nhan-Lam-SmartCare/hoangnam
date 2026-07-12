@@ -1,51 +1,17 @@
 import { useCallback } from "react";
-import { supabase } from "../../supabaseClient";
 import { showToast } from "../../utils/toast";
 import type { Customer } from "../../types";
 import type { AppActions, AppState } from "./types";
+import {
+  findCustomerById,
+  findDuplicateCustomerByPhone,
+  updateCustomerWithFallback,
+  insertCustomerWithFallback,
+} from "../../lib/repository/customersRepository";
 
 type CustomerDeps = Pick<AppState, "customers" | "setCustomers">;
 
 type CustomerInput = Partial<Customer> & { id?: string };
-
-async function updateCustomerWithFallback(
-  customerId: string,
-  payloads: Array<Record<string, any>>
-) {
-  let lastError: any = null;
-  for (const payload of payloads) {
-    const { error } = await supabase
-      .from("customers")
-      .update(payload)
-      .eq("id", customerId);
-    if (!error) return null;
-    lastError = error;
-  }
-  return lastError;
-}
-
-async function insertCustomerWithFallback(payloads: Array<Record<string, any>>) {
-  let lastError: any = null;
-  for (const payload of payloads) {
-    const { error } = await supabase.from("customers").insert([payload]);
-    if (!error) return null;
-    lastError = error;
-  }
-  return lastError;
-}
-
-async function findCustomerById(id: string) {
-  try {
-    const { data: dbCustomer } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("id", id)
-      .single();
-    return dbCustomer ? ({ id: dbCustomer.id } as Customer) : null;
-  } catch {
-    return null;
-  }
-}
 
 function applyLocalCustomerUpsert(
   setCustomers: CustomerDeps["setCustomers"],
@@ -85,16 +51,13 @@ function applyLocalCustomerUpsert(
 async function handleDuplicatePhoneCustomer(customer: CustomerInput): Promise<string | null> {
   if (!customer.phone) return null;
 
-  const { data: duplicates } = await supabase
-    .from("customers")
-    .select("id, name, vehiclemodel, licenseplate, vehicles")
-    .eq("phone", customer.phone)
-    .limit(1);
+  const dupRes = await findDuplicateCustomerByPhone(customer.phone);
+  const duplicate = dupRes.ok ? dupRes.data : null;
 
-  if (!duplicates || duplicates.length === 0) return null;
+  if (!duplicate) return null;
 
-  const existingId = duplicates[0].id;
-  const existingVehicles = duplicates[0].vehicles || [];
+  const existingId = duplicate.id;
+  const existingVehicles = duplicate.vehicles || [];
   let updatedVehicles = existingVehicles;
 
   if (customer.vehicles && customer.vehicles.length > 0) {
@@ -108,28 +71,28 @@ async function handleDuplicatePhoneCustomer(customer: CustomerInput): Promise<st
     }
   }
 
-  const updateError = await updateCustomerWithFallback(existingId, [
+  const updateRes = await updateCustomerWithFallback(existingId, [
     {
-      name: customer.name || duplicates[0].name || "Khách hàng",
-      vehiclemodel: customer.vehicleModel || duplicates[0].vehiclemodel || null,
-      licenseplate: customer.licensePlate || duplicates[0].licenseplate || null,
+      name: customer.name || duplicate.name || "Khách hàng",
+      vehiclemodel: customer.vehicleModel || duplicate.vehiclemodel || null,
+      licenseplate: customer.licensePlate || duplicate.licenseplate || null,
       vehicles: updatedVehicles,
       lastvisit: new Date().toISOString(),
     },
     {
-      name: customer.name || duplicates[0].name || "Khách hàng",
-      vehiclemodel: customer.vehicleModel || duplicates[0].vehiclemodel || null,
-      licenseplate: customer.licensePlate || duplicates[0].licenseplate || null,
+      name: customer.name || duplicate.name || "Khách hàng",
+      vehiclemodel: customer.vehicleModel || duplicate.vehiclemodel || null,
+      licenseplate: customer.licensePlate || duplicate.licenseplate || null,
       vehicles: updatedVehicles,
     },
     {
-      name: customer.name || duplicates[0].name || "Khách hàng",
+      name: customer.name || duplicate.name || "Khách hàng",
       vehicles: updatedVehicles,
     },
   ]);
 
-  if (updateError) {
-    console.error("Lỗi cập nhật khách hàng:", updateError);
+  if (!updateRes.ok) {
+    console.error("Lỗi cập nhật khách hàng:", updateRes.error.cause);
   }
 
   return existingId;
@@ -148,9 +111,9 @@ export function useCustomerActions(
 
       let existingCustomer: Customer | undefined = customers.find((c) => c.id === customer.id);
       if (!existingCustomer && customer.id) {
-        const dbCustomer = await findCustomerById(customer.id);
-        if (dbCustomer) {
-          existingCustomer = dbCustomer;
+        const dbRes = await findCustomerById(customer.id);
+        if (dbRes.ok && dbRes.data) {
+          existingCustomer = dbRes.data;
         }
       }
 
@@ -173,7 +136,7 @@ export function useCustomerActions(
             visitcount: customer.visitCount ?? existingCustomer.visitCount ?? 0,
           };
 
-          const error = await updateCustomerWithFallback(targetCustomerId, [
+          const updateRes = await updateCustomerWithFallback(targetCustomerId, [
             {
               ...basePayload,
               lastvisit: customer.lastVisit || existingCustomer.lastVisit || null,
@@ -187,8 +150,8 @@ export function useCustomerActions(
             },
           ]);
 
-          if (error) {
-            console.error("Error updating customer in Supabase:", error);
+          if (!updateRes.ok) {
+            console.error("Error updating customer in Supabase:", updateRes.error.cause);
             showToast.error("Lỗi cập nhật khách hàng");
           }
         } else {
@@ -199,7 +162,7 @@ export function useCustomerActions(
             return;
           }
 
-          const error = await insertCustomerWithFallback([
+          const insertRes = await insertCustomerWithFallback([
             {
               id: customerId,
               name: customer.name || "Khách hàng",
@@ -231,8 +194,8 @@ export function useCustomerActions(
             },
           ]);
 
-          if (error) {
-            console.error("Lỗi thêm khách hàng vào Supabase:", error);
+          if (!insertRes.ok) {
+            console.error("Lỗi thêm khách hàng vào Supabase:", insertRes.error.cause);
             showToast.error("Lỗi lưu khách hàng mới");
           } else {
             showToast.success("Đã lưu khách hàng mới");

@@ -1331,11 +1331,15 @@ export const useStaffManagement = (activeTab: string) => {
     baseSalary: Number(staff.base_salary || 0),
   }));
 
-  // Trigger loading when staff tab is activated
+  // Trigger loading when staff tab is activated.
+  // Cố ý chỉ phụ thuộc activeTab: refreshStaffScreen là hàm tạo lại mỗi render
+  // (không memo hóa) nên đưa vào deps sẽ khiến effect chạy lại liên tục. hasRole
+  // ổn định theo phiên đăng nhập. Chỉ cần chạy khi tab chuyển sang "staff".
   useEffect(() => {
     if (activeTab === "staff" && hasRole(["owner"])) {
       refreshStaffScreen();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   return {

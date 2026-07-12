@@ -22,6 +22,8 @@ export const REPORTS_EXCLUDED_EXPENSE_CATEGORIES = [
   "sale_refund",
   "loan_payment",
   "debt_payment",
+  "salary",
+  "employee_advance",
 ] as const;
 
 function normalizeCategory(category: string | null | undefined): string {
@@ -94,6 +96,20 @@ function canonicalizeCategory(category: string | null | undefined): string {
     "thu hồi tạm ứng": "employee_advance_repayment",
     "thu hoi tam ung": "employee_advance_repayment",
     "employee_advance_repayment": "employee_advance_repayment",
+
+    // Salary & Advances (exclude from P&L expenses to prevent double-counting with labor total)
+    "lương": "salary",
+    "luong": "salary",
+    "lương nhân viên": "salary",
+    "luong nhan vien": "salary",
+    "salary": "salary",
+    "ứng lương": "employee_advance",
+    "ung luong": "employee_advance",
+    "tạm ứng lương": "employee_advance",
+    "tam ung luong": "employee_advance",
+    "tạm ứng": "employee_advance",
+    "tam ung": "employee_advance",
+    "employee_advance": "employee_advance",
   };
 
   return aliases[normalized] || normalized;
@@ -261,9 +277,17 @@ export function calculateFinancialSummary(params: {
       return c + (unitCost * (Number(p?.quantity) || 0));
     }, 0);
 
+    const workerShare = Number(wo?.workerTotal ?? wo?.worker_total ?? wo?.workertotal ?? 0) || 0;
+    const totalCostRaw = partsCost + workerShare;
+
+    const total = Number(wo?.total) || 0;
+    const paid = Number(wo?.totalPaid ?? wo?.totalpaid ?? total) || 0;
+    const ratio = total > 0 ? Math.min(1, Math.max(0, paid / total)) : 1;
+    const proportionalCost = totalCostRaw * ratio;
+
     // IMPORTANT: Outsourcing/service costs should be recorded via cash expense vouchers
     // (e.g. category 'outsourcing'/'service_cost') to avoid double counting.
-    return sum + partsCost;
+    return sum + proportionalCost;
   }, 0);
 
   const woGrossProfit = woRevenue - woCost;

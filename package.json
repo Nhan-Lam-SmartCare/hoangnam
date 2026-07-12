@@ -17,6 +17,7 @@
     "lint:baseline": "node scripts/maintenance/generate-lint-baseline.mjs",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "test": "vitest run --environment jsdom",
+    "test:unit": "vitest run --environment jsdom --exclude \"tests/integration/**\" --exclude \"e2e/**\" --exclude \"node_modules/**\"",
     "test:watch": "vitest --environment jsdom",
     "ci:test:critical": "vitest run tests/integration/rls_user_flow.test.ts --environment jsdom",
     "test:integration:critical": "vitest run tests/integration/receipt_create_atomic.test.ts tests/integration/rls_access.test.ts tests/integration/inventory_trigger_correctness.test.ts --environment jsdom",

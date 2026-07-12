@@ -444,6 +444,15 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                   return;
                 }
 
+                const totalShare = (newRepairServiceDraft.workers || []).reduce(
+                  (sum, w) => sum + Number(w.share_percent || 0),
+                  0
+                );
+                if (totalShare > 100) {
+                  showToast.error("Tổng phần trăm chia thợ không được vượt quá 100%");
+                  return;
+                }
+
                 setRepairServices([...repairServices, newRepairServiceDraft]);
                 setNewRepairServiceDraft(createEmptyRepairServiceDraft());
               }}

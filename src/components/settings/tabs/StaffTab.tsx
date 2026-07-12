@@ -119,8 +119,6 @@ export const StaffTab: React.FC<StaffTabProps> = ({ staffState, isOwner }) => {
     { key: "admin", label: "Quản trị" },
   ];
 
-
-
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN").format(Number(value || 0));
 
