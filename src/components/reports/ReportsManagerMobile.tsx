@@ -20,10 +20,14 @@ import {
     ChevronUp,
     Search,
     FileText,
+    Users,
 } from "lucide-react";
+
 import { formatCurrency, formatDate } from "../../utils/format";
 import type { Sale } from "../../types";
 import TaxReportExport from "./TaxReportExport";
+import { EmployeeReport } from "./components/EmployeeReport";
+
 
 import {
     isExcludedExpenseCategory,
@@ -136,10 +140,13 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                 return "Công nợ";
             case "tax":
                 return "Thuế";
+            case "employee_report":
+                return "Nhân viên";
             default:
                 return "Báo cáo";
         }
     };
+
 
     // Helper to get date range label
     const getDateRangeLabel = (range: string) => {
@@ -819,7 +826,7 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                             <>
                                 <div className="fixed inset-0 z-30" onClick={() => setShowReportMenu(false)} />
                                 <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-40 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                    {["revenue", "cashflow", "inventory", "debt", "payroll", "tax"].map((tab) => (
+                                    {["revenue", "cashflow", "inventory", "debt", "payroll", "tax", "employee_report"].map((tab) => (
                                         <button
                                             key={tab}
                                             onClick={() => {
@@ -837,10 +844,12 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                                             {tab === "debt" && <ClipboardList className="w-4 h-4" />}
                                             {tab === "payroll" && <BriefcaseBusiness className="w-4 h-4" />}
                                             {tab === "tax" && <FileText className="w-4 h-4" />}
+                                            {tab === "employee_report" && <Users className="w-4 h-4" />}
                                             {getTabLabel(tab)}
                                             {activeTab === tab && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
                                         </button>
                                     ))}
+
                                 </div>
                             </>
                         )}
@@ -920,7 +929,17 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                 {activeTab === "debt" && renderDebtTab()}
                 {activeTab === "payroll" && renderPayrollTab()}
                 {activeTab === "tax" && <TaxReportExport />}
+                {activeTab === "employee_report" && (
+                    <EmployeeReport
+                        sales={revenueReport.sales}
+                        workOrders={revenueReport.workOrders}
+                        employees={employees}
+                        startDate={_startDate}
+                        endDate={_endDate}
+                    />
+                )}
             </div>
         </div>
+
     );
 };

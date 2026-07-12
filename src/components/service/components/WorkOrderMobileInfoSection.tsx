@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { Employee, Customer, Vehicle } from "../../../types";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "../../../constants";
+import { getSelectableEmployees } from "../../../utils/employees";
 
 interface WorkOrderMobileInfoSectionProps {
   status: WorkOrderStatus;
@@ -50,6 +51,7 @@ interface WorkOrderMobileInfoSectionProps {
   handleSelectVehicle: (vehicle: Vehicle) => void;
   setShowAddVehicle: (show: boolean) => void;
   activeWarranty: any;
+  currentBranchId: string;
 }
 
 export const WorkOrderMobileInfoSection: React.FC<WorkOrderMobileInfoSectionProps> = ({
@@ -86,7 +88,10 @@ export const WorkOrderMobileInfoSection: React.FC<WorkOrderMobileInfoSectionProp
   handleSelectVehicle,
   setShowAddVehicle,
   activeWarranty,
+  currentBranchId,
 }) => {
+  const selectableEmployees = getSelectableEmployees(employees, currentBranchId);
+
   return (
     <div className="space-y-3 animate-in fade-in slide-in-from-right-4 duration-300">
       {/* KHỐI 1: TRẠNG THÁI & KỸ THUẬT VIÊN */}
@@ -135,8 +140,7 @@ export const WorkOrderMobileInfoSection: React.FC<WorkOrderMobileInfoSectionProp
             </p>
           )}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
-            {employees
-              .filter((emp) => !["Nguyễn Xuân Nhạn", "Võ Thanh Lâm"].includes(emp.name))
+            {selectableEmployees
               .map((emp) => {
                 const isActive = effectiveSelectedTechnicianId === emp.id;
                 return (

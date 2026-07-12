@@ -111,7 +111,9 @@ const InventoryManagerNew: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  const [filterBranchOnly, setFilterBranchOnly] = useState(true);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+
 
   // Debounce search input by 500ms
   useEffect(() => {
@@ -370,6 +372,14 @@ const InventoryManagerNew: React.FC = () => {
       baseList = repoParts;
     }
 
+    if (filterBranchOnly) {
+      baseList = baseList.filter((part: any) => {
+        const pBranchId = part.branch_id || part.branchId || "";
+        return !pBranchId || pBranchId === currentBranchId;
+      });
+    }
+
+
     // Client-side multi-keyword search refinement
     // Khi người dùng nhập nhiều từ, filter thêm để chỉ hiện sản phẩm có TẤT CẢ các từ
     if (search && search.trim()) {
@@ -468,6 +478,7 @@ const InventoryManagerNew: React.FC = () => {
     stockFilter,
     currentBranchId,
     search,
+    filterBranchOnly,
     sortField,
     sortDirection,
   ]);
@@ -1920,7 +1931,7 @@ const InventoryManagerNew: React.FC = () => {
             </div>
 
             {showAdvancedFilters && (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/40 p-3 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/40 p-3 grid gap-3 grid-cols-2 md:grid-cols-4">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                     Trạng thái tồn kho
@@ -1964,10 +1975,26 @@ const InventoryManagerNew: React.FC = () => {
                       : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100"
                       }`}
                   >
-                    {showDuplicatesOnly ? "Đang lọc trùng mã" : "Lọc trùng mã"}
+                    {showDuplicatesOnly ? "Đang lọc trùng" : "Lọc trùng mã"}
+                  </button>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    Kho chi nhánh
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFilterBranchOnly((prev) => !prev)}
+                    className={`mt-1 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${filterBranchOnly
+                      ? "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100"
+                      }`}
+                  >
+                    {filterBranchOnly ? "Chỉ chi nhánh này" : "Hiện tất cả kho"}
                   </button>
                 </div>
               </div>
+
             )}
           </div>
         </div>

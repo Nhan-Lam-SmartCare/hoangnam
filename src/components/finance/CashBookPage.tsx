@@ -189,6 +189,7 @@ const CashBookTable: React.FC<{
                   ? "Chuyển khoản"
                   : paymentSourceId);
             const notesText = (tx as any).notes || (tx as any).description || "-";
+            const detailsText = (tx as any).details || (tx as any).detail || "";
             const recipientText = (tx as any).recipient || "-";
             const categoryText = formatCashTxCategory((tx as any).category);
 
@@ -301,6 +302,7 @@ const CashBookTable: React.FC<{
                       ? "Chuyển khoản"
                       : paymentSourceId);
                 const notesText = (tx as any).notes || (tx as any).description || "-";
+                const detailsText = (tx as any).details || (tx as any).detail || "";
                 const recipientText = (tx as any).recipient || "-";
                 return (
                   <tr

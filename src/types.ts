@@ -244,6 +244,7 @@ export interface WorkOrder {
     description: string;
     quantity: number;
     price: number;
+    laborPrice?: number; // Tiền công thu thêm của khách (mỗi đơn vị)
     costPrice?: number; // Giá nhập
   }>; // Báo giá (Gia công, Đặt hàng)
   notes?: string;
@@ -318,6 +319,7 @@ export interface CashTransaction {
   amount: number;
   recipient?: string; // Đối tượng thu/chi
   notes: string;
+  details?: string;
   paymentSourceId: string;
   branchId: string;
   category?: CashTransactionCategory;
@@ -631,4 +633,26 @@ export interface AppState {
   loanPayments: LoanPayment[];
   purchaseOrders: PurchaseOrder[];
   externalParts: ExternalPart[];
+}
+
+export interface PawnRecord {
+  id: string;
+  customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  customerCccd?: string;
+  assetType: string;
+  assetModel?: string;
+  assetSerial?: string;
+  loanAmount: number;
+  interestRate?: number;
+  interestPeriod?: "day" | "month";
+  startDate?: string;
+  endDate?: string;
+  minInterest?: number;
+  status: "active" | "redeemed" | "liquidated";
+  notes?: string;
+  branchId?: string;
+  created_at?: string;
+  updated_at?: string;
 }

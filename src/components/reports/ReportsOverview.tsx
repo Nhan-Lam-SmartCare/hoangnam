@@ -10,7 +10,9 @@ import {
   Tag,
   BriefcaseBusiness,
   FileText,
+  Users,
 } from "lucide-react";
+
 import { useAppContext } from "../../contexts/AppContext";
 import { useSales } from "../../hooks/useSupabase";
 import { useWorkOrdersRepo } from "../../hooks/useWorkOrdersRepository";
@@ -51,7 +53,9 @@ import {
   InventoryReport,
   PayrollReport,
   DebtReport,
+  EmployeeReport,
 } from "./components";
+
 
 type ReportTab =
   | "revenue"
@@ -59,7 +63,9 @@ type ReportTab =
   | "inventory"
   | "payroll"
   | "debt"
-  | "tax";
+  | "tax"
+  | "employee_report";
+
 
 type DateRange = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
@@ -126,12 +132,23 @@ const REPORT_TAB_CONFIGS: Array<{
     label: "Báo cáo thuế",
     icon: <FileText className="w-4 h-4" />,
     activeClass:
-      "bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-lg shadow-indigo-500/30",
+      "bg-gradient-to-r from-indigo-505 to-purple-500 text-white border-transparent shadow-lg shadow-indigo-500/30",
     inactiveClass:
       "bg-transparent dark:bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700",
     dotClass: "bg-indigo-400",
   },
+  {
+    key: "employee_report",
+    label: "Nhân viên",
+    icon: <Users className="w-4 h-4" />,
+    activeClass:
+      "bg-gradient-to-r from-teal-500 to-emerald-500 text-white border-transparent shadow-lg shadow-teal-500/30",
+    inactiveClass:
+      "bg-transparent dark:bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700",
+    dotClass: "bg-teal-400",
+  },
 ];
+
 
 export default function ReportsOverview() {
   const { theme: _theme } = useTheme();
@@ -812,7 +829,13 @@ export default function ReportsOverview() {
                     ? "bg-white/20 text-white"
                     : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20";
                   break;
+                case "employee_report":
+                  iconColorSchema = isActive
+                    ? "bg-white/20 text-white"
+                    : "bg-teal-500/10 text-teal-600 dark:text-teal-400 group-hover:bg-teal-500/20";
+                  break;
               }
+
 
               return (
                 <button
@@ -1036,7 +1059,18 @@ export default function ReportsOverview() {
         {activeTab === "tax" && (
           <TaxReportExport />
         )}
+
+        {activeTab === "employee_report" && (
+          <EmployeeReport
+            sales={salesData}
+            workOrders={workOrdersData}
+            employees={employees}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        )}
       </div>
+
     </div>
   );
 }

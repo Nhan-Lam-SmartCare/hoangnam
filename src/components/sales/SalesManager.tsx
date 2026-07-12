@@ -1393,7 +1393,7 @@ Cam on quy khach da tin tuong!
                       setSelectedCustomerId(null); // Clear ID when typing
                       setShowCustomerSuggestions(true);
                     }}
-                    placeholder="Tìm khách hàng (tên, SDT, biển số)"
+                    placeholder="Tìm khách hàng (tên, SĐT, Serial/IMEI)"
                     className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                   />
                 </div>

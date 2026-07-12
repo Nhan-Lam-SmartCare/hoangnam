@@ -35,6 +35,7 @@ import {
 } from "../../../lib/services/repairLaborService";
 import { compressImage } from "../../../utils/imageCompressor";
 import { uploadDevicePhoto, deleteDevicePhoto } from "../../../lib/storage/devicePhotosStorage";
+import { getSelectableEmployees } from "../../../utils/employees";
 
 import {
   RepairServiceDraftWorker,
@@ -113,7 +114,7 @@ export function useWorkOrderFormState({
   const { data: warrantyCards } = useWarrantyCards();
   const { data: serviceConfigs = [] } = useServiceConfigs();
 
-  const employeeOptions = employees as Employee[];
+  const employeeOptions = getSelectableEmployees(employees as Employee[], currentBranchId);
   
   const defaultTechnicianName = useMemo(() => {
     const normalizedProfileEmail = String(profile?.email || "").trim().toLowerCase();
@@ -121,7 +122,7 @@ export function useWorkOrderFormState({
 
     if (!normalizedProfileEmail && !normalizedProfileName) return "";
 
-    const activeEmployees = (employees || []).filter((emp) => emp?.status === "active");
+    const activeEmployees = getSelectableEmployees(employees || [], currentBranchId);
 
     const matchedByEmail = activeEmployees.find(
       (emp) => String(emp?.email || "").trim().toLowerCase() === normalizedProfileEmail
@@ -132,7 +133,7 @@ export function useWorkOrderFormState({
       (emp) => String(emp?.name || "").trim().toLowerCase() === normalizedProfileName
     );
     return matchedByName?.name || "";
-  }, [employees, profile?.email, profile?.name, profile?.full_name]);
+  }, [employees, currentBranchId, profile?.email, profile?.name, profile?.full_name]);
 
   const isStaffRole = String(profile?.role || "").trim().toLowerCase() === "staff";
   const isTechnicianLockedForStaff = isStaffRole && !!defaultTechnicianName;
@@ -679,7 +680,7 @@ export function useWorkOrderFormState({
         storeSettings?.work_order_prefix
       );
 
-      let description = `${workOrder.vehicleModel || "Xe"} (Phiếu sửa chữa #${workOrderNumber})`;
+      let description = `${workOrder.vehicleModel || "Thiết bị"} (Phiếu sửa chữa #${workOrderNumber})`;
 
       if (workOrder.issueDescription) {
         description += `\nVấn đề: ${workOrder.issueDescription}`;
@@ -1014,7 +1015,7 @@ export function useWorkOrderFormState({
     }
 
     if (vehicleChanged && !canUpdateWorkOrderVehicle) {
-      return "Bạn không có quyền sửa thông tin thiết bị/xe trong phiếu sửa chữa";
+      return "Bạn không có quyền sửa thông tin thiết bị trong phiếu sửa chữa";
     }
 
     if (outsourceServicesChanged && !canUpdateWorkOrderOutsourceService) {

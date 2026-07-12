@@ -201,7 +201,7 @@ export const WorkOrderPaymentSection: React.FC<WorkOrderPaymentSectionProps> = (
                     className="w-4 h-4"
                   />
                   <span className="text-sm text-slate-700 dark:text-slate-300">
-                    Thanh toán khi trả xe
+                    Thanh toán khi trả máy
                   </span>
                 </label>
 
@@ -256,7 +256,7 @@ export const WorkOrderPaymentSection: React.FC<WorkOrderPaymentSectionProps> = (
 
           {formData.status !== "Trả máy" && (
             <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-              * Thanh toán khi trả xe chỉ khả dụng khi trạng thái là "Trả máy"
+              * Thanh toán khi trả máy chỉ khả dụng khi trạng thái là "Trả máy"
             </p>
           )}
         </div>

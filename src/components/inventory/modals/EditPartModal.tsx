@@ -1,9 +1,13 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import type { Part } from "../../../types";
 import UiModal from "../../ui/Modal";
+import { supabase } from "../../../supabaseClient";
+
+
 
 interface EditPartModalProps {
   part: Part;
@@ -18,6 +22,15 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
   onSave,
   currentBranchId,
 }) => {
+  const { data: branches = [] } = useQuery({
+    queryKey: ["allBranchesForSelect"],
+    queryFn: async () => {
+      const { data } = await supabase.from("branches").select("id, name").order("name");
+      return data || [];
+    }
+  });
+
+
   const [formData, setFormData] = useState({
     name: part.name,
     category: part.category || "",
@@ -34,7 +47,9 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
       0,
     costPrice: part.costPrice?.[currentBranchId] || 0,
     stock: part.stock?.[currentBranchId] || 0,
+    branchId: (part as any).branch_id || (part as any).branchId || "",
   });
+
   const { data: categories = [] } = useCategories();
   const createCategory = useCreateCategory();
   const [showInlineCat, setShowInlineCat] = useState(false);
@@ -73,8 +88,10 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
         ...(part.wholesalePrice || {}),
         [currentBranchId]: formData.laborCost,
       },
-    });
+      branch_id: formData.branchId || null,
+    } as any);
   };
+
 
   return (
     <UiModal
@@ -261,6 +278,29 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
             </p>
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+            Gán sản phẩm cho chi nhánh
+          </label>
+          <select
+            value={formData.branchId}
+            onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Tất cả chi nhánh</option>
+            {branches.map((b: any) => (
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.id})
+              </option>
+            ))}
+
+          </select>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+            Sản phẩm được gán cho chi nhánh cụ thể sẽ chỉ hiển thị ở kho chi nhánh đó. Chọn "Tất cả chi nhánh" để hiển thị mọi nơi.
+          </p>
+        </div>
+
 
         {/* Info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-xs">

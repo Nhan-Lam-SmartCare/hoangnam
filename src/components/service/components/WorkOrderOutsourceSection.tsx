@@ -4,6 +4,7 @@ import { formatCurrency } from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";
 import { showToast } from "../../../utils/toast";
 import { supabase } from "../../../supabaseClient";
+import { getServiceLineTotal } from "../utils/service.utils";
 
 interface WorkOrderOutsourceSectionProps {
   additionalServices: Array<{
@@ -11,6 +12,7 @@ interface WorkOrderOutsourceSectionProps {
     description: string;
     quantity: number;
     price: number;
+    laborPrice?: number;
     costPrice?: number;
   }>;
   setAdditionalServices: React.Dispatch<
@@ -20,6 +22,7 @@ interface WorkOrderOutsourceSectionProps {
         description: string;
         quantity: number;
         price: number;
+        laborPrice?: number;
         costPrice?: number;
       }>
     >
@@ -28,6 +31,7 @@ interface WorkOrderOutsourceSectionProps {
     description: string;
     quantity: number;
     price: number;
+    laborPrice: number;
     costPrice: number;
   };
   setNewService: React.Dispatch<
@@ -35,6 +39,7 @@ interface WorkOrderOutsourceSectionProps {
       description: string;
       quantity: number;
       price: number;
+      laborPrice: number;
       costPrice: number;
     }>
   >;
@@ -68,6 +73,9 @@ export const WorkOrderOutsourceSection: React.FC<WorkOrderOutsourceSectionProps>
               </th>
               <th className="px-4 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-300">
                 Đơn giá
+              </th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-300">
+                Tiền công
               </th>
               <th className="px-4 py-2 text-right text-xs font-medium text-slate-600 dark:text-slate-300">
                 Thành tiền
@@ -142,8 +150,27 @@ export const WorkOrderOutsourceSection: React.FC<WorkOrderOutsourceSectionProps>
                     placeholder="0"
                   />
                 </td>
+                <td className="px-4 py-2 text-right">
+                  <NumberInput
+                    value={service.laborPrice ?? 0}
+                    onChange={(val) =>
+                      setAdditionalServices(
+                        additionalServices.map((s) =>
+                          s.id === service.id
+                            ? { ...s, laborPrice: val }
+                            : s
+                        )
+                      )
+                    }
+                    disabled={!canEditPriceAndParts}
+                    className={`w-full px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-right bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:border-blue-500 focus:outline-none text-sm ${
+                      !canEditPriceAndParts ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                    placeholder="0"
+                  />
+                </td>
                 <td className="px-4 py-2 text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {formatCurrency(service.price * service.quantity)}
+                  {formatCurrency(getServiceLineTotal(service))}
                 </td>
                 <td className="px-4 py-2 text-center">
                   <button
@@ -233,9 +260,23 @@ export const WorkOrderOutsourceSection: React.FC<WorkOrderOutsourceSectionProps>
                   className="w-full px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-right bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm"
                 />
               </td>
+              <td className="px-4 py-2">
+                <NumberInput
+                  placeholder="Tiền công"
+                  value={newService.laborPrice ?? ""}
+                  onChange={(val) =>
+                    setNewService({
+                      ...newService,
+                      laborPrice: val,
+                    })
+                  }
+                  allowNegative={true}
+                  className="w-full px-2 py-1 border border-slate-300 dark:border-slate-600 rounded text-right bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm"
+                />
+              </td>
               <td className="px-4 py-2 text-right text-sm text-slate-400">
-                {newService.price > 0
-                  ? formatCurrency(newService.price * newService.quantity)
+                {newService.price > 0 || newService.laborPrice > 0
+                  ? formatCurrency(getServiceLineTotal(newService))
                   : "Thành tiền"}
               </td>
               <td className="px-4 py-2 text-center"></td>

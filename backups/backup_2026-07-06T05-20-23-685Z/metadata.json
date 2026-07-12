@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-07-06T05:20:25.445Z",
+  "tables": [
+    "categories",
+    "parts",
+    "suppliers",
+    "customers",
+    "sales",
+    "work_orders",
+    "cash_transactions",
+    "payment_sources",
+    "inventory_transactions",
+    "customer_debts",
+    "supplier_debts"
+  ],
+  "project": "https://xduimljokohsqslwbtja.supabase.co"
+}

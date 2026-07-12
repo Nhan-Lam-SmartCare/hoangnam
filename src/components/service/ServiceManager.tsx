@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+
 import {
   FileText,
   Wrench,
@@ -210,8 +211,61 @@ export default function ServiceManager() {
   // Fallback to fetchedParts if context is empty
   const parts = contextParts.length > 0 ? contextParts : (fetchedParts || []);
   const displayCustomers = customers;
-  const displayEmployees =
-    fetchedEmployees && fetchedEmployees.length > 0 ? fetchedEmployees : employees;
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profilesForTechnicians", currentBranchId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, full_name, email, role, branch_id")
+        .order("name");
+      if (error) return [];
+      return data || [];
+    },
+  });
+
+  const displayEmployees = useMemo(() => {
+    const map = new Map<string, any>();
+
+    // 1. Add from fetchedEmployees (from employees_directory / employees table)
+    if (fetchedEmployees && fetchedEmployees.length > 0) {
+      fetchedEmployees.forEach((emp: any) => {
+        if (emp.name) {
+          map.set(emp.name.toLowerCase().trim(), emp);
+        }
+      });
+    }
+
+    // 2. Add from context employees
+    if (employees && employees.length > 0) {
+      employees.forEach((emp: any) => {
+        if (emp.name) {
+          map.set(emp.name.toLowerCase().trim(), emp);
+        }
+      });
+    }
+
+    // 3. Fallback/merge from profiles (who are staff or manager, or have names)
+    if (profiles && profiles.length > 0) {
+      profiles.forEach((prof: any) => {
+        const name = prof.name || prof.full_name;
+        if (!name) return;
+        
+        const key = name.toLowerCase().trim();
+        if (!map.has(key)) {
+          map.set(key, {
+            id: prof.id,
+            name: name,
+            email: prof.email,
+            role: prof.role,
+            status: "active",
+            branchId: prof.branch_id || prof.branchId || "CN1",
+          });
+        }
+      });
+    }
+
+    return Array.from(map.values());
+  }, [fetchedEmployees, employees, profiles]);
   const displayWorkOrders = fetchedWorkOrders || workOrders;
   const defaultStaffTechnicianName = useMemo(() => {
     if (profile?.role !== USER_ROLES.STAFF) return "";
@@ -896,7 +950,7 @@ export default function ServiceManager() {
         storeSettings?.work_order_prefix
       );
 
-      let description = `${workOrder.vehicleModel || "Xe"
+      let description = `${workOrder.vehicleModel || "Thiết bị"
         } (Phiếu sửa chữa #${workOrderNumber})`;
 
       // Mô tả vấn đề
@@ -2074,7 +2128,7 @@ export default function ServiceManager() {
                   <textarea
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
-                    placeholder="Vd: Khách hàng không đồng ý chi phí, sửa nhầm xe..."
+                    placeholder="Vd: Khách hàng không đồng ý chi phí, sửa nhầm máy..."
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 resize-none"
                     rows={3}
                   />

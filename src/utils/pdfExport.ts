@@ -509,7 +509,7 @@ export const exportWorkOrdersPdf = (
 
   autoTable(doc, {
     startY,
-    head: [["Mã Phiếu", "Ngày tạo", "Khách hàng", "Thiết bị/Xe", "Tổng cộng", "Trạng thái"]],
+    head: [["Mã Phiếu", "Ngày tạo", "Khách hàng", "Thiết bị", "Tổng cộng", "Trạng thái"]],
     body: tableData,
     theme: "striped",
     headStyles: { fillColor: [59, 130, 246] },

@@ -83,8 +83,8 @@ export const PrinterSettings: React.FC<PrinterSettingsProps> = ({
             </style>
           </head>
           <body>
-            <h2>MOTOCARE PRO</h2>
-            <p>Hệ thống Quản lý Cửa hàng Xe máy</p>
+            <h2>SMARTCARE PRO</h2>
+            <p>Hệ thống Quản lý Cửa hàng Điện tử</p>
             <hr />
             <p>BẢN IN THỬ NGHIỆM MẠNG WIFI/LAN</p>
             <p>Thời gian: ${new Date().toLocaleString('vi-VN')}</p>
@@ -103,8 +103,8 @@ export const PrinterSettings: React.FC<PrinterSettingsProps> = ({
       
       const testText = `
 ================================
-         MOTOCARE PRO
-  He thong Quan ly Xe may
+         SMARTCARE PRO
+  He thong Quan ly Cua hang Dien tu
 ================================
 Thoi gian: ${new Date().toLocaleString('vi-VN')}
 Trang thai: KET NOI BT THANH CONG

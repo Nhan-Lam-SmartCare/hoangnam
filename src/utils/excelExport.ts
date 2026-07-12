@@ -435,7 +435,7 @@ export const exportDebtReport = (
 
   // 2. Customers
   const customerData = [
-    ["Tên khách hàng", "SĐT", "Xe", "Biển số", "Phân khúc"],
+    ["Tên khách hàng", "SĐT", "Thiết bị", "Serial/IMEI", "Phân khúc"],
   ];
 
   customers.forEach((c) => {
@@ -1040,8 +1040,8 @@ export const exportWorkOrdersReport = (
     "Ngày tạo",
     "Khách hàng",
     "SĐT",
-    "Thiết bị/Xe",
-    "Biển số/IMEI",
+    "Thiết bị",
+    "Serial/IMEI",
     "Nội dung sửa chữa",
     "Kỹ thuật viên",
     "Chi phí linh kiện",
@@ -1116,8 +1116,8 @@ export const exportWorkOrdersReport = (
     { wch: 18 }, // Ngày tạo
     { wch: 20 }, // Khách hàng
     { wch: 15 }, // SĐT
-    { wch: 18 }, // Thiết bị/Xe
-    { wch: 15 }, // Biển số/IMEI
+    { wch: 18 }, // Thiết bị
+    { wch: 15 }, // Serial/IMEI
     { wch: 30 }, // Nội dung sửa chữa
     { wch: 20 }, // Kỹ thuật viên
     { wch: 15 }, // Chi phí linh kiện

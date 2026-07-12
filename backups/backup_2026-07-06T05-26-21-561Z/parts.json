@@ -1,0 +1,2684 @@
+[
+  {
+    "id": "3f04a449-a5d8-47d7-bdf8-924174d7012e",
+    "name": "Má thắng sau",
+    "sku": "PT-CNE6ZV",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 14
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T03:07:21.736028+00:00",
+    "warranty": null
+  },
+  {
+    "id": "ed30fc63-d4c9-4259-ad18-5108302443ed",
+    "name": "VX-14x2.50",
+    "sku": "PT-ZUBF5L",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ ko ruột",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 278000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T02:00:11.958987+00:00",
+    "warranty": null
+  },
+  {
+    "id": "9d9202d4-860c-4eed-b6d3-5cf384281b90",
+    "name": "Bình 12V-5Ah",
+    "sku": "PT-A4CKYG",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 8
+    },
+    "retailPrice": {
+      "CN1": 320000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T02:07:10.174514+00:00",
+    "warranty": "6"
+  },
+  {
+    "id": "48d6476f-2156-4f71-a9b8-8807667ea8de",
+    "name": "Còi xe 48V",
+    "sku": "PT-ZBBXYN",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 140000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T09:23:20.093327+00:00",
+    "warranty": null
+  },
+  {
+    "id": "01071b40-bc04-40af-8ef1-e915234333f1",
+    "name": "Bóng đèn led 28W",
+    "sku": "PT-T6VM46",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 7
+    },
+    "retailPrice": {
+      "CN1": 90000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T09:20:03.645988+00:00",
+    "warranty": null
+  },
+  {
+    "id": "2eae598f-7e64-4295-8e83-3541906c92ca",
+    "name": "Đồng hồ báo pin",
+    "sku": "PT-AMCA45",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 18
+    },
+    "retailPrice": {
+      "CN1": 90000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T09:18:48.495511+00:00",
+    "warranty": null
+  },
+  {
+    "id": "f8391a9d-a64f-4d3a-81be-455fbb5a7977",
+    "name": "Bình 12V-7.5Ah",
+    "sku": "PT-E62RKR",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 450000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T02:05:10.901501+00:00",
+    "warranty": "6"
+  },
+  {
+    "id": "a8857c8d-b1ed-4f36-b7c6-3f1488defe57",
+    "name": "Đèn pha xe điện",
+    "sku": "PT-XKPXSA",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 9
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T09:21:48.697855+00:00",
+    "warranty": null
+  },
+  {
+    "id": "2f4a2940-ec39-437e-be27-6ca8435a44fd",
+    "name": "VX-16.250",
+    "sku": "PT-TZE3XU",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ k ruột",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 278000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T01:50:36.658002+00:00",
+    "warranty": null
+  },
+  {
+    "id": "36f619ad-7078-42b3-80e6-a712aa7f8350",
+    "name": "Pin 48V-15Ah",
+    "sku": "PT-GPDRZL",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 11
+    },
+    "retailPrice": {
+      "CN1": 3500000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T02:01:30.455714+00:00",
+    "warranty": null
+  },
+  {
+    "id": "f1164b71-1549-4166-9cbe-6f66e2616958",
+    "name": "VX- 12x2.125",
+    "sku": "PT-NAFUBE",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 231000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T08:55:00.415395+00:00",
+    "warranty": null
+  },
+  {
+    "id": "b053a2c6-b082-4374-8606-7468e1b3042f",
+    "name": "VX-12x2.50",
+    "sku": "PT-XRJUH9",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ ko ruột",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 213000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T01:57:56.863301+00:00",
+    "warranty": null
+  },
+  {
+    "id": "41a9d5f0-4b52-4207-8a65-1d693ff2484a",
+    "name": "VX-16 X 3.00",
+    "sku": "PT-JLQK32",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 342000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T08:53:16.111791+00:00",
+    "warranty": null
+  },
+  {
+    "id": "8aff761b-820b-4f73-acbf-8d51436846b7",
+    "name": "VX-90/90/12",
+    "sku": "PT-53WFLE",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ Ko Ruột",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 352000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T02:15:05.735334+00:00",
+    "warranty": null
+  },
+  {
+    "id": "410983b5-5201-40aa-9135-71b747d20071",
+    "name": "Pin 60V-30Ah",
+    "sku": "PT-8L36D3",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 6100000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T02:40:03.39133+00:00",
+    "warranty": null
+  },
+  {
+    "id": "92983e49-a34c-4993-b0bf-f271b03dd9cf",
+    "name": "VX-90/90/10",
+    "sku": "PT-96UZP4",
+    "category": "Phụ tùng xe điện",
+    "description": "vỏ ko ruột",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 333000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T02:08:48.64468+00:00",
+    "warranty": null
+  },
+  {
+    "id": "36686358-d987-4a43-a5a1-30bf28cfac40",
+    "name": "VX-300_10",
+    "sku": "PT-KMQH5E",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ k ruột",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 268000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T02:05:59.518496+00:00",
+    "warranty": null
+  },
+  {
+    "id": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+    "name": "Bình 48V-30Ah",
+    "sku": "PT-KZXRKN",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 25
+    },
+    "retailPrice": {
+      "CN1": 850000
+    },
+    "wholesalePrice": {
+      "CN1": 50000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T02:00:16.941207+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+    "name": "Bình 48V-15Ah",
+    "sku": "PT-CYCERJ",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 32
+    },
+    "retailPrice": {
+      "CN1": 650000
+    },
+    "wholesalePrice": {
+      "CN1": 50000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T01:58:16.701656+00:00",
+    "warranty": "6"
+  },
+  {
+    "id": "1aa02819-5a22-4f2f-9ed3-65a0f1e3f3f6",
+    "name": "Pin 60V-20Ah",
+    "sku": "PT-9DUL9L",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 5500000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T02:38:35.117829+00:00",
+    "warranty": null
+  },
+  {
+    "id": "cc5c4ffc-d758-498d-8de0-ba8f143318b1",
+    "name": "VX-300_8",
+    "sku": "PT-SBWXSE",
+    "category": "Phụ tùng xe điện",
+    "description": "VỎ KO RUỘT",
+    "stock": {
+      "CN1": 9
+    },
+    "retailPrice": {
+      "CN1": 268000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T01:47:18.824245+00:00",
+    "warranty": null
+  },
+  {
+    "id": "21bd81e9-b8f4-48af-ad9d-6dd9350c7176",
+    "name": "VX-16 X 2.125",
+    "sku": "PT-W64EHY",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 296000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T07:43:46.887874+00:00",
+    "warranty": null
+  },
+  {
+    "id": "5205cf73-c3f3-4a3d-b8f5-38d6f33cded6",
+    "name": "VX-250_10",
+    "sku": "PT-ETP2KF",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ ko ruột",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 259000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T03:27:01.497524+00:00",
+    "warranty": null
+  },
+  {
+    "id": "e4b3f8f0-55fe-4acb-8c0c-667246418fb3",
+    "name": "VX-14 X 2.125",
+    "sku": "PT-VRLZLK",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 231000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T08:56:26.938744+00:00",
+    "warranty": null
+  },
+  {
+    "id": "971d92e0-7812-4e96-8a84-22bb08665d63",
+    "name": "VX-16x3.0",
+    "sku": "PT-NMH3A9",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ ko ruột",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 278000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T01:53:50.043477+00:00",
+    "warranty": null
+  },
+  {
+    "id": "0a0bde5d-a8cc-4233-a1c3-9b5069a2cc09",
+    "name": "VX-18 X 2.50",
+    "sku": "PT-4DNVPY",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 305000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T07:45:52.86526+00:00",
+    "warranty": null
+  },
+  {
+    "id": "d70c64d3-4cb4-4d70-a78c-d54fadea47a9",
+    "name": "VX-14 X 250",
+    "sku": "PT-MAYPYF",
+    "category": "Phụ tùng xe điện",
+    "description": "Vỏ có ruột",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 241000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T03:49:04.93582+00:00",
+    "warranty": null
+  },
+  {
+    "id": "537badb6-594b-4e18-ad1d-433d442caaa8",
+    "name": "VX-16 X 2.50",
+    "sku": "PT-MXRAJ3",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 287000
+    },
+    "wholesalePrice": {
+      "CN1": 70000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T08:47:43.163513+00:00",
+    "warranty": null
+  },
+  {
+    "id": "cbbf2524-0dd6-4961-8ede-dd80013f498e",
+    "name": "Còi xe 12V",
+    "sku": "PT-FKQZT5",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-04T09:27:03.850434+00:00",
+    "warranty": null
+  },
+  {
+    "id": "dddcf33c-4f2d-46aa-8d72-b83cb246289b",
+    "name": "Bố thắng đĩa",
+    "sku": "PT-37QNRR",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 30
+    },
+    "retailPrice": {
+      "CN1": 90000
+    },
+    "wholesalePrice": {
+      "CN1": 40000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T03:08:30.742429+00:00",
+    "warranty": null
+  },
+  {
+    "id": "60f675dc-c03f-4c4e-9b31-9130f9c4fad6",
+    "name": "Chia khóa xe",
+    "sku": "PT-WRL6FT",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 13
+    },
+    "retailPrice": {
+      "CN1": 90000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:30:28.063745+00:00",
+    "warranty": null
+  },
+  {
+    "id": "4a1b4170-5a23-4c78-ad77-4efe1a9a421d",
+    "name": "Cặp Tay Thắng",
+    "sku": "PT-ND6ZRE",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:32:32.311253+00:00",
+    "warranty": null
+  },
+  {
+    "id": "c74caeeb-78fe-44b3-b4ce-352ac0bb557d",
+    "name": "Cụm xi-nhan",
+    "sku": "PT-CSTZXN",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:23:18.451318+00:00",
+    "warranty": null
+  },
+  {
+    "id": "55cc937f-7180-4bcc-be4b-158934665c29",
+    "name": "Cụm đèn nhan & còi",
+    "sku": "PT-RT8QGH",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 110000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:24:34.083703+00:00",
+    "warranty": null
+  },
+  {
+    "id": "66887d44-40b9-4d0d-8667-33dbec1c5e9e",
+    "name": "Dây phanh xe máy điện 2.0m",
+    "sku": "PT-CRN37L",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 25
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T06:20:33.61767+00:00",
+    "warranty": null
+  },
+  {
+    "id": "b463919c-b8c5-4452-af2d-0474cc0c8c86",
+    "name": "Gạt chân sau",
+    "sku": "PT-Q53C3S",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 39
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T06:21:43.660951+00:00",
+    "warranty": null
+  },
+  {
+    "id": "21fd66df-4bc6-48fc-9d22-7fbfb4bb40b3",
+    "name": "Bộ xi-nhan đuôi xe",
+    "sku": "PT-GH3UYY",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 9
+    },
+    "retailPrice": {
+      "CN1": 150000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:26:21.399536+00:00",
+    "warranty": null
+  },
+  {
+    "id": "790fb0fd-4e1b-4c55-ab3b-29ddc9366302",
+    "name": "Jack cắm bình",
+    "sku": "PT-4W5DTW",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 18
+    },
+    "retailPrice": {
+      "CN1": 30000
+    },
+    "wholesalePrice": {
+      "CN1": 5000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T03:06:09.799243+00:00",
+    "warranty": null
+  },
+  {
+    "id": "ad388f89-be2a-43cb-8cb6-a80babc43346",
+    "name": "Mặt đồng hồ & đèn",
+    "sku": "PT-QPG6EP",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 200000
+    },
+    "wholesalePrice": {
+      "CN1": 50000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T03:10:38.874257+00:00",
+    "warranty": null
+  },
+  {
+    "id": "07b3c0f8-4880-4349-8ab8-d0b232030680",
+    "name": "Sản phẩm test",
+    "sku": "PT-MDE9Z7",
+    "category": "Linh kiện Điện thoại",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 22500
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 15000
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T01:48:25.037684+00:00",
+    "warranty": "3 Tháng"
+  },
+  {
+    "id": "b39c963b-abc9-436c-8793-de3b67af43ad",
+    "name": "Dây phanh xe đạp điện 1.95m",
+    "sku": "PT-GCCJKR",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 35
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T06:16:20.023766+00:00",
+    "warranty": null
+  },
+  {
+    "id": "56c74573-6e32-4568-9703-4532e765ff20",
+    "name": "Cặp tay ga",
+    "sku": "PT-K5Z5KH",
+    "category": "Phụ tùng xe điện",
+    "description": "Tùy theo loại tay ga",
+    "stock": {
+      "CN1": 33
+    },
+    "retailPrice": {
+      "CN1": 180000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-05T03:12:46.234328+00:00",
+    "warranty": null
+  },
+  {
+    "id": "31654da0-9e9e-49b8-a7b5-83cc6e5f988e",
+    "name": "Cục chóp nhan",
+    "sku": "PT-35RZ4R",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 0
+    },
+    "retailPrice": {
+      "CN1": 40000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T03:01:46.179613+00:00",
+    "warranty": null
+  },
+  {
+    "id": "009b7765-4387-4bda-ae14-44cf96eabbe4",
+    "name": "Màn Hình laptop",
+    "sku": "0X00YR",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1400000
+    },
+    "wholesalePrice": {
+      "CN1": 1260000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:02:38.263201+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "bfa95505-dbc5-45cf-8380-5fa31c919121",
+    "name": "Dây phanh xe đạp điện 2.0m",
+    "sku": "PT-NZ3MH9",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 18
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T06:17:15.052493+00:00",
+    "warranty": null
+  },
+  {
+    "id": "9ad82531-612c-41a1-9337-41f6c19c8271",
+    "name": "Cài Win Laptop/PC",
+    "sku": "PT-CJTX75",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 993
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-11T02:15:25.795831+00:00",
+    "warranty": "1 tháng"
+  },
+  {
+    "id": "9b9891ae-2665-40d2-8eaa-3a3b1eafaea5",
+    "name": "Cặp Xi-nhan trước",
+    "sku": "PT-YFEPWP",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 7
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:27:31.792684+00:00",
+    "warranty": null
+  },
+  {
+    "id": "661bb97f-d741-42a0-96c9-82fe2f66da83",
+    "name": "Dây phanh xe đạp điện 1.85m",
+    "sku": "PT-G3AXNC",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 29
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T03:29:46.10098+00:00",
+    "warranty": null
+  },
+  {
+    "id": "d537c7f8-319c-4cd8-8d7a-01ce666b867c",
+    "name": "Dây phanh xe máy điện 1.75m",
+    "sku": "PT-SGYGB5",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 21
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T06:19:24.045948+00:00",
+    "warranty": null
+  },
+  {
+    "id": "df47eb60-5dfc-4e20-877d-b7df4d7e6364",
+    "name": "Dây phanh xe đạp điện 1.25m",
+    "sku": "PT-WV3MPL",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 21
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T03:26:58.38566+00:00",
+    "warranty": null
+  },
+  {
+    "id": "6825eecd-d01b-49ea-a895-1175ae0b3286",
+    "name": "Vệ Sinh Laptop",
+    "sku": "PT-KN5T4W",
+    "category": "Linh kiện Laptop/PC",
+    "description": "Vệ sinh máy + keo tản nhiệt",
+    "stock": {
+      "CN1": 998
+    },
+    "retailPrice": {
+      "CN1": 100000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-11T02:25:08.589373+00:00",
+    "warranty": "1 tháng"
+  },
+  {
+    "id": "6b8af30f-9253-44ab-ae5d-d6195b463042",
+    "name": "Bộ chìa khóa chống trộm",
+    "sku": "PT-SYRCDU",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 12
+    },
+    "retailPrice": {
+      "CN1": 150000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T02:29:04.712452+00:00",
+    "warranty": null
+  },
+  {
+    "id": "1113aa16-19ba-4a04-b9af-3febc777f494",
+    "name": "Vệ Sinh PC( Máy Bàn)",
+    "sku": "PT-7FA976",
+    "category": "Linh kiện Laptop/PC",
+    "description": "Vệ sinh và tra keo tản nhiệt",
+    "stock": {
+      "CN1": 1000
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-11T02:26:19.680783+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "4ef202e1-d4ba-43c6-9bef-62540b159224",
+    "name": "MH 15.6 SLIM - 144HZ",
+    "sku": "PT-TCGBU8",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 2200000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:24:37.973987+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "02e5ade1-38b0-4edc-b20a-dcf83f9d1b94",
+    "name": "MH 15.6 SLIM - 240HZ",
+    "sku": "PT-9RJGJW",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 2800000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:25:42.70093+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "46c582b6-14cd-4186-ad5f-f2d933547afb",
+    "name": "MH 15.6 FHM - N26",
+    "sku": "PT-UZYLMH",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1700000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:27:13.004558+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "1b1d33f6-f729-48a6-b7a8-b8490840e2fc",
+    "name": "MH 14.0 SLIM 30PIN",
+    "sku": "PT-GSPFKC",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1800000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:28:08.193198+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "68b52dca-1c43-4d51-9a5f-c4a85cee0c22",
+    "name": "MH 14.0 XW02",
+    "sku": "PT-NDB3KR",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1550000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:29:12.698524+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "1eeb201b-ef76-4319-8bce-5ffe43e5ce9e",
+    "name": "MH 14.0 FHM - N48",
+    "sku": "PT-B3896D",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1800000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:32:31.633062+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "85bb60f5-f3f1-48da-822d-0b8a925ba13d",
+    "name": "MH 14.0FHM - N49",
+    "sku": "PT-VRSFM5",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1800000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:30:03.749282+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "40548685-6f4a-4d57-a820-2553bc0aa7b9",
+    "name": "MH 14.0 WX1 - 411",
+    "sku": "PT-U2NAHW",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1650000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:34:56.678162+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "65a30c77-da66-4dee-85b7-71a64a7dddab",
+    "name": "MH 14.0 BGE - EB3",
+    "sku": "PT-M866XL",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 1650000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T09:33:55.000151+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "32484bdc-376e-4c1d-b026-ee02aa079358",
+    "name": "MH Đã Qua Sử Dụng 15.6",
+    "sku": "PT-G5Z8ZW",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 10
+    },
+    "retailPrice": {
+      "CN1": 1000000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T10:05:45.602129+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "71f70de6-af35-4ab9-b7e1-f730ac3f13ce",
+    "name": "MH Đã Qua Sử Dụng 14.0",
+    "sku": "PT-MJPPPM",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 950000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T10:06:49.494456+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "3132f30f-720e-4d0b-b0e6-e24b90a0637d",
+    "name": "MH Đã Qua Sử Dụng 13.0",
+    "sku": "PT-3H6F8F",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 750000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T10:07:44.119654+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "584050a9-1e55-4dbe-87a1-f3d966016663",
+    "name": "MH Đã Qua Sử Dụng 11.0",
+    "sku": "PT-NL3U9H",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 750000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-28T10:08:36.421553+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "764327aa-3d91-4570-82f8-7f920138eae4",
+    "name": "IC Đa Năng HDM - 500W",
+    "sku": "PT-J2N45F",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 600000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:26:38.315436+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "979002f8-7b6d-4cca-84ec-2a7b417bdcbc",
+    "name": "IC Blue linght 9Mos - 500W",
+    "sku": "PT-FNHMNT",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 500000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:36:58.339794+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "65677f2a-fd82-44d5-9889-683b004d6579",
+    "name": "IC Đa Năng HDM - 800W",
+    "sku": "PT-QNDQVE",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 750000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:27:41.287718+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "023d1894-56a3-48f1-9dda-dc81e6704971",
+    "name": "IC Đa Năng HMD - 400W",
+    "sku": "PT-9G3ADJ",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 500000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:25:24.456254+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "502d151e-7490-4aa3-bd80-a6f6b1af5207",
+    "name": "MH 15.6 SLIM 30P 1080P",
+    "sku": "PT-3ZXHVX",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1650000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:09:28.242109+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "b334e6e2-c65f-477a-9596-f348588db904",
+    "name": "IC Đúc B07 (9G) 30A-500W",
+    "sku": "PT-3X3Y8A",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 750000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:30:41.541222+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "c06bc768-abe0-490c-95a3-d3156ab74f47",
+    "name": "IC X-TIGER 500W",
+    "sku": "PT-TE2G9D",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 550000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:38:25.513195+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "3a544fae-db45-4545-a68f-2784e3814767",
+    "name": "IC Đúc B07 (12G) 55A-2000W",
+    "sku": "PT-7P5KEV",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 950000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:32:59.318853+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "a5b346d9-2d8c-47e5-a6ab-c98c56243d80",
+    "name": "IC Đúc B07 (12G) 40A-1200W",
+    "sku": "PT-ATVBUD",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 850000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:34:39.622347+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "48944605-ff26-4ded-8acb-5556629d13d2",
+    "name": "IC AUSBOND 15MOS - 1000W",
+    "sku": "PT-FHJNN2",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 750000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:39:48.011837+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "bfa54e75-ec20-448b-902c-d7aca15400d8",
+    "name": "IC AUSBOND 12MOS - 800W",
+    "sku": "PT-EQVND4",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 600000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:40:45.720867+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "8666c29a-cbfe-4ff2-95f0-b6aeaa08a5bb",
+    "name": "Dây phanh xe đạp điện 2.2m",
+    "sku": "PT-BB9QAY",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 28
+    },
+    "retailPrice": {
+      "CN1": 60000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-06T06:18:04.283097+00:00",
+    "warranty": null
+  },
+  {
+    "id": "f48ea3fa-4fb9-445d-b409-b98a440d9569",
+    "name": "MH Đơn 13.3 30P FHD V.TRÁI 7390",
+    "sku": "PT-27C5ZP",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 2100000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:11:34.978569+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "235c6051-5954-44a4-bec3-b2e15a88288c",
+    "name": "MH 14.0 SLIM 30P 1080PS",
+    "sku": "PT-KRWED3",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1500000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:14:19.180184+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "42c22627-aa48-41b4-8f12-53bf68862a81",
+    "name": "MH 15.6 SLIM 30PIN",
+    "sku": "PT-QEY2JT",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 1550000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:15:01.144971+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "e3bfee7c-b14c-418e-aa5c-860fb36aff6e",
+    "name": "MH 15.6 SLIM - 144HZ",
+    "sku": "PT-VCTUBM",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 2200000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:16:05.034278+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "b876640d-d4b5-470a-85ff-f37a9f835b2b",
+    "name": "MH 14.0 SLIM 30PIN",
+    "sku": "PT-CAGUNB",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1450000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:12:25.516507+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "81e6b01b-cd5e-4a5e-a01d-d66264dcbf51",
+    "name": "MH 14.0 SLIMRP",
+    "sku": "PT-DM44ZV",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 950000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:13:07.658387+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "6c5e5bdf-5cf4-4c36-9ed0-e0435d458957",
+    "name": "MH 15.6 SLIMPR",
+    "sku": "PT-57HGLW",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1450000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:22:39.505157+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "f8270957-6e76-4650-a40c-abd47a7a37a6",
+    "name": "MH Dell 5584",
+    "sku": "PT-Y5PN9U",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1750000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:18:29.734876+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "50bf6a70-81fa-4f9e-850a-e01733587c09",
+    "name": "IC Đúc B07 (6G) -400W",
+    "sku": "PT-FYDR5K",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 0
+    },
+    "retailPrice": {
+      "CN1": 650000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-04-29T03:29:06.835998+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "f42904a7-364b-4417-a1c8-17753458ac87",
+    "name": "MH 15.6 SLIM 30PINRP",
+    "sku": "PT-HG5K5C",
+    "category": "Linh kiện Laptop/PC",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 1250000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-13T08:19:27.860045+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "6f00b619-1c53-4790-bc88-bbdb6238b89f",
+    "name": "Cổ yên xe",
+    "sku": "PT-89ESHL",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 150000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:06:33.837538+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "c1fe89e5-3e66-4e17-bedc-ed70a3213bf7",
+    "name": "Yên xe đạp điện V1 Plus loại 1",
+    "sku": "PT-KPWJBL",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 480000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:07:37.417565+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "93ee7d0e-77f8-4386-9fc0-a622842f7804",
+    "name": "Dè sau CAPA",
+    "sku": "PT-QD8HBF",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 250000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:35:31.22704+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "cdbb47f7-a1d1-450f-9b2e-f312ff153f6b",
+    "name": "Cụm tay thắng & Bình nhớt OSAKAR",
+    "sku": "PT-UCN6XB",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 550000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-14T10:50:13.679375+00:00",
+    "warranty": "1 tháng"
+  },
+  {
+    "id": "0bc52cd9-f995-453b-85ad-611797f931af",
+    "name": "Chân Chổi xe",
+    "sku": "PT-MCETPS",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:24:42.161347+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "812e27e5-18a1-4e8d-9e87-5eb7623f8357",
+    "name": "Dè xe sau 133",
+    "sku": "PT-AZMEDP",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 120000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T01:54:00.234265+00:00",
+    "warranty": "1 tháng"
+  },
+  {
+    "id": "f657a4a9-01ca-44be-b8c8-e64cc6f5dd7b",
+    "name": "Yên xe đạp điện V1 Plus loại 2",
+    "sku": "PT-WPSAU4",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 350000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-14T09:12:18.983239+00:00",
+    "warranty": "1 tháng"
+  },
+  {
+    "id": "315c455f-dede-4883-b35a-0151e539fc56",
+    "name": "Mỏ dè trước",
+    "sku": "PT-8WSWKK",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 230000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:17:10.5173+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "eba68f33-a9d8-426d-bbb8-d8e10c50dc69",
+    "name": "2 miếng ốp xe",
+    "sku": "PT-K36F92",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 6
+    },
+    "retailPrice": {
+      "CN1": 140000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:02:11.430581+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "9e46164d-37e6-4179-bbe7-b337444cb43d",
+    "name": "Yên Xe đạp điện thường",
+    "sku": "PT-9PV6A9",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 150000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:21:51.427793+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "ab734c29-56ca-4233-b1e3-f958f11d1061",
+    "name": "miếng ốp lẻ",
+    "sku": "PT-F2GV79",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 70000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:03:40.25415+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "c257bf8c-0f9d-4afe-86a9-541e2ca2c1e9",
+    "name": "Chìa khóa xe V1",
+    "sku": "PT-P6XNJS",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 30
+    },
+    "retailPrice": {
+      "CN1": 140000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T03:08:59.117379+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "9f52825d-e9e9-4505-8ead-a1e9a0489c8b",
+    "name": "Yên xe sau",
+    "sku": "PT-J6QMX7",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 90000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:22:32.676865+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "c2973f5d-fa89-4798-b691-ea9dfad087df",
+    "name": "Ruột Xe 14x2.50",
+    "sku": "PT-ULFWV7",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:09:58.635247+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "fac5d1bd-1ba0-465d-8037-ec62d33766d5",
+    "name": "Dựa lưng V1 Plus",
+    "sku": "PT-HYM9WY",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 350000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T02:33:24.566698+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "fef15468-fe96-40df-b0df-44ef5bfd2c57",
+    "name": "VX-16x250",
+    "sku": "PT-KLGFQG",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 350000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T04:09:05.056782+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "3ef30609-0321-44cc-bc4d-70bfa2eb54a9",
+    "name": "Ghế bé xe V1plus",
+    "sku": "PT-TDWPEM",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 450000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T04:10:31.81171+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "04beb400-d532-4530-b26f-cf0da6cd4109",
+    "name": "Ghế ngồi em bé",
+    "sku": "PT-NSKGHP",
+    "category": "Chưa phân loại",
+    "description": "",
+    "stock": {
+      "CN1": 1
+    },
+    "retailPrice": {
+      "CN1": 390000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T04:11:10.036533+00:00",
+    "warranty": "2 tháng"
+  },
+  {
+    "id": "b924f9e9-aa51-4005-97bc-f94eddb447f9",
+    "name": "VX-2.50_10",
+    "sku": "PT-6SW4CT",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 320000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-23T04:09:47.59458+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "ae7d3339-3ce8-40ac-ad3e-4db093834550",
+    "name": "Ruột Xe 16x2.125",
+    "sku": "PT-BXHTGS",
+    "category": "Chưa phân loại",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:07:03.426037+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "59aaf726-ab89-4694-8a4b-a4ea055e6b3f",
+    "name": "Ruột Xe 18x2.50",
+    "sku": "PT-TQMPL2",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 4
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:11:44.581937+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "d9ace4e8-a60d-457d-82b6-9a0110673307",
+    "name": "Ruột xe 300-10",
+    "sku": "PT-MN2AHQ",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:13:27.176013+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "6bd64d38-d66f-44cc-89c2-070766b41cb3",
+    "name": "Ruột Xe 3.00-10",
+    "sku": "PT-LW6EMD",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:07:40.956678+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "1efa5c7f-1385-4002-a7d1-ec476713c168",
+    "name": "Ruột Xe 14x2.125",
+    "sku": "PT-6WPE4H",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:08:23.042949+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "01bc5f81-42c2-4b1e-9d30-3b4332d6a048",
+    "name": "VX 18x2.50",
+    "sku": "PT-MKRQGM",
+    "category": "Phụ tùng xe điện",
+    "description": "Có ruột",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 305000
+    },
+    "wholesalePrice": {
+      "CN1": 70
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-15T02:03:39.945472+00:00",
+    "warranty": "1 tháng"
+  },
+  {
+    "id": "e5a238ab-c276-468f-baf3-ec472900e032",
+    "name": "Ruột Xe 18x2.125",
+    "sku": "PT-FZ2GYC",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:12:40.15678+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "ee6adae7-66da-4b49-a716-fb3740f98bba",
+    "name": "Ruột Xe 16x3.00",
+    "sku": "PT-U39978",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:11:06.067791+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "51886a34-9b69-4a0a-85ee-3297247b5356",
+    "name": "Ruột Xe 20x2.125",
+    "sku": "PT-XNYEZZ",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:06:24.76435+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "76ed2726-0d6d-4c88-a9cc-8feb4cf8a6a1",
+    "name": "Ruột Xe 16-3.0",
+    "sku": "PT-PF27WY",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 2
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:14:46.974508+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "0d9667c9-f637-4a8d-b8b0-a103461691df",
+    "name": "Ruột Xe 12x2.125",
+    "sku": "PT-QRF7Q3",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T04:09:11.789772+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "08fa9b4b-3435-4519-a90c-fc93c0541c74",
+    "name": "Ruột Xe 16x2.50",
+    "sku": "PT-TA7VH5",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 5
+    },
+    "retailPrice": {
+      "CN1": 75000
+    },
+    "wholesalePrice": {
+      "CN1": 30000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-24T05:00:05.982504+00:00",
+    "warranty": "3 tháng"
+  },
+  {
+    "id": "f2488425-bd05-4e61-aefd-942a30b6a2d7",
+    "name": "Pin 48V-20Ah",
+    "sku": "PT-2C3HM9",
+    "category": "Pin, Acquy, Nguồn",
+    "description": "",
+    "stock": {
+      "CN1": 3
+    },
+    "retailPrice": {
+      "CN1": 4500000
+    },
+    "wholesalePrice": {
+      "CN1": 20000
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-05-25T09:28:54.818426+00:00",
+    "warranty": "12 tháng"
+  },
+  {
+    "id": "fa2f6a1b-f08e-4fd4-8959-30a19c36a3b1",
+    "name": "Ip 10",
+    "sku": "1234567891234",
+    "category": "Linh Kiện Điện Thoại",
+    "description": "Hàng cũ",
+    "stock": {
+      "CN1": 0
+    },
+    "retailPrice": {
+      "CN1": 2500000
+    },
+    "wholesalePrice": {
+      "CN1": 0
+    },
+    "costPrice": {
+      "CN1": 0
+    },
+    "barcode": null,
+    "created_at": "2026-06-14T12:36:05.738044+00:00",
+    "warranty": "6 tháng"
+  },
+  {
+    "id": "925358f3-811c-4d33-962a-3b894e2c0a54",
+    "name": "Tay ga Xe VK1",
+    "sku": "PT-VG2BL9",
+    "category": "Phụ tùng xe điện",
+    "description": "",
+    "stock": {
+      "CN1": 0
+    },
+    "retailPrice": {
+      "CN1": 180000
+    },
+    "wholesalePrice": {
+      "CN1": 162000
+    },
+    "costPrice": {},
+    "barcode": null,
+    "created_at": "2026-06-20T08:09:58.95375+00:00",
+    "warranty": "3 tháng"
+  }
+]

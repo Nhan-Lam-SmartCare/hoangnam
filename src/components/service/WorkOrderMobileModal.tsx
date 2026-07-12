@@ -801,6 +801,7 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
                 handleSelectVehicle={handleSelectVehicle}
                 setShowAddVehicle={setShowAddVehicle}
                 activeWarranty={activeWarranty}
+                currentBranchId={currentBranchId}
               />
             )}
 

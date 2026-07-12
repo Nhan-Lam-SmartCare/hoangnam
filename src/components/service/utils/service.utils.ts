@@ -8,6 +8,19 @@ import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import type { WorkOrder } from "../../../types";
 
+/**
+ * Tính thành tiền một dòng "Gia công / Đặt hàng ngoài".
+ * Thành tiền = (đơn giá + tiền công) × số lượng.
+ * Tương thích ngược: đơn cũ không có laborPrice => coi như 0.
+ */
+export function getServiceLineTotal(s: {
+    price?: number;
+    laborPrice?: number;
+    quantity?: number;
+}): number {
+    return ((s?.price || 0) + (s?.laborPrice || 0)) * (s?.quantity || 1);
+}
+
 export interface PrintableStoreSettings {
     store_name?: string;
     address?: string;
@@ -183,8 +196,9 @@ export const generateWorkOrderTextReceipt = (
         serviceLines += `Dich vu:\n`;
         order.additionalServices.forEach((s) => {
             serviceLines += `- ${s.description || ""}\n`;
-            const qtyPrice = `  ${s.quantity || 1} x ${formatCurrency(s.price)}`;
-            const totalS = formatCurrency((s.price || 0) * (s.quantity || 1));
+            const unitPrice = (s.price || 0) + ((s as { laborPrice?: number }).laborPrice || 0);
+            const qtyPrice = `  ${s.quantity || 1} x ${formatCurrency(unitPrice)}`;
+            const totalS = formatCurrency(getServiceLineTotal(s));
             const spacesCount = 32 - qtyPrice.length - totalS.length;
             const spaces = spacesCount > 0 ? " ".repeat(spacesCount) : " ";
             serviceLines += `${qtyPrice}${spaces}${totalS}\n`;
@@ -192,7 +206,7 @@ export const generateWorkOrderTextReceipt = (
     }
 
     const partsTotal = order.partsUsed?.reduce((sum, p) => sum + p.quantity * p.price, 0) || 0;
-    const servicesTotal = order.additionalServices?.reduce((sum, s) => sum + (s.price || 0) * (s.quantity || 1), 0) || 0;
+    const servicesTotal = order.additionalServices?.reduce((sum, s) => sum + getServiceLineTotal(s), 0) || 0;
     const laborCost = order.laborCost || 0;
     const grandTotal = order.total || (partsTotal + servicesTotal + laborCost);
 
@@ -217,9 +231,9 @@ ${doubleLine}
 Khach hang: ${order.customerName}
 SDT: ${order.customerPhone}
 Thiet bi: ${order.vehicleModel}
-Bien so: ${order.licensePlate}
+Serial/IMEI: ${order.licensePlate}
 ${doubleLine}
-Noi dung: ${order.issueDescription || "Sua chua xe"}
+Noi dung: ${order.issueDescription || "Sua chua thiet bi"}
 ${line}
 ${partLines}${serviceLines}${line}
 ${partsLine}

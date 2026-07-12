@@ -83,6 +83,10 @@ const StaffDashboard = lazyImport(() =>
     default: m.StaffDashboard,
   }))
 );
+const PawnManager = lazyImport(
+  () => import("./components/pawn/PawnManager")
+);
+
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -181,6 +185,12 @@ const WarrantyPage = () => (
     <WarrantyManager />
   </Suspense>
 );
+const Pawn = () => (
+  <Suspense fallback={<PageLoader />}>
+    <PawnManager />
+  </Suspense>
+);
+
 
 
 const MainLayout: React.FC = () => {
@@ -198,7 +208,9 @@ const MainLayout: React.FC = () => {
     "/categories",
     "/lookup",
     "/cash-book",
+    "/pawn",
   ].some((path) => location.pathname.startsWith(path));
+
 
   return (
     <div className="app-shell min-h-screen transition-colors pb-20 md:pb-0 relative overflow-hidden">
@@ -291,7 +303,9 @@ const MainLayout: React.FC = () => {
             }
           />
           <Route path="/warranty" element={<WarrantyPage />} />
+          <Route path="/pawn" element={<Pawn />} />
           <Route path="/customers" element={<Customers />} />
+
           <Route
             path="/employees"
             element={

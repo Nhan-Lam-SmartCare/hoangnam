@@ -1,0 +1,2191 @@
+[
+  {
+    "id": "SALE-1777880965393",
+    "date": "2026-05-04T07:49:25.393+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 999
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Cường Ngôn",
+      "phone": "0395734754"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-04T07:49:26.331044+00:00",
+    "updated_at": "2026-05-04T07:49:26.331044+00:00",
+    "cashtransactionid": "ca9c9136-14f2-48f5-8fe9-b9c54883818b",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1777880663304",
+    "date": "2026-05-04T07:44:23.304+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 999
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Cường Ngôn",
+      "phone": "0395734754"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-04T07:44:23.659701+00:00",
+    "updated_at": "2026-05-04T07:44:23.659701+00:00",
+    "cashtransactionid": "aa7583b1-e6d7-41e7-abe8-6100075ba76b",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1777885593202",
+    "date": "2026-05-04T09:06:33.202+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 32
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Khách lẻ",
+      "phone": "0356389669"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-04T09:06:33.554884+00:00",
+    "updated_at": "2026-05-04T09:06:33.554884+00:00",
+    "cashtransactionid": "61e1e8c7-b951-486f-b236-5b0fcec563d7",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1777948726924",
+    "date": "2026-05-05T02:38:46.924+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 4,
+        "sellingPrice": 850000,
+        "stockSnapshot": 23
+      }
+    ],
+    "subtotal": 3400000,
+    "discount": 0,
+    "total": 3400000,
+    "customer": {
+      "name": "Anh Qui",
+      "phone": "0394155107"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-05T02:38:47.399593+00:00",
+    "updated_at": "2026-05-05T02:38:47.399593+00:00",
+    "cashtransactionid": "c81ba38b-fdff-4afc-94bf-2e1c7e3d35c0",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1777951086229",
+    "date": "2026-05-05T03:18:06.229+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 28
+      },
+      {
+        "sku": "PT-4W5DTW",
+        "partId": "790fb0fd-4e1b-4c55-ab3b-29ddc9366302",
+        "category": "Phụ tùng xe điện",
+        "partName": "Jack cắm bình",
+        "quantity": 2,
+        "sellingPrice": 30000,
+        "stockSnapshot": 23
+      }
+    ],
+    "subtotal": 2460000,
+    "discount": 0,
+    "total": 2460000,
+    "customer": {
+      "name": "Nguyễn Thị Hoa",
+      "phone": "0347019249"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-05T03:18:12.45093+00:00",
+    "updated_at": "2026-05-05T03:18:12.45093+00:00",
+    "cashtransactionid": "50fc10f1-fc9d-4c30-8adc-4be53a7343ba",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778040071951",
+    "date": "2026-05-06T04:01:11.951+00:00",
+    "items": [
+      {
+        "sku": "PT-YFEPWP",
+        "partId": "9b9891ae-2665-40d2-8eaa-3a3b1eafaea5",
+        "category": "Phụ tùng xe điện",
+        "partName": "Cặp Xin-nhan trước",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 10
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ",
+      "phone": "0356389669"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-06T04:01:12.908115+00:00",
+    "updated_at": "2026-05-06T04:01:12.908115+00:00",
+    "cashtransactionid": "99ad32b3-09be-4406-99ac-c641e57ba52b",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778040091407",
+    "date": "2026-05-06T04:01:31.407+00:00",
+    "items": [
+      {
+        "sku": "PT-YFEPWP",
+        "partId": "9b9891ae-2665-40d2-8eaa-3a3b1eafaea5",
+        "category": "Phụ tùng xe điện",
+        "partName": "Cặp Xin-nhan trước",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 10
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ",
+      "phone": "0356389669"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-06T04:01:34.100411+00:00",
+    "updated_at": "2026-05-06T04:01:34.100411+00:00",
+    "cashtransactionid": "c0952c58-12e6-46fb-b927-427c5da989a9",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778128006064",
+    "date": "2026-05-07T04:26:46.064+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 24
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 200000,
+    "total": 2200000,
+    "customer": {
+      "name": "Chị Hạnh",
+      "phone": "037720654"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-07T04:26:50.215094+00:00",
+    "updated_at": "2026-05-07T04:26:50.215094+00:00",
+    "cashtransactionid": "6d8403e0-4b1e-4e97-9312-37ab6a08e6cc",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778128113047",
+    "date": "2026-05-07T04:28:33.047+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 20
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Chị Hạnh",
+      "phone": "037720654"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-07T04:28:35.614248+00:00",
+    "updated_at": "2026-05-07T04:28:35.614248+00:00",
+    "cashtransactionid": "45473905-c945-4c76-af55-1858cd6badbd",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778133693449",
+    "date": "2026-05-07T06:01:33.449+00:00",
+    "items": [
+      {
+        "sku": "PT-K5Z5KH",
+        "partId": "56c74573-6e32-4568-9703-4532e765ff20",
+        "category": "Phụ tùng xe điện",
+        "partName": "Cặp tay ga",
+        "quantity": 1,
+        "sellingPrice": 180000,
+        "stockSnapshot": 29
+      }
+    ],
+    "subtotal": 180000,
+    "discount": 20000,
+    "total": 160000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-07T06:01:36.258656+00:00",
+    "updated_at": "2026-05-07T06:01:36.258656+00:00",
+    "cashtransactionid": "4ea94832-adf3-4950-86f9-e34ee8062e0c",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778150094639",
+    "date": "2026-05-07T10:34:54.639+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 16
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Chau Phia",
+      "phone": "0339531637"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-07T10:34:59.182021+00:00",
+    "updated_at": "2026-05-07T10:34:59.182021+00:00",
+    "cashtransactionid": "6b782593-f69d-4481-bf42-c439483f1da6",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778154980220",
+    "date": "2026-05-07T11:56:20.22+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 12
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Nguyễn Thị Kim Tha",
+      "phone": "0968906775"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xec",
+    "created_at": "2026-05-07T11:56:22.973087+00:00",
+    "updated_at": "2026-05-07T11:56:22.973087+00:00",
+    "cashtransactionid": "a570dcbc-4c33-4e8b-a14c-bc161c3cb0b7",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778298802590",
+    "date": "2026-05-09T03:53:22.59+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 4,
+        "sellingPrice": 850000,
+        "stockSnapshot": 23
+      }
+    ],
+    "subtotal": 3400000,
+    "discount": 0,
+    "total": 3400000,
+    "customer": {
+      "name": "Trần Thị Nhụy An",
+      "phone": "0373189189"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-09T03:53:27.644465+00:00",
+    "updated_at": "2026-05-09T03:53:27.644465+00:00",
+    "cashtransactionid": "858eb4ab-fb43-46a6-913a-5632b71a7b74",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778320864618",
+    "date": "2026-05-09T10:01:04.618+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 8
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Chau Ni",
+      "phone": "0585337053"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-09T10:01:09.932247+00:00",
+    "updated_at": "2026-05-09T10:01:09.932247+00:00",
+    "cashtransactionid": "4048bd3b-99ee-4a10-8ecb-7d0e9db7f8ec",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778403720435",
+    "date": "2026-05-10T09:02:00.435+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 998
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-10T09:02:01.041932+00:00",
+    "updated_at": "2026-05-10T09:02:01.041932+00:00",
+    "cashtransactionid": "e2506d03-7237-47b5-81e1-62312ee6abef",
+    "username": "Local User"
+  },
+  {
+    "id": "RLS-SEED-A",
+    "date": "2026-06-21T01:54:56.154+00:00",
+    "items": [],
+    "subtotal": 0,
+    "discount": 0,
+    "total": 0,
+    "customer": {
+      "name": "A"
+    },
+    "paymentmethod": null,
+    "userid": null,
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-04-09T00:52:55.806918+00:00",
+    "updated_at": "2026-04-09T00:52:55.806918+00:00",
+    "cashtransactionid": null,
+    "username": null
+  },
+  {
+    "id": "RLS-SEED-B",
+    "date": "2026-06-21T01:54:56.314+00:00",
+    "items": [],
+    "subtotal": 0,
+    "discount": 0,
+    "total": 0,
+    "customer": {
+      "name": "B"
+    },
+    "paymentmethod": null,
+    "userid": null,
+    "branchid": "CN2",
+    "branchId": "CN2",
+    "branch_id": "CN2",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-04-09T00:52:56.103433+00:00",
+    "updated_at": "2026-04-09T00:52:56.103433+00:00",
+    "cashtransactionid": null,
+    "username": null
+  },
+  {
+    "id": "SALE-1778403755547",
+    "date": "2026-05-10T09:02:35.547+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 998
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-10T09:02:37.462275+00:00",
+    "updated_at": "2026-05-10T09:02:37.462275+00:00",
+    "cashtransactionid": "acab237b-958c-4f66-879d-659d47755d63",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778482732207",
+    "date": "2026-05-11T06:58:52.207+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 4
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 200000,
+    "total": 2200000,
+    "customer": {
+      "name": "Khách lẻ",
+      "phone": "0983372413"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-11T06:58:59.730846+00:00",
+    "updated_at": "2026-05-11T06:58:59.730846+00:00",
+    "cashtransactionid": "6b7fadeb-b57a-4ace-b67d-4334f91e2d5c",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778631833329",
+    "date": "2026-05-13T00:23:53.329+00:00",
+    "items": [
+      {
+        "sku": "PT-T6VM46",
+        "partId": "01071b40-bc04-40af-8ef1-e915234333f1",
+        "category": "Phụ tùng xe điện",
+        "partName": "Bóng đèn led 28W",
+        "quantity": 1,
+        "sellingPrice": 90000,
+        "stockSnapshot": 9
+      }
+    ],
+    "subtotal": 90000,
+    "discount": 0,
+    "total": 90000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-13T00:23:59.299274+00:00",
+    "updated_at": "2026-05-13T00:23:59.299274+00:00",
+    "cashtransactionid": "7382376f-5273-4f59-b940-eb9567215968",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778645681501",
+    "date": "2026-05-13T04:14:41.501+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 5,
+        "sellingPrice": 850000,
+        "stockSnapshot": 11
+      }
+    ],
+    "subtotal": 4250000,
+    "discount": 0,
+    "total": 4250000,
+    "customer": {
+      "name": "Dương Hữu Tân",
+      "phone": "0988884234"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-13T04:14:50.185404+00:00",
+    "updated_at": "2026-05-13T04:14:50.185404+00:00",
+    "cashtransactionid": "81d0572c-4273-4bd6-9c05-96b5639b08ca",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778756844742",
+    "date": "2026-05-14T11:07:24.742+00:00",
+    "items": [
+      {
+        "sku": "PT-K5Z5KH",
+        "partId": "56c74573-6e32-4568-9703-4532e765ff20",
+        "category": "Phụ tùng xe điện",
+        "partName": "Cặp tay ga",
+        "quantity": 1,
+        "sellingPrice": 180000,
+        "stockSnapshot": 28
+      }
+    ],
+    "subtotal": 180000,
+    "discount": 10000,
+    "total": 170000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-14T11:07:28.772562+00:00",
+    "updated_at": "2026-05-14T11:07:28.772562+00:00",
+    "cashtransactionid": "e4d8dafd-fcb0-4ce9-91a4-93c8754d1c53",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778986541734",
+    "date": "2026-05-17T02:55:41.734+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 2,
+        "sellingPrice": 600000,
+        "stockSnapshot": 36
+      }
+    ],
+    "subtotal": 1200000,
+    "discount": 0,
+    "total": 1200000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-17T02:55:45.942888+00:00",
+    "updated_at": "2026-05-17T02:55:45.942888+00:00",
+    "cashtransactionid": "bfa0912e-a4b5-44af-a85d-d8ff556a70bd",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1778999275643",
+    "date": "2026-05-17T06:27:55.643+00:00",
+    "items": [
+      {
+        "sku": "PT-ZBBXYN",
+        "partId": "48d6476f-2156-4f71-a9b8-8807667ea8de",
+        "category": "Phụ tùng xe điện",
+        "partName": "Còi xe 48V",
+        "quantity": 1,
+        "sellingPrice": 140000,
+        "stockSnapshot": 3
+      }
+    ],
+    "subtotal": 140000,
+    "discount": 0,
+    "total": 140000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-17T06:28:02.092333+00:00",
+    "updated_at": "2026-05-17T06:28:02.092333+00:00",
+    "cashtransactionid": "9df8cbc6-4b96-484f-8bbc-92c90eb4f435",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779009599815",
+    "date": "2026-05-17T09:19:59.815+00:00",
+    "items": [
+      {
+        "sku": "PT-K5Z5KH",
+        "partId": "56c74573-6e32-4568-9703-4532e765ff20",
+        "category": "Phụ tùng xe điện",
+        "partName": "Cặp tay ga",
+        "quantity": 1,
+        "sellingPrice": 180000,
+        "stockSnapshot": 27
+      }
+    ],
+    "subtotal": 180000,
+    "discount": 30000,
+    "total": 150000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "K có số",
+    "created_at": "2026-05-17T09:20:04.21985+00:00",
+    "updated_at": "2026-05-17T09:20:04.21985+00:00",
+    "cashtransactionid": "96398c6e-e9dc-46c1-8328-36d993d0c4d3",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779011626292",
+    "date": "2026-05-17T09:53:46.292+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 34
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Chị Thảo",
+      "phone": "0963142220"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-17T09:53:47.750517+00:00",
+    "updated_at": "2026-05-17T09:53:47.750517+00:00",
+    "cashtransactionid": "cf5d18fd-419e-4e5c-bdf0-e75ef0b285af",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779099626270",
+    "date": "2026-05-18T10:20:26.27+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 2,
+        "sellingPrice": 600000,
+        "stockSnapshot": 30
+      }
+    ],
+    "subtotal": 1200000,
+    "discount": 0,
+    "total": 1200000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Chuyển khoản",
+    "created_at": "2026-05-18T10:20:29.549068+00:00",
+    "updated_at": "2026-05-18T10:20:29.549068+00:00",
+    "cashtransactionid": "c463db0b-e79c-4046-877e-7f187e6ff37e",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779357926705",
+    "date": "2026-05-21T10:05:26.705+00:00",
+    "items": [
+      {
+        "sku": "PT-KMQH5E",
+        "partId": "36686358-d987-4a43-a5a1-30bf28cfac40",
+        "category": "Phụ tùng xe điện",
+        "partName": "VX-300_10",
+        "quantity": 1,
+        "sellingPrice": 268000,
+        "stockSnapshot": 5
+      }
+    ],
+    "subtotal": 268000,
+    "discount": 8000,
+    "total": 260000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-21T10:05:29.902718+00:00",
+    "updated_at": "2026-05-21T10:05:29.902718+00:00",
+    "cashtransactionid": "2c62f376-5ffb-417f-a7d3-7168aa0fcb43",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779415063245",
+    "date": "2026-05-22T01:57:43.245+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 5,
+        "sellingPrice": 850000,
+        "stockSnapshot": 22
+      }
+    ],
+    "subtotal": 4250000,
+    "discount": 0,
+    "total": 4250000,
+    "customer": {
+      "name": "Nguyễn Văn Đạt",
+      "phone": "0367333352"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "kèm theo xe",
+    "created_at": "2026-05-22T01:57:48.451737+00:00",
+    "updated_at": "2026-05-22T01:57:48.451737+00:00",
+    "cashtransactionid": "d6b85dce-8287-4160-85c7-947c4d7e8556",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779498163918",
+    "date": "2026-05-23T01:02:43.918+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 27
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-23T01:02:47.817341+00:00",
+    "updated_at": "2026-05-23T01:02:47.817341+00:00",
+    "cashtransactionid": "c3d8cc62-0fe8-4f4e-b350-1407ff3997e0",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779498183502",
+    "date": "2026-05-23T01:03:03.502+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 23
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-23T01:03:05.931751+00:00",
+    "updated_at": "2026-05-23T01:03:05.931751+00:00",
+    "cashtransactionid": "769b53ee-66df-4542-babe-46e323998b2f",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779498237565",
+    "date": "2026-05-23T01:03:57.565+00:00",
+    "items": [
+      {
+        "sku": "PT-KMQH5E",
+        "partId": "36686358-d987-4a43-a5a1-30bf28cfac40",
+        "category": "Phụ tùng xe điện",
+        "partName": "VX-300_10",
+        "quantity": 1,
+        "sellingPrice": 268000,
+        "stockSnapshot": 3
+      }
+    ],
+    "subtotal": 268000,
+    "discount": 0,
+    "total": 268000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Tính vs a nam",
+    "created_at": "2026-05-23T01:03:59.925649+00:00",
+    "updated_at": "2026-05-23T01:03:59.925649+00:00",
+    "cashtransactionid": "2a99c864-3b77-49ed-9d79-cacafded9870",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779503310386",
+    "date": "2026-05-23T02:28:30.386+00:00",
+    "items": [
+      {
+        "sku": "PT-GPDRZL",
+        "partId": "36f619ad-7078-42b3-80e6-a712aa7f8350",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Pin 48V-15Ah",
+        "quantity": 1,
+        "sellingPrice": 3500000,
+        "stockSnapshot": 8
+      }
+    ],
+    "subtotal": 3500000,
+    "discount": 1300000,
+    "total": 2200000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-23T02:28:34.220016+00:00",
+    "updated_at": "2026-05-23T02:28:34.220016+00:00",
+    "cashtransactionid": "74cf55ec-490a-44ad-bfdc-73fd1b7933ad",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779504147210",
+    "date": "2026-05-23T02:42:27.21+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 997
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-23T02:42:33.749634+00:00",
+    "updated_at": "2026-05-23T02:42:33.749634+00:00",
+    "cashtransactionid": "8db5221b-fdd5-407d-945d-8f298ae5570c",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779521864484",
+    "date": "2026-05-23T07:37:44.484+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 2,
+        "sellingPrice": 850000,
+        "stockSnapshot": 12
+      }
+    ],
+    "subtotal": 1700000,
+    "discount": 0,
+    "total": 1700000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "BH cho khách",
+    "created_at": "2026-05-23T07:37:52.908543+00:00",
+    "updated_at": "2026-05-23T07:37:52.908543+00:00",
+    "cashtransactionid": "3adb5cf0-c9eb-4657-bc12-c3b377723c4b",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779594425377",
+    "date": "2026-05-24T03:47:05.377+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 23
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-24T03:47:11.587123+00:00",
+    "updated_at": "2026-05-24T03:47:11.587123+00:00",
+    "cashtransactionid": "958a442a-5e08-48fe-9581-585e5753bcac",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779599609767",
+    "date": "2026-05-24T05:13:29.767+00:00",
+    "items": [
+      {
+        "sku": "PT-FYDR5K",
+        "partId": "50bf6a70-81fa-4f9e-850a-e01733587c09",
+        "category": "Phụ tùng xe điện",
+        "partName": "IC Đúc B07 (6G) -400W",
+        "quantity": 1,
+        "sellingPrice": 650000,
+        "stockSnapshot": 2
+      }
+    ],
+    "subtotal": 650000,
+    "discount": 0,
+    "total": 650000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-24T05:13:33.345345+00:00",
+    "updated_at": "2026-05-24T05:13:33.345345+00:00",
+    "cashtransactionid": "9481c441-ca89-41d7-a14d-2b5208d3198b",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779670743359",
+    "date": "2026-05-25T00:59:03.359+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 19
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Neang Sa Mi",
+      "phone": "0399741320"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-25T00:59:05.965678+00:00",
+    "updated_at": "2026-05-25T00:59:05.965678+00:00",
+    "cashtransactionid": "68cc7a14-ea47-4a99-b67b-2d9483101b06",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779848365776",
+    "date": "2026-05-27T02:19:25.776+00:00",
+    "items": [
+      {
+        "sku": "PT-9G3ADJ",
+        "partId": "023d1894-56a3-48f1-9dda-dc81e6704971",
+        "category": "Phụ tùng xe điện",
+        "partName": "IC Đa Năng HMD - 400W",
+        "quantity": 1,
+        "sellingPrice": 500000,
+        "stockSnapshot": 3
+      },
+      {
+        "sku": "PT-TQMPL2",
+        "partId": "59aaf726-ab89-4694-8a4b-a4ea055e6b3f",
+        "category": "Phụ tùng xe điện",
+        "partName": "Ruột Xe 18x2.50",
+        "quantity": 1,
+        "sellingPrice": 75000,
+        "stockSnapshot": 5
+      },
+      {
+        "sku": "PT-MKRQGM",
+        "partId": "01bc5f81-42c2-4b1e-9d30-3b4332d6a048",
+        "category": "Phụ tùng xe điện",
+        "partName": "VX 18x2.50",
+        "quantity": 1,
+        "sellingPrice": 305000,
+        "stockSnapshot": 3
+      }
+    ],
+    "subtotal": 880000,
+    "discount": 0,
+    "total": 880000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "thay xe nhà",
+    "created_at": "2026-05-27T02:19:29.846568+00:00",
+    "updated_at": "2026-05-27T02:19:29.846568+00:00",
+    "cashtransactionid": "3c554fa8-9832-4fef-93ef-d89dd135b0be",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779859161904",
+    "date": "2026-05-27T05:19:21.904+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 5,
+        "sellingPrice": 850000,
+        "stockSnapshot": 8
+      }
+    ],
+    "subtotal": 4250000,
+    "discount": 0,
+    "total": 4250000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-05-27T05:19:25.817907+00:00",
+    "updated_at": "2026-05-27T05:19:25.817907+00:00",
+    "cashtransactionid": "510d1eec-b260-41b2-98ec-26c019ed2e8b",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1779949750007",
+    "date": "2026-05-28T06:29:10.007+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 5,
+        "sellingPrice": 850000,
+        "stockSnapshot": 10
+      }
+    ],
+    "subtotal": 4250000,
+    "discount": 0,
+    "total": 4250000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kem theo xe",
+    "created_at": "2026-05-28T06:29:16.314241+00:00",
+    "updated_at": "2026-05-28T06:29:16.314241+00:00",
+    "cashtransactionid": "d1eaffad-48e9-4ef3-ac11-7bc3086a6ec0",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780021097745",
+    "date": "2026-05-29T02:18:17.745+00:00",
+    "items": [
+      {
+        "sku": "PT-ZUBF5L",
+        "partId": "ed30fc63-d4c9-4259-ad18-5108302443ed",
+        "category": "Phụ tùng xe điện",
+        "partName": "VX-14x2.50",
+        "quantity": 1,
+        "sellingPrice": 278000,
+        "stockSnapshot": 4
+      }
+    ],
+    "subtotal": 278000,
+    "discount": 0,
+    "total": 278000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-29T02:18:20.618348+00:00",
+    "updated_at": "2026-05-29T02:18:20.618348+00:00",
+    "cashtransactionid": "15577a05-9179-43d4-b3e7-d34b54af2eeb",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780130600629",
+    "date": "2026-05-30T08:43:20.629+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 996
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-30T08:43:24.43243+00:00",
+    "updated_at": "2026-05-30T08:43:24.43243+00:00",
+    "cashtransactionid": "846e6d71-e1f7-4b0a-a88c-c92692604047",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780189377074",
+    "date": "2026-05-31T01:02:57.074+00:00",
+    "items": [
+      {
+        "sku": "PT-E62RKR",
+        "partId": "f8391a9d-a64f-4d3a-81be-455fbb5a7977",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 12V-7.5Ah",
+        "quantity": 1,
+        "sellingPrice": 450000,
+        "stockSnapshot": 6
+      }
+    ],
+    "subtotal": 450000,
+    "discount": 0,
+    "total": 450000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-05-31T01:02:59.824321+00:00",
+    "updated_at": "2026-05-31T01:02:59.824321+00:00",
+    "cashtransactionid": "7245aba9-ff81-4ae9-9dde-d09d15260dd2",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780284499530",
+    "date": "2026-06-01T03:28:19.53+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 34
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Sa Rinh",
+      "phone": "0355422937"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-01T03:28:21.690688+00:00",
+    "updated_at": "2026-06-01T03:28:21.690688+00:00",
+    "cashtransactionid": "816c6d52-af01-4ff8-810d-7945e5e811a8",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780557370540",
+    "date": "2026-06-04T07:16:10.54+00:00",
+    "items": [
+      {
+        "sku": "PT-WV3MPL",
+        "partId": "df47eb60-5dfc-4e20-877d-b7df4d7e6364",
+        "category": "Phụ tùng xe điện",
+        "partName": "Dây phanh xe đạp điện 1.25m",
+        "quantity": 1,
+        "sellingPrice": 60000,
+        "stockSnapshot": 22
+      }
+    ],
+    "subtotal": 60000,
+    "discount": 0,
+    "total": 60000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-04T07:16:11.467265+00:00",
+    "updated_at": "2026-06-04T07:16:11.467265+00:00",
+    "cashtransactionid": "307bf539-ed10-4f7f-b9cd-a3896f6d011d",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780735454475",
+    "date": "2026-06-06T08:44:14.475+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 30
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Võ Thị Bích",
+      "phone": "0967020770"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kem theo xe",
+    "created_at": "2026-06-06T08:44:19.427202+00:00",
+    "updated_at": "2026-06-06T08:44:19.427202+00:00",
+    "cashtransactionid": "e28cea4a-3c94-429a-aa35-6769b7e7c231",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780970646111",
+    "date": "2026-06-09T02:04:06.111+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 26
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Neang Sóc Phonl",
+      "phone": "0385324801"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-09T02:04:11.24348+00:00",
+    "updated_at": "2026-06-09T02:04:11.24348+00:00",
+    "cashtransactionid": "cb2ecc8e-63d2-418e-b1e2-1e4ec130a1be",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1780991044991",
+    "date": "2026-06-09T07:44:04.991+00:00",
+    "items": [
+      {
+        "sku": "PT-MCETPS",
+        "partId": "0bc52cd9-f995-453b-85ad-611797f931af",
+        "category": "Phụ tùng xe điện",
+        "partName": "Chân Chổi xe",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 5
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-09T07:44:07.406358+00:00",
+    "updated_at": "2026-06-09T07:44:07.406358+00:00",
+    "cashtransactionid": "7b495907-bfbf-49c6-8d9b-d953ef2e2c14",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781689138931-3TD",
+    "date": "2026-06-17T09:38:58.931+00:00",
+    "items": [
+      {
+        "sku": "PT-CNE6ZV",
+        "partId": "3f04a449-a5d8-47d7-bdf8-924174d7012e",
+        "category": "Phụ tùng xe điện",
+        "partName": "Má thắng sau",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 15
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "0ae7d34a-6803-47ab-a04c-ac41837fc0d3",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-17T09:39:00.125611+00:00",
+    "updated_at": "2026-06-17T09:39:00.125611+00:00",
+    "cashtransactionid": "39af564f-acd2-4468-9d84-1203d04e06f9",
+    "username": "Chanh Thonl"
+  },
+  {
+    "id": "SALE-1781003467546",
+    "date": "2026-06-09T11:11:07.546+00:00",
+    "items": [
+      {
+        "sku": "PT-FYDR5K",
+        "partId": "50bf6a70-81fa-4f9e-850a-e01733587c09",
+        "category": "Phụ tùng xe điện",
+        "partName": "IC Đúc B07 (6G) -400W",
+        "quantity": 1,
+        "sellingPrice": 650000,
+        "stockSnapshot": 1
+      }
+    ],
+    "subtotal": 650000,
+    "discount": 0,
+    "total": 650000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "BH cho khách",
+    "created_at": "2026-06-09T11:11:10.952777+00:00",
+    "updated_at": "2026-06-09T11:11:10.952777+00:00",
+    "cashtransactionid": "132d995a-3985-474d-9ba2-758fc28d98d1",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781082204253",
+    "date": "2026-06-10T09:03:24.253+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 995
+      },
+      {
+        "sku": "PT-KN5T4W",
+        "partId": "6825eecd-d01b-49ea-a895-1175ae0b3286",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Vệ Sinh Laptop",
+        "quantity": 1,
+        "sellingPrice": 100000,
+        "stockSnapshot": 1000
+      }
+    ],
+    "subtotal": 220000,
+    "discount": 0,
+    "total": 220000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-10T09:03:26.834562+00:00",
+    "updated_at": "2026-06-10T09:03:26.834562+00:00",
+    "cashtransactionid": "b90f0a37-72af-4eff-b3d4-e024958df11e",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781082281941",
+    "date": "2026-06-10T09:04:41.941+00:00",
+    "items": [
+      {
+        "sku": "PT-KN5T4W",
+        "partId": "6825eecd-d01b-49ea-a895-1175ae0b3286",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Vệ Sinh Laptop",
+        "quantity": 1,
+        "sellingPrice": 100000,
+        "stockSnapshot": 999
+      }
+    ],
+    "subtotal": 100000,
+    "discount": 0,
+    "total": 100000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-10T09:04:44.3345+00:00",
+    "updated_at": "2026-06-10T09:04:44.3345+00:00",
+    "cashtransactionid": "febc0f52-5ed1-4bd1-afbf-b68d20d685ab",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781166397702",
+    "date": "2026-06-11T08:26:37.702+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 600000,
+        "stockSnapshot": 22
+      }
+    ],
+    "subtotal": 2400000,
+    "discount": 0,
+    "total": 2400000,
+    "customer": {
+      "name": "Đặng Minh Tài",
+      "phone": "0366677764"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-11T08:26:40.725027+00:00",
+    "updated_at": "2026-06-11T08:26:40.725027+00:00",
+    "cashtransactionid": "2bbba424-d43d-4d71-9608-65ac8eeef79c",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781251355132",
+    "date": "2026-06-12T08:02:35.132+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 5,
+        "sellingPrice": 850000,
+        "stockSnapshot": 29
+      }
+    ],
+    "subtotal": 4250000,
+    "discount": 0,
+    "total": 4250000,
+    "customer": {
+      "name": "Huỳnh Giau",
+      "phone": "0907813426"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-12T08:02:38.976136+00:00",
+    "updated_at": "2026-06-12T08:02:38.976136+00:00",
+    "cashtransactionid": "a2648183-6d1f-41c2-bcb0-6103825f88c5",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781254836309",
+    "date": "2026-06-12T09:00:36.309+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 1,
+        "sellingPrice": 600000,
+        "stockSnapshot": 18
+      }
+    ],
+    "subtotal": 600000,
+    "discount": 0,
+    "total": 600000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-12T09:00:39.54618+00:00",
+    "updated_at": "2026-06-12T09:00:39.54618+00:00",
+    "cashtransactionid": "dc91703e-3db8-4242-a11c-2e679822e4ac",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781333511554",
+    "date": "2026-06-13T06:51:51.554+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 4,
+        "sellingPrice": 650000,
+        "stockSnapshot": 17
+      }
+    ],
+    "subtotal": 2600000,
+    "discount": 0,
+    "total": 2600000,
+    "customer": {
+      "name": "Nguyễn Thị Kim Hằng",
+      "phone": "0834985878"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-13T06:51:56.483286+00:00",
+    "updated_at": "2026-06-13T06:51:56.483286+00:00",
+    "cashtransactionid": "99063aed-f2bc-456b-814a-2f0e4d752fd3",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781333549426",
+    "date": "2026-06-13T06:52:29.426+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 5,
+        "sellingPrice": 850000,
+        "stockSnapshot": 24
+      }
+    ],
+    "subtotal": 4250000,
+    "discount": 0,
+    "total": 4250000,
+    "customer": {
+      "name": "Đặng Minh Tài",
+      "phone": "0366677764"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-13T06:52:31.928026+00:00",
+    "updated_at": "2026-06-13T06:52:31.928026+00:00",
+    "cashtransactionid": "b5144b60-4185-45c1-82f0-07737248de23",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781334598902",
+    "date": "2026-06-13T07:09:58.902+00:00",
+    "items": [
+      {
+        "sku": "PT-ULFWV7",
+        "partId": "c2973f5d-fa89-4798-b691-ea9dfad087df",
+        "category": "Phụ tùng xe điện",
+        "partName": "Ruột Xe 14x2.50",
+        "quantity": 1,
+        "sellingPrice": 75000,
+        "stockSnapshot": 6
+      }
+    ],
+    "subtotal": 75000,
+    "discount": 0,
+    "total": 75000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-13T07:10:03.729846+00:00",
+    "updated_at": "2026-06-13T07:10:03.729846+00:00",
+    "cashtransactionid": "736480de-a6be-4ec5-aebb-a6a8bfc4d3b1",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781346963768",
+    "date": "2026-06-13T10:36:03.768+00:00",
+    "items": [
+      {
+        "sku": "PT-CJTX75",
+        "partId": "9ad82531-612c-41a1-9337-41f6c19c8271",
+        "category": "Linh kiện Laptop/PC",
+        "partName": "Cài Win Laptop/PC",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 994
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "bank",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-13T10:36:11.012519+00:00",
+    "updated_at": "2026-06-13T10:36:11.012519+00:00",
+    "cashtransactionid": "e9eb3a95-9798-467b-960d-494b64a929e9",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781440063086",
+    "date": "2026-06-14T12:27:43.086+00:00",
+    "items": [
+      {
+        "sku": "PT-E62RKR",
+        "partId": "f8391a9d-a64f-4d3a-81be-455fbb5a7977",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 12V-7.5Ah",
+        "quantity": 1,
+        "sellingPrice": 450000,
+        "stockSnapshot": 5
+      }
+    ],
+    "subtotal": 450000,
+    "discount": 0,
+    "total": 450000,
+    "customer": {
+      "name": "SN4",
+      "phone": "0996854415"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Bảo hành 12 tháng",
+    "created_at": "2026-06-14T12:27:43.287319+00:00",
+    "updated_at": "2026-06-14T12:27:43.287319+00:00",
+    "cashtransactionid": "fc6c1c9e-96ee-489c-9c93-219b5bdeede3",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781440431055",
+    "date": "2026-06-14T12:33:51.055+00:00",
+    "items": [
+      {
+        "sku": "PT-E62RKR",
+        "partId": "f8391a9d-a64f-4d3a-81be-455fbb5a7977",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 12V-7.5Ah",
+        "quantity": 1,
+        "sellingPrice": 450000,
+        "stockSnapshot": 4
+      }
+    ],
+    "subtotal": 450000,
+    "discount": 0,
+    "total": 450000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-14T12:33:51.019883+00:00",
+    "updated_at": "2026-06-14T12:33:51.019883+00:00",
+    "cashtransactionid": "b434b318-8187-4104-b0ee-53e8fff41f8c",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781440595761",
+    "date": "2026-06-14T12:36:35.761+00:00",
+    "items": [
+      {
+        "sku": "1234567891234",
+        "partId": "fa2f6a1b-f08e-4fd4-8959-30a19c36a3b1",
+        "category": "Linh Kiện Điện Thoại",
+        "partName": "Ip 10",
+        "quantity": 1,
+        "sellingPrice": 2500000,
+        "stockSnapshot": 1
+      }
+    ],
+    "subtotal": 2500000,
+    "discount": 0,
+    "total": 2500000,
+    "customer": {
+      "name": "SN4",
+      "phone": "0996854415"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-14T12:36:35.681186+00:00",
+    "updated_at": "2026-06-14T12:36:35.681186+00:00",
+    "cashtransactionid": "73f4c513-fa45-4bc5-9d36-8311eee4f6f8",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781571578682-4DJ",
+    "date": "2026-06-16T00:59:38.682+00:00",
+    "items": [
+      {
+        "sku": "PT-ZUBF5L",
+        "partId": "ed30fc63-d4c9-4259-ad18-5108302443ed",
+        "category": "Phụ tùng xe điện",
+        "partName": "VX-14x2.50",
+        "quantity": 1,
+        "sellingPrice": 278000,
+        "stockSnapshot": 3
+      }
+    ],
+    "subtotal": 278000,
+    "discount": 0,
+    "total": 278000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-16T00:59:38.57135+00:00",
+    "updated_at": "2026-06-16T00:59:38.57135+00:00",
+    "cashtransactionid": "5332f6a6-fc5b-4df4-8f1b-ef994dbbee94",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781571607841-QYO",
+    "date": "2026-06-16T01:00:07.841+00:00",
+    "items": [
+      {
+        "sku": "PT-CYCERJ",
+        "partId": "c29f7a7b-ab55-4a8b-a4df-d2bf62cbc4ec",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-15Ah",
+        "quantity": 1,
+        "sellingPrice": 650000,
+        "stockSnapshot": 15
+      }
+    ],
+    "subtotal": 650000,
+    "discount": 0,
+    "total": 650000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-16T01:00:07.688829+00:00",
+    "updated_at": "2026-06-16T01:00:07.688829+00:00",
+    "cashtransactionid": "701b56a6-549d-418d-901f-746d85094212",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781574321905-5QT",
+    "date": "2026-06-16T01:45:21.905+00:00",
+    "items": [
+      {
+        "sku": "PT-YFEPWP",
+        "partId": "9b9891ae-2665-40d2-8eaa-3a3b1eafaea5",
+        "category": "Phụ tùng xe điện",
+        "partName": "Cặp Xin-nhan trước",
+        "quantity": 1,
+        "sellingPrice": 120000,
+        "stockSnapshot": 8
+      }
+    ],
+    "subtotal": 120000,
+    "discount": 0,
+    "total": 120000,
+    "customer": {
+      "name": "Khách lẻ"
+    },
+    "paymentmethod": "cash",
+    "userid": "local-user",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": null,
+    "created_at": "2026-06-16T01:45:21.753388+00:00",
+    "updated_at": "2026-06-16T01:45:21.753388+00:00",
+    "cashtransactionid": "3b9a8fe3-c388-48bc-8d4e-317da49ccc2c",
+    "username": "Local User"
+  },
+  {
+    "id": "SALE-1781937694885-KUP",
+    "date": "2026-06-20T06:41:34.885+00:00",
+    "items": [
+      {
+        "sku": "PT-KZXRKN",
+        "partId": "2abb78a0-3202-47a9-90c4-89bed0716f98",
+        "category": "Pin, Acquy, Nguồn",
+        "partName": "Bình 48V-30Ah",
+        "quantity": 4,
+        "sellingPrice": 850000,
+        "stockSnapshot": 19
+      }
+    ],
+    "subtotal": 3400000,
+    "discount": 0,
+    "total": 3400000,
+    "customer": {
+      "id": "CUS-1781935120713-36815e",
+      "name": "Lê Thị Kim Lộc",
+      "phone": "0385368518"
+    },
+    "paymentmethod": "cash",
+    "userid": "0ae7d34a-6803-47ab-a04c-ac41837fc0d3",
+    "branchid": "CN1",
+    "branchId": "CN1",
+    "branch_id": "CN1",
+    "refunded": false,
+    "note": "Kèm theo xe",
+    "created_at": "2026-06-20T06:41:36.16369+00:00",
+    "updated_at": "2026-06-20T06:41:36.16369+00:00",
+    "cashtransactionid": "3bf6f1fc-3185-4649-9c43-6cb326d8017c",
+    "username": "Chanh Thonl"
+  }
+]

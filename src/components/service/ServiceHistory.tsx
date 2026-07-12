@@ -818,7 +818,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                         {order.customerPhone}
                       </div>
                       <div className="text-xs text-slate-400">
-                        <span className="font-medium">Xe: </span>
+                        <span className="font-medium">Thiết bị: </span>
                         <span>{order.vehicleModel || "N/A"}</span>
                         {order.licensePlate && (
                           <span className="ml-1">- {order.licensePlate}</span>
@@ -1084,7 +1084,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                     {order.customerPhone}
                   </div>
                   <div className="text-sm text-slate-400 mt-1">
-                    Xe: {order.vehicleModel || "N/A"} -{" "}
+                    Thiết bị: {order.vehicleModel || "N/A"} -{" "}
                     {order.licensePlate || "N/A"}
                   </div>
                   {order.issueDescription && (

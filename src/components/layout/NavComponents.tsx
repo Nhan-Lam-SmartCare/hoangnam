@@ -16,8 +16,10 @@ import {
   Crown,
   Settings,
   CircleUser,
-  ClipboardList
+  ClipboardList,
+  Scale,
 } from "lucide-react";
+
 import { useAuth } from "../../contexts/AuthContext";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { useTheme } from "../../contexts/useTheme";
@@ -213,6 +215,14 @@ export const BottomNav: React.FC = () => {
       color: "violet",
       show: true,
     },
+    {
+      to: "/pawn",
+      icon: <Scale className="w-6 h-6" />,
+      label: "Cầm đồ",
+      color: "orange",
+      show: true,
+    },
+
     {
       to: "/sales",
       icon: <ShoppingCart className="w-6 h-6" />,
@@ -415,6 +425,13 @@ export const BottomNav: React.FC = () => {
                     icon={<Shield className="w-5 h-5" />}
                     label="Tra cứu bảo hành"
                     color="emerald"
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <MobileDrawerLink
+                    to="/pawn"
+                    icon={<Scale className="w-5 h-5" />}
+                    label="Cầm đồ"
+                    color="orange"
                     onClick={() => setShowMenu(false)}
                   />
                   {canViewReports && (

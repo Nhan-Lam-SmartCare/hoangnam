@@ -53,7 +53,7 @@ export const useStoreSettings = () => {
             if (!data) {
                 return {
                     id: "default",
-                    store_name: "MotoCare",
+                    store_name: "SmartCare",
                 } as StoreSettings;
             }
 

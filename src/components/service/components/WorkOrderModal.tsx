@@ -174,7 +174,7 @@ const WorkOrderModal: React.FC<{
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-                Khách hàng & Xe
+                Khách hàng & Thiết bị
               </h3>
 
               <div>
@@ -382,6 +382,7 @@ const WorkOrderModal: React.FC<{
               getSelectedPartCost={state.getSelectedPartCost}
               canEditPriceAndParts={state.canEditPriceAndParts}
               order={props.order}
+              currentBranchId={props.currentBranchId}
             />
           </div>
 
@@ -570,7 +571,7 @@ const WorkOrderModal: React.FC<{
               </div>
 
               <div className="text-xs text-slate-500 dark:text-slate-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
-                🔹 Xe mới sẽ tự động được chọn sau khi thêm
+                🔹 Thiết bị mới sẽ tự động được chọn sau khi thêm
               </div>
             </div>
 

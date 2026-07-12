@@ -18,6 +18,7 @@ import {
 } from "../../../utils/maintenanceReminder";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "../../../constants";
 import { showToast } from "../../../utils/toast";
+import { getSelectableEmployees } from "../../../utils/employees";
 import type {
   Employee,
   ServiceConfig,
@@ -187,9 +188,7 @@ export function useWorkOrderMobileFormState({
 
     if (!normalizedProfileEmail && !normalizedProfileName) return "";
 
-    const activeEmployees = (employees || []).filter(
-      (emp) => emp?.status === "active"
-    );
+    const activeEmployees = getSelectableEmployees(employees || [], currentBranchId);
 
     const matchedByEmail = activeEmployees.find(
       (emp) =>
@@ -206,7 +205,7 @@ export function useWorkOrderMobileFormState({
           .toLowerCase() === normalizedProfileName
     );
     return matchedByName?.id || "";
-  }, [employees, profile?.email, profile?.name, profile?.full_name]);
+  }, [employees, currentBranchId, profile?.email, profile?.name, profile?.full_name]);
   const technicianIdFromWorkOrder = useMemo(
     () => employees.find((e) => e.name === workOrder?.technicianName)?.id || "",
     [employees, workOrder?.technicianName]
@@ -1231,7 +1230,7 @@ export function useWorkOrderMobileFormState({
       }
 
       if (vehicleChanged && !canUpdateWorkOrderVehicle) {
-        showToast.error("Bạn không có quyền sửa thông tin thiết bị/xe trong phiếu sửa chữa");
+        showToast.error("Bạn không có quyền sửa thông tin thiết bị trong phiếu sửa chữa");
         setIsSubmitting(false);
         return;
       }

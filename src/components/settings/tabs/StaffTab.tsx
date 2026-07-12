@@ -16,6 +16,7 @@ import {
 import LoadingSpinner from "../../common/LoadingSpinner";
 import { StaffMember, Branch } from "../types";
 import { useStaffManagement, STAFF_DEPARTMENTS } from "../hooks/useStaffManagement";
+import { APP_ACTION_OPTIONS } from "../../../utils/permissions";
 
 interface StaffTabProps {
   staffState: ReturnType<typeof useStaffManagement>;
@@ -82,9 +83,12 @@ export const StaffTab: React.FC<StaffTabProps> = ({ staffState, isOwner }) => {
     payrollSeedRows,
     filteredStaffList,
     handleAddBranch,
+    handleUpdateBranch,
+    handleDeleteBranch,
     handleUpdateStaff,
     handleDeleteStaff,
     handleCreateStaffAccount,
+
     openResetStaffDialog,
     closeResetStaffDialog,
     handleResetStaffPassword,
@@ -115,9 +119,7 @@ export const StaffTab: React.FC<StaffTabProps> = ({ staffState, isOwner }) => {
     { key: "admin", label: "Quản trị" },
   ];
 
-  // We need to import the APP_ACTION_OPTIONS from useStaffManagement's module or the shared permissions module
-  // Let's import it from ../../../utils/permissions
-  const { APP_ACTION_OPTIONS } = require("../../../utils/permissions");
+
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN").format(Number(value || 0));
@@ -134,6 +136,10 @@ export const StaffTab: React.FC<StaffTabProps> = ({ staffState, isOwner }) => {
       minute: "2-digit",
     });
   };
+
+  const [editingBranchId, setEditingBranchId] = React.useState<string | null>(null);
+  const [editingBranchName, setEditingBranchName] = React.useState<string>("");
+
 
   const normalizeBranchId = (value: string) => {
     const cleaned = String(value || "").trim().toUpperCase();
@@ -197,7 +203,95 @@ export const StaffTab: React.FC<StaffTabProps> = ({ staffState, isOwner }) => {
             </button>
           </div>
         </div>
+
+        {/* Branch List Table */}
+        {branches && branches.length > 0 && (
+          <div className="border-t border-white/10 px-4 py-3 bg-slate-900/20">
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 mb-2">
+              Danh sách chi nhánh ({branches.length})
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {branches.map((branch) => {
+                const isEditing = editingBranchId === branch.id;
+                return (
+                  <div
+                    key={branch.id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 text-xs text-white"
+                  >
+                    <div className="flex items-center gap-3 flex-1 mr-4">
+                      <span className="font-bold text-slate-400 px-1.5 py-0.5 rounded bg-white/10">
+                        {branch.id}
+                      </span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingBranchName}
+                          onChange={(e) => setEditingBranchName(e.target.value)}
+                          className="flex-1 px-2.5 py-1 text-xs border border-white/20 rounded bg-slate-800 text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      ) : (
+                        <span className="font-semibold">{branch.name}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              handleUpdateBranch(branch.id, editingBranchName);
+                              setEditingBranchId(null);
+                            }}
+                            className="px-2.5 py-1 rounded bg-green-600 hover:bg-green-700 text-[10px] font-bold uppercase tracking-wider text-white"
+                          >
+                            Lưu
+                          </button>
+                          <button
+                            onClick={() => setEditingBranchId(null)}
+                            className="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-650 text-[10px] font-bold uppercase tracking-wider text-white"
+                          >
+                            Hủy
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setEditingBranchId(branch.id);
+                              setEditingBranchName(branch.name);
+                            }}
+                            className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+                            title="Sửa tên chi nhánh"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          {branch.id !== "CN1" && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Bạn có chắc chắn muốn xóa chi nhánh ${branch.name} (${branch.id})? Các tài khoản nhân viên thuộc chi nhánh này sẽ cần đổi chi nhánh.`
+                                  )
+                                ) {
+                                  handleDeleteBranch(branch.id);
+                                }
+                              }}
+                              className="p-1 hover:bg-red-500/20 rounded text-red-400 hover:text-red-300"
+                              title="Xóa chi nhánh"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
 
       {/* Add Staff Form */}
       {showAddStaff && (

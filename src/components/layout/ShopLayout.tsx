@@ -30,7 +30,7 @@ export function ShopLayout({ children }: ShopLayoutProps) {
               />
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Sơn Nam</h1>
-                <p className="text-xs text-gray-500">Phụ tùng & Sửa chữa xe máy</p>
+                <p className="text-xs text-gray-500">Linh kiện & Sửa chữa điện tử</p>
               </div>
             </Link>
 
@@ -107,7 +107,7 @@ export function ShopLayout({ children }: ShopLayoutProps) {
                 <h3 className="text-lg font-bold text-white">Sơn Nam</h3>
               </div>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Chuyên cung cấp phụ tùng chính hãng và dịch vụ sửa chữa, bảo dưỡng xe máy 
+                Chuyên cung cấp linh kiện chính hãng và dịch vụ sửa chữa thiết bị điện tử
                 chuyên nghiệp. Uy tín - Chất lượng - Giá tốt.
               </p>
             </div>

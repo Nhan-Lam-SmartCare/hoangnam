@@ -30,7 +30,9 @@ import {
   Menu,
   Home,
   ClipboardList,
+  Scale,
 } from "lucide-react";
+
 
 const BRANCH_TABLE_DISABLED_KEY = "motocare-schema-missing-branches";
 
@@ -363,6 +365,13 @@ export function Nav() {
               icon={<Shield className="w-4 h-4" />}
               label="Bảo hành"
             />
+            <NavLink
+              to="/pawn"
+              colorKey="orange"
+              icon={<Scale className="w-4 h-4" />}
+              label="Cầm đồ"
+            />
+
             {canCreateSale && (
               <NavLink
                 to="/sales"

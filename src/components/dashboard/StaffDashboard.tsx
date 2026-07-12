@@ -87,7 +87,7 @@ export const StaffDashboard: React.FC = () => {
             to="/service"
             icon={<Wrench className="w-6 h-6" />}
             label="Phiếu sửa chữa"
-            description="Quản lý phiếu sửa chữa, tiếp nhận xe, theo dõi tiến độ"
+            description="Quản lý phiếu sửa chữa, tiếp nhận máy, theo dõi tiến độ"
             color="violet"
           />
 

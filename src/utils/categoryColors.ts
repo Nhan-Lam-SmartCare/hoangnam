@@ -129,7 +129,39 @@ const categoryColors: Record<string, CategoryColorStyle> = {
     text: "text-purple-600/80 dark:text-purple-400/70",
   },
 
-  // === THƯƠNG HIỆU / HÃNG XE ===
+  // === THƯƠNG HIỆU / THIẾT BỊ ===
+  Apple: {
+    bg: "bg-slate-100 dark:bg-slate-800/40",
+    text: "text-slate-800 dark:text-slate-200",
+  },
+  Samsung: {
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    text: "text-blue-600/80 dark:text-blue-400/70",
+  },
+  Xiaomi: {
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    text: "text-orange-600/80 dark:text-orange-400/70",
+  },
+  Oppo: {
+    bg: "bg-green-50 dark:bg-green-950/30",
+    text: "text-green-600/80 dark:text-green-400/70",
+  },
+  Asus: {
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    text: "text-blue-600/80 dark:text-blue-400/70",
+  },
+  Dell: {
+    bg: "bg-sky-50 dark:bg-sky-950/30",
+    text: "text-sky-600/80 dark:text-sky-400/70",
+  },
+  HP: {
+    bg: "bg-cyan-50 dark:bg-cyan-950/30",
+    text: "text-cyan-600/80 dark:text-cyan-400/70",
+  },
+  Lenovo: {
+    bg: "bg-red-50 dark:bg-red-950/30",
+    text: "text-red-600/80 dark:text-red-400/70",
+  },
   Honda: {
     bg: "bg-red-50 dark:bg-red-950/30",
     text: "text-red-600/80 dark:text-red-400/70",

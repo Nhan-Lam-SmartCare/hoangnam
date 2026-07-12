@@ -10,6 +10,7 @@
     "migrate:workorder-codes": "node scripts/setup/apply-sql.mjs sql/2026-04-02_migrate_work_order_ids_compact.sql",
     "migrate:secure-profiles": "node scripts/setup/apply-sql.mjs sql/2026-06-19_secure_profiles_and_remaining_tables.sql",
     "migrate:secure-followup": "node scripts/setup/apply-sql.mjs sql/2026-06-19_followup_payment_sources_and_employee_salary.sql",
+    "db:backup": "node scripts/maintenance/export-all-tables.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives",
     "lint:json": "eslint src --ext ts,tsx --format json",

@@ -4,6 +4,7 @@ import { formatCurrency } from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";
 import { showToast } from "../../../utils/toast";
 import { supabase } from "../../../supabaseClient";
+import { getSelectableEmployees } from "../../../utils/employees";
 import {
   buildDefaultWorkerSplit,
   splitWorkerAmount,
@@ -30,6 +31,7 @@ interface WorkOrderLaborSectionProps {
   getSelectedPartCost: (partId: string) => number;
   canEditPriceAndParts: boolean;
   order: WorkOrder;
+  currentBranchId: string;
 }
 
 export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
@@ -51,7 +53,11 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
   getSelectedPartCost,
   canEditPriceAndParts,
   order,
+  currentBranchId,
 }) => {
+  const selectableEmployees = getSelectableEmployees(employees, currentBranchId);
+  const selectableWorkerOptions = getSelectableEmployees(employeeOptions, currentBranchId);
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -81,8 +87,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <option value="">-- Chọn kỹ thuật viên --</option>
-            {employees
-              .filter((emp) => emp.status === "active")
+            {selectableEmployees
               .map((emp) => (
                 <option key={emp.id} value={emp.name}>
                   {emp.name}
@@ -348,8 +353,7 @@ export const WorkOrderLaborSection: React.FC<WorkOrderLaborSectionProps> = ({
                       className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-slate-100"
                     >
                       <option value="">-- Chọn thợ --</option>
-                      {employeeOptions
-                        .filter((employee) => employee.status === "active")
+                      {selectableWorkerOptions
                         .map((employee) => (
                           <option key={employee.id} value={employee.id}>
                             {employee.name}

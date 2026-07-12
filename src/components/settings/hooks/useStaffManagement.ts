@@ -534,6 +534,63 @@ export const useStaffManagement = (activeTab: string) => {
     }
   };
 
+  const handleUpdateBranch = async (id: string, newName: string) => {
+    if (!newName.trim()) {
+      showToast.error("Tên chi nhánh không được để trống");
+      return;
+    }
+
+    setSavingBranch(true);
+    try {
+      let error: any = null;
+      if (!readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
+        const updateRes = await supabase
+          .from("branches")
+          .update({ name: newName.trim() })
+          .eq("id", id);
+        error = updateRes.error;
+      }
+
+      setBranchOverrides((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, name: newName.trim() } : b))
+      );
+      setBranches((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, name: newName.trim() } : b))
+      );
+
+      showToast.success("Đã cập nhật tên chi nhánh thành công!");
+      await refreshStaffScreen();
+    } catch (error: any) {
+      console.error("Error updating branch:", error);
+      showToast.error(error.message || "Không thể cập nhật chi nhánh");
+    } finally {
+      setSavingBranch(false);
+    }
+  };
+
+  const handleDeleteBranch = async (id: string) => {
+    setSavingBranch(true);
+    try {
+      let error: any = null;
+      if (!readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
+        const deleteRes = await supabase.from("branches").delete().eq("id", id);
+        error = deleteRes.error;
+      }
+
+      setBranchOverrides((prev) => prev.filter((b) => b.id !== id));
+      setBranches((prev) => prev.filter((b) => b.id !== id));
+
+      showToast.success("Đã xóa chi nhánh thành công!");
+      await refreshStaffScreen();
+    } catch (error: any) {
+      console.error("Error deleting branch:", error);
+      showToast.error(error.message || "Không thể xóa chi nhánh");
+    } finally {
+      setSavingBranch(false);
+    }
+  };
+
+
   const handleUpdateStaff = async () => {
     if (!editingStaff) return;
 
@@ -1347,7 +1404,10 @@ export const useStaffManagement = (activeTab: string) => {
     filteredStaffList,
     refreshStaffScreen,
     handleAddBranch,
+    handleUpdateBranch,
+    handleDeleteBranch,
     handleUpdateStaff,
+
     handleDeleteStaff,
     handleCreateStaffAccount,
     openResetStaffDialog,

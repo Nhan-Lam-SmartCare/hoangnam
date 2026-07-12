@@ -1,0 +1,56 @@
+[
+  {
+    "id": "cat-elec-01",
+    "name": "Linh kiện Điện thoại",
+    "icon": "📱",
+    "color": "#0ea5e9",
+    "created_at": "2026-03-28T08:43:06.782616+00:00",
+    "markup_percent": 50,
+    "rounding_rule": "integer"
+  },
+  {
+    "id": "cat-elec-02",
+    "name": "Linh kiện Laptop/PC",
+    "icon": "💻",
+    "color": "#6366f1",
+    "created_at": "2026-03-28T08:43:06.782616+00:00",
+    "markup_percent": 50,
+    "rounding_rule": "integer"
+  },
+  {
+    "id": "cat-elec-03",
+    "name": "Linh Kiện điện tử",
+    "icon": "🔌",
+    "color": "#f59e0b",
+    "created_at": "2026-03-28T08:43:06.782616+00:00",
+    "markup_percent": 50,
+    "rounding_rule": "integer"
+  },
+  {
+    "id": "cat-elec-05",
+    "name": "Linh Kiện Điện Thoại",
+    "icon": "🖥️",
+    "color": "#10b981",
+    "created_at": "2026-03-28T08:43:06.782616+00:00",
+    "markup_percent": 50,
+    "rounding_rule": "integer"
+  },
+  {
+    "id": "f8f74b59-6296-4428-aece-5137905b020c",
+    "name": "Phụ tùng xe điện",
+    "icon": "bike",
+    "color": "#f59e0b",
+    "created_at": "2026-04-02T14:34:17.647+00:00",
+    "markup_percent": 50,
+    "rounding_rule": "integer"
+  },
+  {
+    "id": "cat-elec-06",
+    "name": "Pin, Acquy, Nguồn",
+    "icon": "🔋",
+    "color": "#dc2626",
+    "created_at": "2026-03-28T08:43:06.782616+00:00",
+    "markup_percent": 50,
+    "rounding_rule": "integer"
+  }
+]

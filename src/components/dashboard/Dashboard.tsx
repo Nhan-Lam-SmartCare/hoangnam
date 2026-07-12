@@ -164,7 +164,7 @@ const Dashboard: React.FC = () => {
           />
           <StatusItem
             icon={<Car className="w-5 h-5" />}
-            label="Đã trả/giao xe"
+            label="Đã trả/giao máy"
             count={workOrderStats.delivered}
             color="slate"
           />

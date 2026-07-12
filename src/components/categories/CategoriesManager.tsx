@@ -21,8 +21,9 @@ import {
   Hammer,
   Cog,
   Bolt,
-  Bike,
-  Car,
+  Smartphone,
+  Laptop,
+  Tablet,
   Disc,
   Battery,
   Lightbulb,
@@ -225,8 +226,9 @@ const CategoriesManager: React.FC = () => {
     hammer: <Hammer className="w-5 h-5" />,
     cog: <Cog className="w-5 h-5" />,
     bolt: <Bolt className="w-5 h-5" />,
-    bike: <Bike className="w-5 h-5" />,
-    car: <Car className="w-5 h-5" />,
+    smartphone: <Smartphone className="w-5 h-5" />,
+    laptop: <Laptop className="w-5 h-5" />,
+    tablet: <Tablet className="w-5 h-5" />,
     disc: <Disc className="w-5 h-5" />,
     battery: <Battery className="w-5 h-5" />,
     lightbulb: <Lightbulb className="w-5 h-5" />,
@@ -584,7 +586,7 @@ const CategoriesManager: React.FC = () => {
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="VD: Phụ tùng xe máy"
+                  placeholder="VD: Linh kiện iPhone"
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-slate-100"
                   autoFocus
                 />

@@ -3,6 +3,9 @@ import { formatCurrency, formatWorkOrderId } from "../../../utils/format";
 import type { WorkOrder, WorkOrderPart } from "../../../types";
 import type { StoreSettings } from "../types/service.types";
 import { sanitizeIssueDescriptionForPrint, getDynamicQrUrl } from "../utils/service.utils";
+import { useAppContext } from "../../../contexts/AppContext";
+import { getPartWarranty } from "../hooks/useWorkOrderSharedLogic";
+
 
 interface WorkOrderReceiptTemplateProps {
   id?: string;
@@ -15,6 +18,8 @@ export const WorkOrderReceiptTemplate: React.FC<WorkOrderReceiptTemplateProps> =
   workOrder,
   storeSettings,
 }) => {
+  const { parts } = useAppContext();
+
   const printableIssueDescription = sanitizeIssueDescriptionForPrint(
     workOrder.issueDescription
   );
@@ -330,6 +335,24 @@ export const WorkOrderReceiptTemplate: React.FC<WorkOrderReceiptTemplateProps> =
                 >
                   {part.partName}
                 </div>
+                {(() => {
+                  let warrantyText = "";
+                  if (part.partId) {
+                    warrantyText = getPartWarranty(part.partId, parts);
+                  }
+                  if (!warrantyText && (part as any).warrantyPeriod) {
+                    warrantyText = (part as any).warrantyPeriod;
+                  }
+                  if (warrantyText) {
+                    return (
+                      <div style={{ fontSize: "8.5pt", color: "#b91c1c", marginBottom: "1mm" }}>
+                        Bảo hành: {warrantyText}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div
                   style={{
                     display: "flex",

@@ -15,6 +15,7 @@ export interface CreateCashTxInput {
   paymentSourceId?: string; // maps to paymentSource column in DB
   date?: string;
   notes?: string;
+  details?: string;
   category?: string; // e.g. sale_income, debt_collection
   saleId?: string;
   workOrderId?: string;
@@ -262,6 +263,8 @@ export async function createCashTransaction(
         category: canonicalCategory,
         date: txDate,
         description: input.notes || "",
+        details: input.details || "",
+        detail: input.details || "",
         recipient: input.recipient || null,
         saleid: input.saleId,
         workorderid: input.workOrderId,
@@ -283,6 +286,8 @@ export async function createCashTransaction(
         category: canonicalCategory,
         date: txDate,
         notes: input.notes || "",
+        details: input.details || "",
+        detail: input.details || "",
         recipient: input.recipient || null,
         saleId: input.saleId,
         workOrderId: input.workOrderId,
@@ -302,6 +307,8 @@ export async function createCashTransaction(
         category: canonicalCategory,
         date: txDate,
         description: input.notes || "",
+        details: input.details || "",
+        detail: input.details || "",
         recipient: input.recipient || null,
         userid: creatorId,
         username: creatorName,
@@ -351,6 +358,7 @@ export async function createCashTransaction(
       date: txDate,
       amount: input.amount,
       notes: input.notes || "",
+      details: input.details || "",
       paymentSourceId: String(
         (usedPayload as any)?.paymentsource ||
         (usedPayload as any)?.paymentSource ||

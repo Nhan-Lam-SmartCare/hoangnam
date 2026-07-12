@@ -320,10 +320,11 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
                             <Calendar className="w-4 h-4" />
                             Thời hạn bảo hành
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                             {[3, 6, 12].map((months) => (
                                 <button
                                     key={months}
+                                    type="button"
                                     onClick={() =>
                                         setFormData({ ...formData, warrantyPeriodMonths: months })
                                     }
@@ -335,6 +336,27 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
                                     {months} tháng
                                 </button>
                             ))}
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    placeholder="Khác..."
+                                    value={![3, 6, 12].includes(formData.warrantyPeriodMonths) && formData.warrantyPeriodMonths > 0 ? formData.warrantyPeriodMonths : ""}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        setFormData({ ...formData, warrantyPeriodMonths: isNaN(val) ? 0 : val });
+                                    }}
+                                    className={`w-full py-2.5 px-2 rounded-lg text-sm font-bold text-center border transition-all focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                        ![3, 6, 12].includes(formData.warrantyPeriodMonths) && formData.warrantyPeriodMonths > 0
+                                            ? "bg-blue-600 text-white border-blue-650 shadow-lg shadow-blue-500/30 placeholder-white/70"
+                                            : "bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400"
+                                    }`}
+                                />
+                                {![3, 6, 12].includes(formData.warrantyPeriodMonths) && formData.warrantyPeriodMonths > 0 && (
+                                    <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-black text-white pointer-events-none pr-1">
+                                        tháng
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
