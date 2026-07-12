@@ -2,9 +2,22 @@
 -- RUNME_complete_migration.sql
 -- Chạy file này 1 lần trên Supabase SQL Editor để kích hoạt
 -- toàn bộ tính năng của MotoCare Pro.
--- 
--- Tất cả câu lệnh đều dùng IF NOT EXISTS / OR REPLACE 
+--
+-- Tất cả câu lệnh đều dùng IF NOT EXISTS / OR REPLACE
 -- nên an toàn để chạy nhiều lần.
+--
+-- ⚠️  BẢO MẬT — ĐỌC TRƯỚC KHI CHẠY:
+--   File này CHỈ tạo bảng + ENABLE RLS (fail-closed). Các policy mở
+--   "Enable all access for all users" (USING true) trước đây trong file
+--   đã bị GỠ vì gây lỗ hổng (anon truy cập bảng tài chính; staff xem/sửa
+--   quỹ-lương chi nhánh khác).
+--   SAU khi chạy file này, PHẢI chạy tiếp các file siết RLS để app hoạt
+--   động và an toàn:
+--     sql/2026-06-16_tighten_rls_sensitive_tables.sql
+--     sql/2026-06-19_secure_profiles_and_remaining_tables.sql
+--     sql/2026-06-19_followup_payment_sources_and_employee_salary.sql
+--     sql/2026-06-20_tighten_labor_rls.sql
+--   KHÔNG khôi phục lại policy "FOR ALL USING (true)" trong file này.
 -- ============================================================
 
 -- ============================================================
@@ -34,11 +47,8 @@ ALTER TABLE public.inventory_transactions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Enable all access for all users" ON public.inventory_transactions;
 DROP POLICY IF EXISTS "Allow all access" ON public.inventory_transactions;
 
-CREATE POLICY "Enable all access for all users" 
-  ON public.inventory_transactions 
-  FOR ALL 
-  USING (true)
-  WITH CHECK (true);
+-- ⚠️ Policy mở đã gỡ. Policy an toàn (SELECT theo chi nhánh; UPDATE/DELETE
+--    owner/manager) nằm ở sql/2026-06-16_tighten_rls_sensitive_tables.sql.
 
 -- ============================================================
 -- PHẦN 2: Sổ quỹ (payment_sources + cash_transactions)
@@ -64,8 +74,8 @@ ALTER TABLE public.payment_sources
 ALTER TABLE public.payment_sources ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Enable all access for all users" ON public.payment_sources;
-CREATE POLICY "Enable all access for all users"
-  ON public.payment_sources FOR ALL USING (true) WITH CHECK (true);
+-- ⚠️ Policy mở đã gỡ. Policy an toàn (SELECT authenticated; INSERT/DELETE
+--    owner/manager) nằm ở sql/2026-06-16_tighten_rls_sensitive_tables.sql.
 
 INSERT INTO public.payment_sources (id, name, type, balance, is_default)
 VALUES
@@ -99,6 +109,8 @@ CREATE TABLE IF NOT EXISTS public.cash_transactions (
   "supplierId" TEXT,
   customerid TEXT,
   "customerId" TEXT,
+  employee_id TEXT,
+  "employeeId" TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -123,13 +135,15 @@ ALTER TABLE public.cash_transactions
   ADD COLUMN IF NOT EXISTS "supplierId" TEXT,
   ADD COLUMN IF NOT EXISTS customerid TEXT,
   ADD COLUMN IF NOT EXISTS "customerId" TEXT,
+  ADD COLUMN IF NOT EXISTS employee_id TEXT,
+  ADD COLUMN IF NOT EXISTS "employeeId" TEXT,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
 
 ALTER TABLE public.cash_transactions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Enable all access for all users" ON public.cash_transactions;
-CREATE POLICY "Enable all access for all users"
-  ON public.cash_transactions FOR ALL USING (true) WITH CHECK (true);
+-- ⚠️ Policy mở đã gỡ. Policy an toàn (SELECT theo chi nhánh; UPDATE/DELETE
+--    owner/manager) nằm ở sql/2026-06-16_tighten_rls_sensitive_tables.sql.
 
 DROP VIEW IF EXISTS public.cash_transactions_ledger;
 CREATE VIEW public.cash_transactions_ledger AS
@@ -147,6 +161,7 @@ SELECT
   COALESCE(workorderid, "workOrderId") AS workorderid,
   COALESCE(supplierid, "supplierId") AS supplierid,
   COALESCE(customerid, "customerId") AS customerid,
+  COALESCE(employee_id, "employeeId") AS employee_id,
   created_at
 FROM public.cash_transactions;
 
@@ -230,21 +245,11 @@ ALTER TABLE public.repair_order_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.repair_order_service_workers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.repair_order_service_items ENABLE ROW LEVEL SECURITY;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'Enable all access for all users') THEN
-    CREATE POLICY "Enable all access for all users" ON public.services FOR ALL USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'repair_order_services' AND policyname = 'Enable all access for all users') THEN
-    CREATE POLICY "Enable all access for all users" ON public.repair_order_services FOR ALL USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'repair_order_service_workers' AND policyname = 'Enable all access for all users') THEN
-    CREATE POLICY "Enable all access for all users" ON public.repair_order_service_workers FOR ALL USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'repair_order_service_items' AND policyname = 'Enable all access for all users') THEN
-    CREATE POLICY "Enable all access for all users" ON public.repair_order_service_items FOR ALL USING (true);
-  END IF;
-END $$;
+-- ⚠️ Các policy mở "Enable all access for all users" trên 4 bảng labor đã
+--    được GỠ. Policy an toàn (SELECT authenticated; INSERT/UPDATE/DELETE
+--    owner/manager; services chỉ owner) nằm ở:
+--        sql/2026-06-20_tighten_labor_rls.sql
+--    Chỉ ENABLE RLS ở trên (fail-closed) — chạy file tighten để cấp policy.
 
 CREATE OR REPLACE FUNCTION public.recalculate_repair_order_labor_totals(p_repair_order_id TEXT)
 RETURNS TABLE(labor_total NUMERIC, worker_total NUMERIC)

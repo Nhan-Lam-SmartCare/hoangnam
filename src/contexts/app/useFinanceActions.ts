@@ -324,8 +324,16 @@ export function useFinanceActions(
           }
 
           // Fallback: chạy từng bước (phòng thủ cho DB chưa apply migration)
+          // ⚠️ NỢ KỸ THUẬT / P0: luồng dưới đây KHÔNG atomic — nếu lỗi giữa
+          // chừng có thể để đơn/kho/sổ quỹ lệch nhau. Chỉ chạy khi RPC
+          // sale_create_atomic CHƯA deploy. Sau khi xác nhận RPC đã có trên
+          // production (SELECT proname FROM pg_proc ...), HÃY GỠ cả nhánh này.
           console.warn(
             "[finalizeSale] RPC sale_create_atomic chưa có, dùng fallback từng bước"
+          );
+          showToast.warning(
+            "Hệ thống đang chạy chế độ dự phòng (chưa cập nhật CSDL). " +
+              "Vui lòng báo quản trị viên deploy RPC sale_create_atomic để đảm bảo an toàn số liệu."
           );
         }
 
@@ -723,8 +731,6 @@ export function useFinanceActions(
     [
       currentBranchId,
       sales,
-      cashTransactions,
-      customerDebts,
       setCashTransactions,
       setCustomerDebts,
       setParts,

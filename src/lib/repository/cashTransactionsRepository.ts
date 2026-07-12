@@ -22,6 +22,7 @@ export interface CreateCashTxInput {
   loanPaymentId?: string;
   supplierId?: string;
   customerId?: string;
+  employeeId?: string;
   recipient?: string; // human readable target
   skipBalanceUpdate?: boolean;
 }
@@ -267,6 +268,7 @@ export async function createCashTransaction(
         workorderid: input.workOrderId,
         supplierid: input.supplierId,
         customerid: input.customerId,
+        employee_id: input.employeeId || null,
         userid: creatorId,
         username: creatorName,
         created_by: creatorId,
@@ -288,6 +290,7 @@ export async function createCashTransaction(
         workOrderId: input.workOrderId,
         supplierId: input.supplierId,
         customerId: input.customerId,
+        employeeId: input.employeeId || null,
         userId: creatorId,
         userName: creatorName,
         createdBy: creatorId,
@@ -363,6 +366,7 @@ export async function createCashTransaction(
       saleId: input.saleId,
       workOrderId: input.workOrderId,
       recipient: input.recipient,
+      employeeId: (usedPayload as any)?.employeeId || (usedPayload as any)?.employee_id || input.employeeId || undefined,
       ...(usedPayload || {}),
     } as CashTransaction;
 

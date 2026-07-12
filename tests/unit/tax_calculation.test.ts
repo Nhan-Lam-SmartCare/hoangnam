@@ -61,4 +61,18 @@ describe("Split Work Order Revenue", () => {
     expect(splitted.partsRevenue).toBe(0);
     expect(splitted.serviceRevenue).toBe(300000);
   });
+
+  it("apportions revenue proportionally when a discount is present", () => {
+    const order = {
+      total: 1200000, // discount from 1.5M to 1.2M
+      partsUsed: [
+        { retailPrice: 500000, quantity: 2 } // 1,000,000 parts
+      ],
+      laborCost: 500000 // 500,000 service
+    };
+
+    const splitted = splitWorkOrderRevenue(order);
+    expect(splitted.partsRevenue).toBe(800000); // 1.2M * 10/15
+    expect(splitted.serviceRevenue).toBe(400000); // 1.2M * 5/15
+  });
 });

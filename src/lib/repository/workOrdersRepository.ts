@@ -2927,6 +2927,11 @@ export async function completeWorkOrderPayment(
         });
       }
 
+      // ⚠️ NỢ KỸ THUẬT / P0: fallback update trực tiếp KHÔNG atomic (trừ kho
+      // và cập nhật thanh toán tách rời, có thể lệch nếu lỗi giữa chừng).
+      // Chỉ chạy khi RPC work_order_complete_payment CHƯA deploy. Sau khi xác
+      // nhận RPC đã có trên production, HÃY GỠ nhánh fallback này. Cờ
+      // usedFallback:true bên dưới để UI cảnh báo người dùng khi rơi vào đây.
       console.warn(
         "[completeWorkOrderPayment] RPC work_order_complete_payment chưa tồn tại, đã dùng fallback update trực tiếp có trừ kho"
       );

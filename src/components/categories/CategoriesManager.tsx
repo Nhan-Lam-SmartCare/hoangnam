@@ -107,7 +107,7 @@ const CategoriesManager: React.FC = () => {
     });
   }, [categoriesData, parts, currentBranchId, pricingRules]);
 
-  const handleUpdateCategoryRule = (
+  const handleUpdateCategoryRule = async (
     categoryName: string,
     patch: Partial<{ markupPercent: number; roundingRule: RoundingRule }>
   ) => {
@@ -129,6 +129,22 @@ const CategoriesManager: React.FC = () => {
 
     setCategoryPricingRule(categoryName, nextRule);
     setPricingRules((prev) => ({ ...prev, [key]: nextRule }));
+
+    // Cập nhật lên Supabase để đồng bộ giữa các thiết bị
+    const cat = categoriesData.find((c) => c.name === categoryName);
+    if (cat) {
+      try {
+        await updateCategory.mutateAsync({
+          id: cat.id,
+          updates: {
+            markup_percent: nextRule.markupPercent,
+            rounding_rule: nextRule.roundingRule,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to sync category rule to Supabase:", err);
+      }
+    }
   };
 
   const handleAddCategory = async () => {

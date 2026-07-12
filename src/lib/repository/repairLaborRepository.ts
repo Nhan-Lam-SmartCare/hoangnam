@@ -523,6 +523,7 @@ export async function getWorkerMonthlySalary(
       const baseSalary = toNumber(row.base_salary || employeeRow?.base_salary);
       const bonus = toNumber(row.bonus);
       const penalty = toNumber(row.penalty);
+      const advance = toNumber(row.advance);
       const totalWorkerAmount = toNumber(row.total_worker_amount) + manualFallback.amount;
       const totalServiceCount = toNumber(row.total_service_count) + manualFallback.count;
       return success({
@@ -533,14 +534,15 @@ export async function getWorkerMonthlySalary(
         baseSalary,
         bonus,
         penalty,
-        finalSalary: toNumber(baseSalary + totalWorkerAmount + bonus - penalty),
+        advance,
+        finalSalary: toNumber(baseSalary + totalWorkerAmount + bonus - penalty - advance),
       });
     }
 
     const startDate = new Date(year, month - 1, 1).toISOString();
     const endDate = new Date(year, month, 1).toISOString();
 
-    const [workerRows, employeeRows] = await Promise.all([
+    const [workerRows, employeeRows, advanceRows] = await Promise.all([
       supabase
         .from(REPAIR_ORDER_SERVICE_WORKERS_TABLE)
         .select("*, repair_order_services!inner(repair_order_id, service_name, created_at)")
@@ -548,6 +550,16 @@ export async function getWorkerMonthlySalary(
         .gte("repair_order_services.created_at", startDate)
         .lt("repair_order_services.created_at", endDate),
       supabase.from("employees").select("*").eq("id", workerId).maybeSingle(),
+      employeeRow?.name
+        ? supabase
+            .from("cash_transactions")
+            .select("amount")
+            .eq("category", "employee_advance")
+            .eq("type", "expense")
+            .gte("date", startDate)
+            .lt("date", endDate)
+            .ilike("recipient", employeeRow.name.trim())
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (workerRows.error) {
@@ -564,11 +576,17 @@ export async function getWorkerMonthlySalary(
       employeeRows.data?.name ||
       "Chua phan cong";
 
+    const advanceSum = (advanceRows?.data || []).reduce(
+      (sum, row) => sum + toNumber((row as any).amount),
+      0
+    );
+
     const serviceSummary = computeMonthlySalarySummary({
       workerId,
       workerName,
       serviceWorkers: (workerRows.data || []).map(normalizeRepairOrderServiceWorker),
       employee: employeeRows.data as any,
+      advance: advanceSum,
     });
 
     return success({
@@ -579,7 +597,8 @@ export async function getWorkerMonthlySalary(
         serviceSummary.baseSalary +
         (serviceSummary.totalWorkerAmount + manualFallback.amount) +
         serviceSummary.bonus -
-        serviceSummary.penalty,
+        serviceSummary.penalty -
+        (serviceSummary.advance || 0),
     });
   } catch (cause) {
     return failure({

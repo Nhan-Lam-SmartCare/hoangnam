@@ -8,6 +8,8 @@ import {
 } from "../../hooks/useCashTransactionsRepository";
 import { useStoreSettings } from "../../hooks/useStoreSettings";
 import type { StoreSettings } from "../../hooks/useStoreSettings";
+import { useEmployeesDirectoryRepo } from "../../hooks/useEmployeesRepository";
+import type { Employee } from "../../types";
 import { supabase } from "../../supabaseClient";
 import { formatCurrency, formatDate } from "../../utils/format";
 import { formatCashTxCategory } from "../../lib/finance/cashTxCategories";
@@ -569,6 +571,9 @@ type CashTxFormModalProps = {
   formNotes: string;
   paymentSources: Array<{ id: string; name: string }>;
   isSaving: boolean;
+  employees?: Employee[];
+  selectedEmployeeId?: string;
+  onEmployeeChange?: (employeeId: string, employeeName: string) => void;
   onClose: () => void;
   onCategoryChange: (value: string) => void;
   onAmountChange: (value: number) => void;
@@ -591,6 +596,9 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
   formNotes,
   paymentSources,
   isSaving,
+  employees = [],
+  selectedEmployeeId = "",
+  onEmployeeChange,
   onClose,
   onCategoryChange,
   onAmountChange,
@@ -638,13 +646,32 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
             className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
           />
 
-          <input
-            type="text"
-            value={formRecipient}
-            onChange={(e) => onRecipientChange(e.target.value)}
-            placeholder="Đối tượng"
-            className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
-          />
+          {formCategory === "employee_advance" ? (
+            <select
+              value={selectedEmployeeId}
+              onChange={(e) => {
+                const empId = e.target.value;
+                const emp = employees.find((x) => x.id === empId);
+                onEmployeeChange?.(empId, emp?.name || "");
+              }}
+              className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+            >
+              <option value="">-- Chọn nhân viên --</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name} ({emp.position || "Nhân viên"})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={formRecipient}
+              onChange={(e) => onRecipientChange(e.target.value)}
+              placeholder="Đối tượng"
+              className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+            />
+          )}
 
           <input
             type="date"
@@ -682,7 +709,7 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
           </button>
           <button
             onClick={onSubmit}
-            disabled={isSaving || formAmount <= 0}
+            disabled={isSaving || formAmount <= 0 || (formCategory === "employee_advance" && !selectedEmployeeId)}
             className={`flex-1 px-3 py-2 text-sm rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed ${
               formType === "income" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"
             }`}
@@ -698,6 +725,7 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
 const CashBookPage: React.FC = () => {
   const { currentBranchId, paymentSources } = useAppContext();
   const { data: storeSettings } = useStoreSettings();
+  const { data: employees = [] } = useEmployeesDirectoryRepo();
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -706,6 +734,7 @@ const CashBookPage: React.FC = () => {
   const [formCategory, setFormCategory] = useState<string>("other_income");
   const [formDate, setFormDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [formRecipient, setFormRecipient] = useState<string>("");
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [formNotes, setFormNotes] = useState<string>("");
   const [formPaymentSourceId, setFormPaymentSourceId] = useState<string>("cash");
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -731,6 +760,7 @@ const CashBookPage: React.FC = () => {
       { value: "inventory_purchase", label: "Mua hàng" },
       { value: "supplier_payment", label: "Chi trả nhà cung cấp" },
       { value: "salary", label: "Lương nhân viên" },
+      { value: "employee_advance", label: "Ứng lương" },
       { value: "debt_payment", label: "Trả nợ nhà cung cấp" },
       { value: "loan_payment", label: "Trả nợ vay" },
       { value: "other_expense", label: "Chi khác" },
@@ -740,6 +770,14 @@ const CashBookPage: React.FC = () => {
   );
 
   const formCategoryOptions = formType === "income" ? incomeCategoryOptions : expenseCategoryOptions;
+
+  const handleCategoryChange = (val: string) => {
+    setFormCategory(val);
+    if (val === "employee_advance") {
+      setSelectedEmployeeId("");
+      setFormRecipient("");
+    }
+  };
 
   useEffect(() => {
     setFormCategory(formType === "income" ? "other_income" : "other_expense");
@@ -791,17 +829,20 @@ const CashBookPage: React.FC = () => {
       date: formDate ? `${formDate}T00:00:00` : undefined,
       category: formCategory,
       recipient: formRecipient.trim() || undefined,
+      employeeId: formCategory === "employee_advance" ? selectedEmployeeId : undefined,
       notes: formNotes.trim() || undefined,
     });
 
     setFormAmount(0);
     setFormRecipient("");
+    setSelectedEmployeeId("");
     setFormNotes("");
     setIsFormModalOpen(false);
   };
 
   const openTxModal = (type: "income" | "expense") => {
     setFormType(type);
+    setSelectedEmployeeId("");
     setIsFormModalOpen(true);
   };
 
@@ -913,8 +954,14 @@ const CashBookPage: React.FC = () => {
         formNotes={formNotes}
         paymentSources={paymentSources || []}
         isSaving={createCashTxMutation.isPending}
+        employees={employees}
+        selectedEmployeeId={selectedEmployeeId}
+        onEmployeeChange={(id, name) => {
+          setSelectedEmployeeId(id);
+          setFormRecipient(name);
+        }}
         onClose={() => setIsFormModalOpen(false)}
-        onCategoryChange={setFormCategory}
+        onCategoryChange={handleCategoryChange}
         onAmountChange={setFormAmount}
         onRecipientChange={setFormRecipient}
         onDateChange={setFormDate}

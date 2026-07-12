@@ -1,3 +1,11 @@
+-- ============================================================
+-- 2026-04-01_add_repair_labor_module.sql  (module tiền công sửa chữa)
+--
+-- ⚠️  BẢO MẬT: File này KHÔNG còn tạo policy mở "FOR ALL USING (true)".
+--     Sau khi chạy file này (tạo bảng + ENABLE RLS), PHẢI chạy tiếp
+--         sql/2026-06-20_tighten_labor_rls.sql
+--     để cấp policy an toàn theo vai trò. Xem chi tiết ở khối RLS bên dưới.
+-- ============================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS public.services (
@@ -77,36 +85,20 @@ ALTER TABLE public.repair_order_services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.repair_order_service_workers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.repair_order_service_items ENABLE ROW LEVEL SECURITY;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'Enable all access for all users'
-  ) THEN
-    CREATE POLICY "Enable all access for all users" ON public.services FOR ALL USING (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'repair_order_services' AND policyname = 'Enable all access for all users'
-  ) THEN
-    CREATE POLICY "Enable all access for all users" ON public.repair_order_services FOR ALL USING (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'repair_order_service_workers' AND policyname = 'Enable all access for all users'
-  ) THEN
-    CREATE POLICY "Enable all access for all users" ON public.repair_order_service_workers FOR ALL USING (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'repair_order_service_items' AND policyname = 'Enable all access for all users'
-  ) THEN
-    CREATE POLICY "Enable all access for all users" ON public.repair_order_service_items FOR ALL USING (true);
-  END IF;
-END $$;
+-- ============================================================
+-- ⚠️  RLS POLICIES: KHÔNG tạo policy "FOR ALL USING (true)" ở đây nữa.
+--
+-- Trước đây file này tạo policy mở "Enable all access for all users"
+-- (USING true) trên 4 bảng labor → lỗ hổng: staff tự sửa tiền công / %
+-- chia / worker_amount, và anon truy cập được nếu có GRANT.
+--
+-- Policy AN TOÀN (SELECT: authenticated; INSERT/UPDATE/DELETE: owner/manager;
+-- services: chỉ owner) nay nằm ở:
+--     sql/2026-06-20_tighten_labor_rls.sql   ← chạy file này để cấp policy
+--
+-- Ở đây chỉ ENABLE RLS (fail-closed). Nếu cài mới, PHẢI chạy tiếp file
+-- tighten ở trên để app đọc/ghi được labor. KHÔNG khôi phục policy mở.
+-- ============================================================
 
 CREATE OR REPLACE FUNCTION public.recalculate_repair_order_labor_totals(p_repair_order_id TEXT)
 RETURNS TABLE(labor_total NUMERIC, worker_total NUMERIC)

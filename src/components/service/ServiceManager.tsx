@@ -41,6 +41,7 @@ import {
   recordWorkOrderPaymentTransactions,
 } from "../../lib/repository/workOrdersRepository";
 import { syncRepairOrderServices } from "../../lib/repository/repairLaborRepository";
+import { createNotification } from "../../lib/repository/notificationsRepository";
 import {
   useCreateWorkOrderAtomicRepo,
   useUpdateWorkOrderAtomicRepo,
@@ -791,8 +792,7 @@ export default function ServiceManager() {
     createdByName: string
   ) => {
     try {
-      const { error } = await supabase.from("notifications").insert({
-        id: crypto.randomUUID(),
+      const res = await createNotification({
         type: "work_order",
         title: "Phiếu sửa chữa mới",
         message: `${createdByName} tạo phiếu ${orderId} - ${customerName} (${licensePlate || vehicleModel
@@ -805,15 +805,13 @@ export default function ServiceManager() {
           total,
           createdBy: createdByName,
         },
-        created_by: profile?.id || null,
-        recipient_role: "owner", // Gửi đến owner
-        branch_id: currentBranchId,
-        is_read: false,
-        created_at: new Date().toISOString(),
+        createdBy: profile?.id || null,
+        recipientRole: "owner", // Gửi đến owner
+        branchId: currentBranchId,
       });
 
-      if (error) {
-        console.error("❌ Error creating notification:", error);
+      if (!res.ok) {
+        console.error("❌ Error creating notification:", res.error.cause);
       }
     } catch (err) {
       console.error("❌ Error in createWorkOrderNotification:", err);

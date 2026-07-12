@@ -16,6 +16,7 @@ import {
 import LoadingSpinner from "../../common/LoadingSpinner";
 import { StaffMember, Branch } from "../types";
 import { useStaffManagement, STAFF_DEPARTMENTS } from "../hooks/useStaffManagement";
+import { APP_ACTION_OPTIONS } from "../../../utils/permissions";
 
 interface StaffTabProps {
   staffState: ReturnType<typeof useStaffManagement>;
@@ -114,10 +115,6 @@ export const StaffTab: React.FC<StaffTabProps> = ({ staffState, isOwner }) => {
     { key: "finance", label: "Tài chính" },
     { key: "admin", label: "Quản trị" },
   ];
-
-  // We need to import the APP_ACTION_OPTIONS from useStaffManagement's module or the shared permissions module
-  // Let's import it from ../../../utils/permissions
-  const { APP_ACTION_OPTIONS } = require("../../../utils/permissions");
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN").format(Number(value || 0));

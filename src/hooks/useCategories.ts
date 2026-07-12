@@ -7,6 +7,7 @@ import {
 } from "../lib/repository/categoriesRepository";
 import type { Category } from "../types";
 import { showToast } from "../utils/toast";
+import { getCategoryPricingRule, setCategoryPricingRule } from "../utils/categoryPricingRules";
 
 export const useCategories = () => {
   return useQuery({
@@ -14,6 +15,21 @@ export const useCategories = () => {
     queryFn: async () => {
       const res = await fetchCategories();
       if (!res.ok) throw res.error;
+
+      // Đồng bộ quy tắc giá từ Supabase xuống localStorage
+      const fetchedCategories = res.data;
+      if (Array.isArray(fetchedCategories)) {
+        fetchedCategories.forEach((cat) => {
+          if (cat.name) {
+            const currentRule = getCategoryPricingRule(cat.name);
+            setCategoryPricingRule(cat.name, {
+              markupPercent: cat.markup_percent !== undefined && cat.markup_percent !== null ? cat.markup_percent : currentRule.markupPercent,
+              roundingRule: (cat.rounding_rule || currentRule.roundingRule) as any,
+            });
+          }
+        });
+      }
+
       return res.data;
     },
   });

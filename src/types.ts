@@ -92,6 +92,8 @@ export interface Category {
   name: string;
   icon?: string; // UI icon key
   color?: string; // Hex color
+  markup_percent?: number;
+  rounding_rule?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -216,6 +218,7 @@ export interface WorkerMonthlySalary {
   baseSalary: number;
   bonus: number;
   penalty: number;
+  advance?: number;
   finalSalary: number;
 }
 
@@ -323,6 +326,7 @@ export interface CashTransaction {
   category?: CashTransactionCategory;
   saleId?: string;
   workOrderId?: string;
+  employeeId?: string;
 }
 
 // Employee & Payroll Types

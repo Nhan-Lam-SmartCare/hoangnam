@@ -724,7 +724,7 @@ export function useWorkOrderMobileFormState({
       const laborBase = getPartLaborBase(item.partId);
       return sum + getIntegratedLaborByQuantity(laborBase, Number(item.quantity || 0));
     }, 0);
-  }, [selectedParts, getPartLaborBase]);
+  }, [selectedParts, getPartLaborBase, getIntegratedLaborByQuantity]);
 
   const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
 
@@ -1017,6 +1017,16 @@ export function useWorkOrderMobileFormState({
     if (!selectedCustomer || !selectedVehicle) {
       alert("Vui lòng chọn khách hàng và thiết bị");
       return;
+    }
+
+    // Validate workers' share percent total does not exceed 100%
+    for (const service of repairServices || []) {
+      const workers = service.workers || [];
+      const totalShare = workers.reduce((sum: number, w: any) => sum + Number(w.share_percent || w.sharePercent || 0), 0);
+      if (totalShare > 100) {
+        showToast.error(`Tổng phần trăm chia thợ cho dịch vụ "${service.serviceName}" vượt quá 100% (${totalShare}%)`);
+        return;
+      }
     }
 
     setIsSubmitting(true);

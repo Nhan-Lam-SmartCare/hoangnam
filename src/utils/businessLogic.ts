@@ -60,18 +60,39 @@ export function splitWorkOrderRevenue(order: Partial<WorkOrder>): {
     }
   }
 
-  // Khấu trừ discount chia đều theo tỷ lệ (nếu cần chuẩn xác), 
-  // nhưng ở đây ta giảm trừ thẳng vào công thợ trước (hoặc chia đều).
-  // Đơn giản nhất: Doanh thu phụ tùng = partsRawTotal (không chịu discount trừ khi discount > labor)
-  // Thực tế:
-  let partsRevenue = partsRawTotal;
-  let serviceRevenue = Math.max(0, total - partsRawTotal);
-
-  if (partsRevenue > total) {
-    // Discount quá lớn lẹm vào cả phụ tùng
-    partsRevenue = total;
-    serviceRevenue = 0;
+  // Tính tổng dịch vụ/công thợ (laborCost/laborTotal + additionalServices)
+  const laborRaw = Number(order.laborCost ?? order.laborTotal ?? 0);
+  let additionalServicesRaw = 0;
+  if (Array.isArray(order.additionalServices)) {
+    for (const s of order.additionalServices) {
+      additionalServicesRaw += (Number(s.price) || 0) * (Number(s.quantity || 1) || 0);
+    }
   }
+  const serviceRawTotal = laborRaw + additionalServicesRaw;
+
+  const rawSum = partsRawTotal + serviceRawTotal;
+
+  let partsRevenue = partsRawTotal;
+  let serviceRevenue = serviceRawTotal;
+
+  if (total < rawSum) {
+    // Trường hợp có discount: phân bổ tỷ lệ phần trăm
+    if (rawSum > 0) {
+      partsRevenue = total * (partsRawTotal / rawSum);
+      serviceRevenue = total * (serviceRawTotal / rawSum);
+    } else {
+      partsRevenue = 0;
+      serviceRevenue = total;
+    }
+  } else {
+    // Trường hợp không có discount hoặc có thặng dư: giữ nguyên giá trị phụ tùng, phần thặng dư đưa vào dịch vụ
+    partsRevenue = partsRawTotal;
+    serviceRevenue = total - partsRawTotal;
+  }
+
+  // Làm tròn 2 chữ số thập phân để tránh sai lệch số thực
+  partsRevenue = Math.round(partsRevenue * 100) / 100;
+  serviceRevenue = Math.round(serviceRevenue * 100) / 100;
 
   return { partsRevenue, serviceRevenue };
 }
@@ -111,11 +132,13 @@ export function classifyCustomer(
  */
 export function calculateNewStockAfterSale(
   currentStock: number,
-  quantitySold: number
-): { nextStock: number; hasWarning: boolean } {
+  quantitySold: number,
+  lowStockThreshold: number = 3
+): { nextStock: number; hasWarning: boolean; isNegative: boolean } {
   const next = currentStock - quantitySold;
   return {
     nextStock: next,
-    hasWarning: next <= 3, // Cảnh báo nếu tồn kho còn <= 3
+    hasWarning: next <= lowStockThreshold,
+    isNegative: next < 0,
   };
 }
