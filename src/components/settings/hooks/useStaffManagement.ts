@@ -3,11 +3,7 @@ import { supabase } from "../../../supabaseClient";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../../contexts/AuthContext";
 import { showToast } from "../../../utils/toast";
-import {
-  getWorkerMonthlyLaborDetails,
-  getWorkerMonthlySalary,
-  type WorkerLaborDetailRow,
-} from "../../../lib/repository/repairLaborRepository";
+
 import {
   APP_ACTION_OPTIONS,
   canDo,
@@ -112,14 +108,7 @@ export const useStaffManagement = (activeTab: string) => {
     }
   });
 
-  const [salaryMonth, setSalaryMonth] = useState(new Date().getMonth() + 1);
-  const [salaryYear, setSalaryYear] = useState(new Date().getFullYear());
-  const [staffSalaryRows, setStaffSalaryRows] = useState<any[]>([]);
-  const [loadingSalaryRows, setLoadingSalaryRows] = useState(false);
-  const [selectedSalaryWorker, setSelectedSalaryWorker] = useState<any | null>(null);
-  const [salaryDetailRows, setSalaryDetailRows] = useState<WorkerLaborDetailRow[]>([]);
-  const [loadingSalaryDetails, setLoadingSalaryDetails] = useState(false);
-  const salaryRowsCacheRef = useRef<Record<string, any[]>>({});
+
 
   useEffect(() => {
     try {
@@ -1136,86 +1125,7 @@ export const useStaffManagement = (activeTab: string) => {
     });
   };
 
-  const handleOpenSalaryDetails = async (row: any) => {
-    setSelectedSalaryWorker(row);
-    setSalaryDetailRows([]);
-    setLoadingSalaryDetails(true);
-    try {
-      const result = await getWorkerMonthlyLaborDetails(
-        row.workerId,
-        salaryMonth,
-        salaryYear
-      );
-      if (!result.ok) {
-        showToast.error(result.error?.message || "Không thể tải chi tiết công sửa");
-        return;
-      }
-      setSalaryDetailRows(result.data || []);
-    } finally {
-      setLoadingSalaryDetails(false);
-    }
-  };
 
-  const handleExportSalaryDetailsExcel = () => {
-    if (!selectedSalaryWorker) return;
-
-    const header = [
-      "Thoi gian",
-      "Ma phieu",
-      "Khach hang",
-      "Thiet bi",
-      "Hang muc",
-      "Nguon cong",
-      "Tien cong",
-    ];
-
-    const rows = salaryDetailRows.map((detail) => [
-      formatDateTime(detail.date),
-      detail.workOrderId,
-      detail.customerName || "Khach le",
-      detail.vehicleModel || "",
-      detail.serviceName || "Tien cong phieu",
-      detail.type === "service_split" ? "Chia cong dich vu" : "Tien cong theo phieu",
-      Number(detail.amount || 0),
-    ]);
-
-    const totalAmount = salaryDetailRows.reduce(
-      (sum, item) => sum + Number(item.amount || 0),
-      0
-    );
-
-    const sheetData = [
-      ["Chi tiet cong sua"],
-      [
-        `Nhan vien: ${selectedSalaryWorker.workerName} - Ky: Thang ${salaryMonth}/${salaryYear}`,
-      ],
-      [],
-      header,
-      ...rows,
-      [],
-      ["Tong tien cong", "", "", "", "", "", totalAmount],
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws["!cols"] = [
-      { wch: 22 },
-      { wch: 18 },
-      { wch: 24 },
-      { wch: 26 },
-      { wch: 28 },
-      { wch: 20 },
-      { wch: 16 },
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Chi tiet cong");
-
-    const safeName = String(selectedSalaryWorker.workerName || "NhanVien")
-      .replace(/\s+/g, "_")
-      .replace(/[^\w-]/g, "");
-    const fileName = `ChiTietCong_${safeName}_T${salaryMonth}_${salaryYear}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-  };
 
   const filteredStaffList = useMemo(() => {
     return staffList.filter((staff) => {
@@ -1236,74 +1146,7 @@ export const useStaffManagement = (activeTab: string) => {
     });
   }, [staffList, staffSearch, staffDepartmentFilter]);
 
-  const salaryStaffIdsKey = useMemo(
-    () => filteredStaffList.map((staff) => staff.id).sort().join("|"),
-    [filteredStaffList]
-  );
 
-  useEffect(() => {
-    let active = true;
-
-    const loadSalaryRows = async () => {
-      const salaryCacheKey = `${salaryYear}-${String(salaryMonth).padStart(2, "0")}::${salaryStaffIdsKey}`;
-
-      if (activeTab !== "staff" || filteredStaffList.length === 0) {
-        if (active) setStaffSalaryRows([]);
-        return;
-      }
-
-      const cachedRows = salaryRowsCacheRef.current[salaryCacheKey];
-      if (cachedRows && active) {
-        setStaffSalaryRows(cachedRows);
-      }
-
-      if (!cachedRows) {
-        setLoadingSalaryRows(true);
-      }
-
-      try {
-        const rows = await Promise.all(
-          filteredStaffList.map(async (staff) => {
-            const salaryResult = await getWorkerMonthlySalary(
-              staff.id,
-              salaryMonth,
-              salaryYear
-            );
-
-            if (!salaryResult.ok) {
-              return {
-                workerId: staff.id,
-                workerName: staff.name || staff.email || "Chua dat ten",
-                totalServiceCount: 0,
-                totalWorkerAmount: 0,
-                baseSalary: Number(staff.base_salary || 0),
-                bonus: 0,
-                penalty: 0,
-                finalSalary: Number(staff.base_salary || 0),
-              };
-            }
-
-            return salaryResult.data;
-          })
-        );
-
-        if (active) {
-          salaryRowsCacheRef.current[salaryCacheKey] = rows;
-          setStaffSalaryRows(rows);
-        }
-      } finally {
-        if (active) {
-          setLoadingSalaryRows(false);
-        }
-      }
-    };
-
-    void loadSalaryRows();
-
-    return () => {
-      active = false;
-    };
-  }, [activeTab, filteredStaffList, salaryMonth, salaryYear, salaryStaffIdsKey]);
 
   const totalBaseSalary = filteredStaffList.reduce(
     (sum, staff) => sum + Number(staff.base_salary || 0),
@@ -1314,10 +1157,7 @@ export const useStaffManagement = (activeTab: string) => {
     staffList.map((staff) => staff.department).filter(Boolean)
   ).size;
 
-  const totalLaborAmountInMonth = useMemo(
-    () => staffSalaryRows.reduce((sum, row) => sum + Number(row.totalWorkerAmount || 0), 0),
-    [staffSalaryRows]
-  );
+
 
   const payrollSeedRows = filteredStaffList.map((staff) => ({
     id: staff.id,
@@ -1391,19 +1231,8 @@ export const useStaffManagement = (activeTab: string) => {
     setStaffSearch,
     staffDepartmentFilter,
     setStaffDepartmentFilter,
-    salaryMonth,
-    setSalaryMonth,
-    salaryYear,
-    setSalaryYear,
-    staffSalaryRows,
-    loadingSalaryRows,
-    selectedSalaryWorker,
-    setSelectedSalaryWorker,
-    salaryDetailRows,
-    loadingSalaryDetails,
     totalBaseSalary,
     activeDepartmentCount,
-    totalLaborAmountInMonth,
     payrollSeedRows,
     filteredStaffList,
     refreshStaffScreen,
@@ -1428,8 +1257,7 @@ export const useStaffManagement = (activeTab: string) => {
     toggleNewStaffPermission,
     applyRoleDefaultPermissions,
     allowAllNewStaffPermissions,
-    handleOpenSalaryDetails,
-    handleExportSalaryDetailsExcel,
+
     generateTemporaryPassword,
   };
 };

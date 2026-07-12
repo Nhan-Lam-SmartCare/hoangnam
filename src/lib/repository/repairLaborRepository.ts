@@ -500,7 +500,8 @@ export async function recalculateRepairOrderLaborTotals(
 export async function getWorkerMonthlySalary(
   workerId: string,
   month: number,
-  year: number
+  year: number,
+  workerNameStr?: string
 ): Promise<RepoResult<WorkerMonthlySalary>> {
   try {
     const { data: employeeRow } = await supabase
@@ -509,7 +510,7 @@ export async function getWorkerMonthlySalary(
       .eq("id", workerId)
       .maybeSingle();
 
-    const fallbackWorkerName = employeeRow?.name || "Chua phan cong";
+    const fallbackWorkerName = workerNameStr || employeeRow?.name || "Chua phan cong";
     const manualFallback = await getManualLaborFallback(workerId, fallbackWorkerName, month, year);
 
     const { data, error } = await supabase.rpc("get_worker_monthly_salary", {
@@ -622,7 +623,8 @@ export interface WorkerLaborDetailRow {
 export async function getWorkerMonthlyLaborDetails(
   workerId: string,
   month: number,
-  year: number
+  year: number,
+  workerNameStr?: string
 ): Promise<RepoResult<WorkerLaborDetailRow[]>> {
   try {
     const { data: employeeRow } = await supabase
@@ -631,7 +633,7 @@ export async function getWorkerMonthlyLaborDetails(
       .eq("id", workerId)
       .maybeSingle();
 
-    const workerName = employeeRow?.name || "";
+    const workerName = workerNameStr || employeeRow?.name || "";
 
     const { data: workerRows, error: workerRowsError } = await supabase
       .from(REPAIR_ORDER_SERVICE_WORKERS_TABLE)

@@ -26,7 +26,6 @@ import {
 import { formatCurrency, formatDate } from "../../utils/format";
 import type { Sale } from "../../types";
 import TaxReportExport from "./TaxReportExport";
-import { EmployeeReport } from "./components/EmployeeReport";
 
 
 import {
@@ -69,6 +68,7 @@ interface ReportsManagerMobileProps {
         unpaidSalary: number;
         employeeCount: number;
     };
+    salaryReportProps: any;
     debtReport: {
         customerDebts: any[];
         supplierDebts: any[];
@@ -103,6 +103,7 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
     cashflowReport,
     inventoryReport,
     payrollReport,
+    salaryReportProps,
     debtReport,
     employees,
     dateRange,
@@ -140,8 +141,6 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                 return "Công nợ";
             case "tax":
                 return "Thuế";
-            case "employee_report":
-                return "Nhân viên";
             default:
                 return "Báo cáo";
         }
@@ -756,47 +755,58 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
 
             {/* List */}
             <div className="space-y-3">
-                {payrollReport.records.length === 0 ? (
+                {salaryReportProps.loadingSalaryRows ? (
+                    <div className="text-center py-8 text-slate-400 dark:text-slate-505 text-xs italic">
+                        Đang tính lương công sửa...
+                    </div>
+                ) : salaryReportProps.staffSalaryRows?.length === 0 ? (
                     <div className="text-center py-8 text-slate-400 dark:text-slate-505 text-xs italic">
                         Không có ghi nhận bảng lương
                     </div>
                 ) : (
-                    payrollReport.records.map((record) => {
-                        const employee = employees?.find((e) => e.id === record.employeeId);
-                        const isPaid = record.paymentStatus === "paid";
+                    salaryReportProps.staffSalaryRows?.map((row: any) => {
                         return (
                             <div
-                                key={record.id}
-                                className="bg-white dark:bg-slate-805 border border-slate-200 dark:border-slate-700/50 p-4 rounded-xl shadow-sm flex flex-col gap-3 hover:scale-[1.01] transition-all"
+                                key={row.workerId}
+                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 p-4 rounded-xl shadow-sm flex flex-col gap-3"
                             >
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-xs font-black text-slate-650 dark:text-slate-300">
-                                            {(record.employeeName || employee?.name || "N").charAt(0).toUpperCase()}
+                                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-slate-700 border border-blue-100 dark:border-slate-600 flex items-center justify-center text-xs font-black text-blue-600 dark:text-slate-300">
+                                            {(row.workerName || "N").charAt(0).toUpperCase()}
                                         </div>
                                         <div>
                                             <div className="text-xs font-extrabold text-slate-900 dark:text-white">
-                                                {record.employeeName || employee?.name || "N/A"}
+                                                {row.workerName || "N/A"}
                                             </div>
                                             <div className="text-[10px] text-slate-500 mt-0.5">
-                                                Tháng: {record.month}
+                                                Tháng: {selectedMonth}
                                             </div>
                                         </div>
                                     </div>
-                                    <span
-                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase border tracking-wider ${
-                                            isPaid
-                                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
-                                                : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
-                                        }`}
-                                    >
-                                        {isPaid ? "Đã trả" : "Chưa trả"}
-                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-100 dark:border-slate-700/50 pt-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Số công việc</span>
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{row.totalServiceCount}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Tiền công</span>
+                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(Number(row.totalWorkerAmount || 0))}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Lương CB</span>
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(Number(row.baseSalary || 0))}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Thưởng/Phạt</span>
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(Number(row.bonus || 0) - Number(row.penalty || 0))}</span>
+                                    </div>
                                 </div>
                                 <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-700/50 pt-3">
-                                    <span className="text-xs text-slate-500 font-medium">Thực nhận</span>
-                                    <span className="text-sm font-black text-slate-800 dark:text-white font-mono">
-                                        {formatCurrency(record.netSalary)}
+                                    <span className="text-xs text-slate-500 font-medium">Lương tạm tính</span>
+                                    <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono">
+                                        {formatCurrency(Number(row.finalSalary || 0))} đ
                                     </span>
                                 </div>
                             </div>
@@ -826,7 +836,7 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                             <>
                                 <div className="fixed inset-0 z-30" onClick={() => setShowReportMenu(false)} />
                                 <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-40 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                    {["revenue", "cashflow", "inventory", "debt", "payroll", "tax", "employee_report"].map((tab) => (
+                                    {["revenue", "cashflow", "inventory", "debt", "payroll", "tax"].map((tab) => (
                                         <button
                                             key={tab}
                                             onClick={() => {
@@ -844,7 +854,6 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                                             {tab === "debt" && <ClipboardList className="w-4 h-4" />}
                                             {tab === "payroll" && <BriefcaseBusiness className="w-4 h-4" />}
                                             {tab === "tax" && <FileText className="w-4 h-4" />}
-                                            {tab === "employee_report" && <Users className="w-4 h-4" />}
                                             {getTabLabel(tab)}
                                             {activeTab === tab && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
                                         </button>
@@ -929,15 +938,6 @@ export const ReportsManagerMobile: React.FC<ReportsManagerMobileProps> = ({
                 {activeTab === "debt" && renderDebtTab()}
                 {activeTab === "payroll" && renderPayrollTab()}
                 {activeTab === "tax" && <TaxReportExport />}
-                {activeTab === "employee_report" && (
-                    <EmployeeReport
-                        sales={revenueReport.sales}
-                        workOrders={revenueReport.workOrders}
-                        employees={employees}
-                        startDate={_startDate}
-                        endDate={_endDate}
-                    />
-                )}
             </div>
         </div>
 

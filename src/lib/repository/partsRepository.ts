@@ -146,6 +146,10 @@ export async function fetchPartsPaged(params?: {
     if (params?.category && params.category !== "all") {
       query = query.eq("category", params.category);
     }
+    if (params?.branchId) {
+      // Show products assigned to this branch, or legacy global products without a branch assigned
+      query = query.or(`branch_id.eq.${params.branchId},branch_id.is.null`);
+    }
     if (params?.search && params.search.trim()) {
       const term = params.search.trim().toLowerCase();
 
@@ -209,6 +213,7 @@ export async function createPart(
       warrantyperiod: input.warrantyPeriod,
       warranty_period: input.warrantyPeriod,
       warranty: input.warrantyPeriod,
+      branch_id: (input as any).branch_id || (input as any).branchId || null,
       // costPrice, vatRate không có trong schema parts của bản hiện tại => không insert
     };
     const { data, error } = await insertPartWithSchemaFallback(payload);
@@ -268,6 +273,12 @@ export async function updatePart(
       updatePayload.warrantyperiod = (updates as any).warrantyPeriod;
       updatePayload.warranty_period = (updates as any).warrantyPeriod;
       updatePayload.warranty = (updates as any).warrantyPeriod;
+    }
+    
+    if (Object.prototype.hasOwnProperty.call(updates, "branch_id")) {
+      updatePayload.branch_id = (updates as any).branch_id;
+    } else if (Object.prototype.hasOwnProperty.call(updates, "branchId")) {
+      updatePayload.branch_id = (updates as any).branchId;
     }
 
     const { data, error } = await updatePartWithSchemaFallback(id, updatePayload);

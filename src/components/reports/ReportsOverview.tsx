@@ -39,6 +39,7 @@ import {
 import { ReportsManagerMobile } from "./ReportsManagerMobile";
 import TaxReportExport from "./TaxReportExport";
 import { useDailyFinancials } from "./hooks/useDailyFinancials";
+import { useSalaryReport } from "./hooks/useSalaryReport";
 import {
   calculateFinancialSummary,
   isExcludedExpenseCategory,
@@ -53,7 +54,6 @@ import {
   InventoryReport,
   PayrollReport,
   DebtReport,
-  EmployeeReport,
 } from "./components";
 
 
@@ -63,8 +63,7 @@ type ReportTab =
   | "inventory"
   | "payroll"
   | "debt"
-  | "tax"
-  | "employee_report";
+  | "tax";
 
 
 type DateRange = "today" | "week" | "month" | "quarter" | "year" | "custom";
@@ -137,16 +136,6 @@ const REPORT_TAB_CONFIGS: Array<{
       "bg-transparent dark:bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700",
     dotClass: "bg-indigo-400",
   },
-  {
-    key: "employee_report",
-    label: "Nhân viên",
-    icon: <Users className="w-4 h-4" />,
-    activeClass:
-      "bg-gradient-to-r from-teal-500 to-emerald-500 text-white border-transparent shadow-lg shadow-teal-500/30",
-    inactiveClass:
-      "bg-transparent dark:bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-slate-200 dark:border-slate-700",
-    dotClass: "bg-teal-400",
-  },
 ];
 
 
@@ -208,6 +197,8 @@ export default function ReportsOverview() {
   ); // 1-12
   const [selectedYear] = useState<number>(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const salaryReportProps = useSalaryReport(employees, selectedMonth, selectedYear, activeTab);
 
   const getLocalDateKey = (input: string | Date): string => {
     const d = input instanceof Date ? input : new Date(input);
@@ -612,30 +603,16 @@ export default function ReportsOverview() {
     };
   }, [partsData, currentBranchId]);
 
-  // Báo cáo lương
+  // Báo cáo lương (mới)
   const payrollReport = useMemo(() => {
-    const filteredRecords = payrollRecords.filter((r) => {
-      const recordDate = new Date(r.month);
-      return recordDate >= start && recordDate <= end;
-    });
-
-    const totalSalary = filteredRecords.reduce(
-      (sum, r) => sum + r.netSalary,
-      0
-    );
-    const paidSalary = filteredRecords
-      .filter((r) => r.paymentStatus === "paid")
-      .reduce((sum, r) => sum + r.netSalary, 0);
-    const unpaidSalary = totalSalary - paidSalary;
-
     return {
-      records: filteredRecords,
-      totalSalary,
-      paidSalary,
-      unpaidSalary,
-      employeeCount: new Set(filteredRecords.map((r) => r.employeeId)).size,
+      records: salaryReportProps.staffSalaryRows || [],
+      totalSalary: salaryReportProps.staffSalaryRows?.reduce((sum, r) => sum + Number(r.finalSalary || 0), 0) || 0,
+      paidSalary: 0,
+      unpaidSalary: 0,
+      employeeCount: salaryReportProps.staffSalaryRows?.length || 0,
     };
-  }, [payrollRecords, start, end]);
+  }, [salaryReportProps.staffSalaryRows]);
 
   // Báo cáo công nợ
   const debtReport = useMemo(() => {
@@ -772,6 +749,7 @@ export default function ReportsOverview() {
         cashflowReport={cashflowReport}
         inventoryReport={inventoryReport}
         payrollReport={payrollReport}
+        salaryReportProps={salaryReportProps}
         debtReport={debtReport}
         employees={employees}
         dateRange={dateRange}
@@ -1045,8 +1023,10 @@ export default function ReportsOverview() {
 
         {activeTab === "payroll" && (
           <PayrollReport
-            payrollReport={payrollReport}
+            salaryReportProps={salaryReportProps}
             employees={employees}
+            salaryMonth={selectedMonth}
+            salaryYear={selectedYear}
           />
         )}
 
@@ -1060,15 +1040,6 @@ export default function ReportsOverview() {
           <TaxReportExport />
         )}
 
-        {activeTab === "employee_report" && (
-          <EmployeeReport
-            sales={salesData}
-            workOrders={workOrdersData}
-            employees={employees}
-            startDate={startDate}
-            endDate={endDate}
-          />
-        )}
       </div>
 
     </div>

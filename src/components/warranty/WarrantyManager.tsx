@@ -19,13 +19,15 @@ import { showToast } from "../../utils/toast";
 import { useAuth } from "../../contexts/AuthContext";
 import { canDo } from "../../utils/permissions";
 import { useStoreSettings } from "../../hooks/useStoreSettings";
+import { useAppContext } from "../../contexts/AppContext";
 
 // eslint-disable-next-line max-lines-per-function
 export const WarrantyManager: React.FC = () => {
     const { profile } = useAuth();
     const { data: storeSettings } = useStoreSettings();
-    const { data: warrantyCards, isLoading } = useWarrantyCards();
-    const { data: warrantyClaims, isLoading: claimsLoading } = useWarrantyClaims();
+    const { currentBranchId } = useAppContext();
+    const { data: warrantyCards, isLoading } = useWarrantyCards(currentBranchId);
+    const { data: warrantyClaims, isLoading: claimsLoading } = useWarrantyClaims(undefined, currentBranchId);
     const createClaimMutation = useCreateWarrantyClaim();
     const updateWarrantyStatusMutation = useUpdateWarrantyStatus();
     const deleteWarrantyCardMutation = useDeleteWarrantyCard();

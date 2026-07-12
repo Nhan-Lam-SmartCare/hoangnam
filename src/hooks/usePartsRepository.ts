@@ -27,6 +27,7 @@ export const usePartsRepoPaged = (params: {
   pageSize: number;
   search?: string;
   category?: string;
+  branchId?: string;
   enabled?: boolean;
 }) => {
   return useQuery({
@@ -36,6 +37,7 @@ export const usePartsRepoPaged = (params: {
       params.pageSize,
       params.search || "",
       params.category || "all",
+      params.branchId || "all",
     ],
     queryFn: async () => {
       const res = await fetchPartsPaged(params);

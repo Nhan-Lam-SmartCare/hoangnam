@@ -329,10 +329,9 @@ const deriveWarrantyCardsFromWorkOrders = async (
 };
 
 // Hook to fetch warranty cards
-export const useWarrantyCards = () => {
+export const useWarrantyCards = (overrideBranchId?: string) => {
     const { profile } = useAuth();
-    const profileBranchId =
-        profile?.branch_id || (profile as any)?.branchId || null;
+    const profileBranchId = overrideBranchId || profile?.branch_id || (profile as any)?.branchId || null;
 
     return useQuery({
         queryKey: ["warranty_cards", profileBranchId || "all"],
@@ -749,10 +748,9 @@ export const useCreateWarrantyClaim = () => {
 };
 
 // Hook to get warranty claims
-export const useWarrantyClaims = (warrantyCardId?: string) => {
+export const useWarrantyClaims = (warrantyCardId?: string, overrideBranchId?: string) => {
     const { profile } = useAuth();
-    const profileBranchId =
-        profile?.branch_id || (profile as any)?.branchId || null;
+    const profileBranchId = overrideBranchId || profile?.branch_id || (profile as any)?.branchId || null;
 
     return useQuery({
         queryKey: ["warranty_claims", profileBranchId || "all", warrantyCardId],

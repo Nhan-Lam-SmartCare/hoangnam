@@ -111,7 +111,7 @@ export function useWorkOrderFormState({
   const { profile } = useAuth();
   const { mutateAsync: createWorkOrderAtomicAsync } = useCreateWorkOrderAtomicRepo();
   const { mutateAsync: updateWorkOrderAtomicAsync } = useUpdateWorkOrderAtomicRepo();
-  const { data: warrantyCards } = useWarrantyCards();
+  const { data: warrantyCards } = useWarrantyCards(currentBranchId);
   const { data: serviceConfigs = [] } = useServiceConfigs();
 
   const employeeOptions = getSelectableEmployees(employees as Employee[], currentBranchId);
@@ -566,8 +566,8 @@ export function useWorkOrderFormState({
     );
   };
 
-  const buildRepairServicePayloads = () =>
-    repairServices.map((service: RepairServiceDraft) => {
+  const buildRepairServicePayloads = () => {
+    const repairPayloads = repairServices.map((service: RepairServiceDraft) => {
       const laborAmount = getRepairServiceLaborAmount(service);
       const effectiveWorkers = getRepairServiceWorkers(service);
       const workerSplits = splitWorkerAmount(laborAmount, effectiveWorkers);
@@ -609,6 +609,39 @@ export function useWorkOrderFormState({
       };
     });
 
+    const outsourcePayloads = additionalServices
+      .filter((s: any) => (s.laborPrice || 0) > 0)
+      .map((s: any) => {
+        const laborAmount = (s.laborPrice || 0) * (s.quantity || 1);
+        const effectiveWorkers = buildDefaultWorkerSplit(
+          employeeOptions,
+          resolvedTechnicianName,
+          100
+        );
+        const workerSplits = splitWorkerAmount(laborAmount, effectiveWorkers);
+
+        return {
+          service_id: undefined,
+          service_name: `[Gia công] ${s.description}`,
+          labor_calc_type: "fixed",
+          labor_fixed_amount: laborAmount,
+          labor_percent_of_cost: 0,
+          minimum_labor_amount: 0,
+          related_product_cost: (s.costPrice || 0) * (s.quantity || 1),
+          labor_amount: laborAmount,
+          worker_share_percent: workerSplits.length === 1 ? Number(workerSplits[0].share_percent || 0) : 100,
+          worker_amount: workerSplits.length === 1 ? Number(workerSplits[0].worker_amount || 0) : 0,
+          is_billable: false,
+          is_payable_to_worker: true,
+          note: "Tiền công gia công ngoài",
+          workers: workerSplits,
+          related_items: [],
+        };
+      });
+
+    return [...repairPayloads, ...outsourcePayloads];
+  };
+
   const syncRepairServicesForOrder = async (repairOrderId: string) => {
     const payloads = buildRepairServicePayloads().filter(
       (service: any) => service.service_name.trim().length > 0
@@ -637,7 +670,7 @@ export function useWorkOrderFormState({
   );
   
   const servicesTotal = additionalServices.reduce(
-    (sum: number, s: any) => sum + (s.price || 0) * (s.quantity || 0),
+    (sum: number, s: any) => sum + ((s.price || 0) + (s.laborPrice || 0)) * (s.quantity || 0),
     0
   );
   
