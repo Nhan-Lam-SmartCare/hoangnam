@@ -359,7 +359,11 @@ export default function ServiceManager() {
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [showProfit, setShowProfit] = useState(false); // Toggle profit visibility
   const [rowActionMenuId, setRowActionMenuId] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    right: number;
+  }>({
     top: 0,
     right: 0,
   });

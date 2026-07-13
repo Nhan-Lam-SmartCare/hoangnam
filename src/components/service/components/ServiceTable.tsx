@@ -25,7 +25,8 @@ import StatusBadge from "./StatusBadge";
 import { StoreSettings, WorkOrderStatus } from "../types/service.types";
 
 interface DropdownPosition {
-  top: number;
+  top?: number;
+  bottom?: number;
   right: number;
 }
 
@@ -596,12 +597,19 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              const rect =
-                                e.currentTarget.getBoundingClientRect();
-                              setDropdownPosition({
-                                top: rect.bottom + 4,
-                                right: window.innerWidth - rect.right,
-                              });
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              if (spaceBelow < 280) {
+                                setDropdownPosition({
+                                  bottom: window.innerHeight - rect.top + 4,
+                                  right: window.innerWidth - rect.right,
+                                });
+                              } else {
+                                setDropdownPosition({
+                                  top: rect.bottom + 4,
+                                  right: window.innerWidth - rect.right,
+                                });
+                              }
                               setRowActionMenuId(
                                 rowActionMenuId === order.id ? null : order.id
                               );
@@ -616,7 +624,8 @@ export const ServiceTable: React.FC<ServiceTableProps> = ({
                             <div
                               className="fixed w-52 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-2xl z-[9999] overflow-hidden"
                               style={{
-                                top: dropdownPosition.top,
+                                ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : {}),
+                                ...(dropdownPosition.bottom !== undefined ? { bottom: dropdownPosition.bottom } : {}),
                                 right: dropdownPosition.right,
                               }}
                             >

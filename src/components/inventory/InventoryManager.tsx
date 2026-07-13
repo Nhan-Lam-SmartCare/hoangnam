@@ -64,6 +64,7 @@ import {
   fetchPartsBySkus,
   bulkCreateParts,
   bulkUpdatePartStock,
+  fetchPartBySku,
 } from "../../lib/repository/partsRepository";
 import { useSupplierDebtsRepo } from "../../hooks/useDebtsRepository";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
@@ -1203,75 +1204,24 @@ const InventoryManagerNew: React.FC = () => {
 
     try {
       // 1. Get original transactions to rollback stock
-      const { data: originalTxs } = await supabase
-        .from("inventory_transactions")
-        .select("*")
-        .ilike("notes", `%${receiptCode}%`);
+      const origTxRes = await fetchReceiptTransactions(receiptCode);
+      const originalTxs = origTxRes.ok ? origTxRes.data : [];
 
       if (originalTxs && originalTxs.length > 0) {
-        // Rollback stock for original items.
-        // Fallback tên cột (schema dùng camelCase/lowercase/snake khác nhau) và
-        // hoàn kho theo ĐÚNG chi nhánh của giao dịch (chống lệch tồn đa chi nhánh).
-        for (const tx of originalTxs) {
-          const partId = tx.partId || tx.partid || tx.part_id;
-          const quantityChange = Number(tx.quantity || tx.quantity_change || 0);
-          const txBranchId =
-            tx.branchId || tx.branchid || tx.branch_id || currentBranchId;
-          if (partId && quantityChange > 0) {
-            const { data: partData } = await supabase
-              .from("parts")
-              .select("stock")
-              .eq("id", partId)
-              .single();
-
-            if (partData) {
-              const currentStock = partData.stock || {};
-              const branchStock = currentStock[txBranchId] || 0;
-              const newBranchStock = Math.max(0, branchStock - quantityChange);
-
-              await supabase
-                .from("parts")
-                .update({
-                  stock: {
-                    ...currentStock,
-                    [txBranchId]: newBranchStock,
-                  },
-                })
-                .eq("id", partId);
-            }
-          }
-        }
+        // Rollback stock cho các item gốc (đúng chi nhánh của từng giao dịch).
+        await rollbackReceiptStock(originalTxs, currentBranchId);
       }
 
-      // 2. Delete original database records
-      await supabase.from("inventory_transactions").delete().ilike("notes", `%${receiptCode}%`);
-      await supabase.from("supplier_debts").delete().ilike("description", `%${receiptCode}%`);
-      // Sổ quỹ: schema khác nhau dùng cột notes HOẶC description -> xóa theo cả hai.
-      await supabase
-        .from("cash_transactions")
-        .delete()
-        .or(`notes.ilike.%${receiptCode}%,description.ilike.%${receiptCode}%`);
+      // 2. Delete original database records (inventory_transactions + supplier_debts + cash_transactions)
+      await deleteReceiptRecords(receiptCode);
 
       // 3. Resolve supplier ID or create new one
       const supplierName = updatedData.supplier;
-      const { data: foundSupplier } = await supabase
-        .from("suppliers")
-        .select("id")
-        .eq("name", supplierName)
-        .maybeSingle();
-
-      let supplierId = foundSupplier?.id;
-      if (!supplierId) {
-        const { data: newSup } = await supabase
-          .from("suppliers")
-          .insert({
-            name: supplierName,
-            phone: updatedData.supplierPhone,
-          })
-          .select("id")
-          .single();
-        supplierId = newSup?.id;
-      }
+      const supplierRes = await resolveOrCreateSupplier(
+        supplierName,
+        updatedData.supplierPhone
+      );
+      let supplierId = supplierRes.ok ? supplierRes.data?.id : undefined;
 
       // 4. Resolve part IDs for items (some might be new or existing)
       const processedItems = await Promise.all(
@@ -1279,11 +1229,8 @@ const InventoryManagerNew: React.FC = () => {
           let partId = item.partId || item.id;
           if (!partId || String(partId).startsWith("new-") || String(partId).startsWith("temp-")) {
             // Find part by SKU
-            const { data: existingPart } = await supabase
-              .from("parts")
-              .select("id")
-              .eq("sku", item.sku)
-              .maybeSingle();
+            const existingRes = await fetchPartBySku(item.sku);
+            const existingPart = existingRes.ok ? existingRes.data : null;
 
             if (existingPart) {
               partId = existingPart.id;
@@ -1345,18 +1292,15 @@ const InventoryManagerNew: React.FC = () => {
       }
 
       if (debtAmount > 0) {
-        const dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
-        const debtId = `DEBT-${dateStr}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-        await supabase.from("supplier_debts").insert({
-          id: debtId,
-          supplier_id: supplierId,
-          supplier_name: supplierName,
-          branch_id: currentBranchId,
-          total_amount: debtAmount,
-          paid_amount: 0,
-          remaining_amount: debtAmount,
+        await createSupplierDebt({
+          supplierId: supplierId || "",
+          supplierName,
+          branchId: currentBranchId,
+          totalAmount: debtAmount,
+          paidAmount: 0,
+          remainingAmount: debtAmount,
           description: `Nợ tiền nhập hàng (Phiếu ${receiptCode} - Đã sửa)`,
-          created_date: new Date().toISOString(),
+          createdDate: new Date().toISOString(),
         });
       }
 
@@ -1396,10 +1340,8 @@ const InventoryManagerNew: React.FC = () => {
 
     try {
       // 1. Get transaction details to rollback stock
-      const { data: transactions } = await supabase
-        .from("inventory_transactions")
-        .select("*")
-        .ilike("notes", `%${receiptCode}%`);
+      const txRes = await fetchReceiptTransactions(receiptCode);
+      const transactions = txRes.ok ? txRes.data : [];
 
       if (!transactions || transactions.length === 0) {
         showToast.error("Không tìm thấy phiếu nhập");
@@ -1407,71 +1349,11 @@ const InventoryManagerNew: React.FC = () => {
       }
 
       // 2. Rollback stock for each part BEFORE deleting transactions.
-      // Fallback tên cột + hoàn kho theo ĐÚNG chi nhánh của giao dịch.
-      for (const tx of transactions) {
-        const partId = tx.partId || tx.partid || tx.part_id;
-        const quantityChange = Number(tx.quantity || tx.quantity_change || 0);
-        const txBranchId =
-          tx.branchId || tx.branchid || tx.branch_id || currentBranchId;
-        if (partId && quantityChange > 0) {
-          // Get current part stock
-          const { data: partData, error: partError } = await supabase
-            .from("parts")
-            .select("stock")
-            .eq("id", partId)
-            .single();
+      await rollbackReceiptStock(transactions, currentBranchId);
 
-          if (partError || !partData) {
-            console.warn(`Could not find part ${partId}:`, partError);
-            continue;
-          }
-
-          // Calculate new stock (deduct the import quantity)
-          const currentStock = partData.stock || {};
-          const branchStock = currentStock[txBranchId] || 0;
-          const newBranchStock = Math.max(0, branchStock - quantityChange);
-
-          // Update stock
-          const { error: updateError } = await supabase
-            .from("parts")
-            .update({
-              stock: {
-                ...currentStock,
-                [txBranchId]: newBranchStock,
-              },
-            })
-            .eq("id", partId);
-
-          if (updateError) {
-            console.warn(`Could not update stock for ${partId}:`, updateError);
-          }
-        }
-      }
-
-      // 3. Delete transactions
-      const { error: deleteError } = await supabase
-        .from("inventory_transactions")
-        .delete()
-        .ilike("notes", `%${receiptCode}%`);
-
-      if (deleteError) throw deleteError;
-
-      // 4. Delete supplier debt if exists
-      const { error: debtError } = await supabase
-        .from("supplier_debts")
-        .delete()
-        .ilike("description", `%${receiptCode}%`);
-
-      if (debtError) console.warn("Could not delete debt:", debtError);
-
-      // 5. Delete cash transaction if exists.
-      // Schema khác nhau dùng cột notes HOẶC description -> xóa theo cả hai.
-      const { error: cashError } = await supabase
-        .from("cash_transactions")
-        .delete()
-        .or(`notes.ilike.%${receiptCode}%,description.ilike.%${receiptCode}%`);
-
-      if (cashError) console.warn("Could not delete cash tx:", cashError);
+      // 3-5. Delete inventory_transactions + supplier_debts + cash_transactions
+      const delRes = await deleteReceiptRecords(receiptCode);
+      if (!delRes.ok) throw delRes.error.cause || new Error(delRes.error.message);
 
       showToast.success(`Đã xóa phiếu nhập ${receiptCode} và hoàn trả tồn kho`);
 
