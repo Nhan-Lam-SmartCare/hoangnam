@@ -7,12 +7,14 @@ interface PawnReceiptTemplateProps {
   id?: string;
   record: PawnRecord;
   storeSettings?: any;
+  forceVisible?: boolean;
 }
 
 export const PawnReceiptTemplate: React.FC<PawnReceiptTemplateProps> = ({
   id = "pawn-receipt",
   record,
   storeSettings,
+  forceVisible = false,
 }) => {
   const storeName = storeSettings?.store_name || "CỬA HÀNG DỊCH VỤ TIN HỌC VIỄN THÔNG SƠN NAM";
   const storePhone = storeSettings?.phone || "0868.1111.01 - 0976.507.401";
@@ -44,7 +46,7 @@ export const PawnReceiptTemplate: React.FC<PawnReceiptTemplateProps> = ({
   return (
     <div
       id={id}
-      className="hidden print:block"
+      className={forceVisible ? "block" : "hidden print:block"}
       style={{
         width: "148mm", // A5 Width (standard for pawn receipts in Vietnam)
         minHeight: "210mm", // A5 Height

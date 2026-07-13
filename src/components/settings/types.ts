@@ -28,6 +28,7 @@ export interface StoreSettings {
   print_paper_size_receipt?: string;
   print_paper_size_sales?: string;
   print_paper_size_warranty?: string;
+  print_paper_size_pawn?: string;
   print_label_size_default?: string;
 }
 

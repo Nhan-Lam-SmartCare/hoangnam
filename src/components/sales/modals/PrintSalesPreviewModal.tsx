@@ -5,7 +5,7 @@ import { formatCurrency } from "../../../utils/format";
 import { showToast } from "../../../utils/toast";
 import { shareBlobNative } from "../../../utils/nativeShare";
 import { getDynamicQrUrl } from "../../service/utils/service.utils";
-import type { CartItem } from "../SalesManager";
+import type { CartItem } from "../../../types";
 
 export interface PrintSalesPayload {
   customer: { name: string; phone?: string };
@@ -258,7 +258,7 @@ const PrintSalesPreviewModal: React.FC<PrintSalesPreviewModalProps> = ({
       isSale: true,
       code: printPayload.saleId,
     },
-    storeSettings
+    storeSettings || null
   );
 
   return (

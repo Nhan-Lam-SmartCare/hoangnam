@@ -27,6 +27,7 @@ import { supabase } from "../../supabaseClient";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
 import { PawnReceiptTemplate } from "./PawnReceiptTemplate";
+import PrintPawnPreviewModal from "./modals/PrintPawnPreviewModal";
 
 export default function PawnManager() {
   const { currentBranchId } = useAppContext();
@@ -41,6 +42,7 @@ export default function PawnManager() {
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [showStatusModal, setShowStatusModal] = useState<any>(null);
   const [printRecord, setPrintRecord] = useState<any>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -232,9 +234,7 @@ export default function PawnManager() {
 
   const handleDoPrint = (record: any) => {
     setPrintRecord(record);
-    setTimeout(() => {
-      window.print();
-    }, 300);
+    setIsPrintModalOpen(true);
   };
 
   return (
@@ -421,9 +421,25 @@ export default function PawnManager() {
         </div>
       </div>
 
+      {/* Print Preview Modal */}
+      <PrintPawnPreviewModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        printRecord={printRecord}
+        storeSettings={storeSettings}
+        onPrint={() => {
+          setTimeout(() => {
+            window.print();
+            setIsPrintModalOpen(false);
+          }, 300);
+        }}
+      >
+        <PawnReceiptTemplate record={printRecord} storeSettings={storeSettings} forceVisible={true} />
+      </PrintPawnPreviewModal>
+
       {/* Hidden print rendering block */}
       {printRecord && (
-        <PawnReceiptTemplate record={printRecord} storeSettings={storeSettings} />
+        <PawnReceiptTemplate record={printRecord} storeSettings={storeSettings} forceVisible={false} />
       )}
 
       {/* Add / Edit Pawn Record Modal */}
