@@ -26,6 +26,7 @@ import { useAppContext } from "../../contexts/AppContext";
 import { supabase } from "../../supabaseClient";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
+import { printElementById } from "../../utils/print";
 import { PawnReceiptTemplate } from "./PawnReceiptTemplate";
 import PrintPawnPreviewModal from "./modals/PrintPawnPreviewModal";
 
@@ -421,17 +422,25 @@ export default function PawnManager() {
         </div>
       </div>
 
-      {/* Print Preview Modal */}
       <PrintPawnPreviewModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         printRecord={printRecord}
         storeSettings={storeSettings}
-        onPrint={() => {
-          setTimeout(() => {
-            window.print();
-            setIsPrintModalOpen(false);
-          }, 300);
+        onPrint={(paperSizeKey: string) => {
+          printElementById("pawn-receipt", {
+            pageStyle: `
+              @page { size: ${paperSizeKey === "80mm" || paperSizeKey === "58mm" ? paperSizeKey + " auto" : paperSizeKey + " portrait"}; margin: 0; }
+              body { margin: 0; padding: 0; display: flex; justify-content: center; }
+              @media print {
+                #pawn-receipt { 
+                  transform: ${paperSizeKey === "80mm" ? "scale(0.54)" : paperSizeKey === "58mm" ? "scale(0.39)" : "none"}; 
+                  transform-origin: top left;
+                }
+              }
+            `
+          });
+          setIsPrintModalOpen(false);
         }}
       >
         <PawnReceiptTemplate record={printRecord} storeSettings={storeSettings} forceVisible={true} />

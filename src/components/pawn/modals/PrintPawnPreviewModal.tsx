@@ -36,7 +36,7 @@ interface PrintPawnPreviewModalProps {
   onClose: () => void;
   printRecord: PawnRecord | null;
   storeSettings?: StoreSettings;
-  onPrint: () => void;
+  onPrint: (paperSizeKey: string) => void;
   children?: React.ReactNode;
 }
 
@@ -187,7 +187,7 @@ const PrintPawnPreviewModal: React.FC<PrintPawnPreviewModalProps> = ({
 
   const handleMobilePrint = async () => {
     if (isNative || !isMobileDevice) {
-      onPrint();
+      onPrint(selectedPaperSizeKey);
       return;
     }
 
@@ -225,7 +225,7 @@ const PrintPawnPreviewModal: React.FC<PrintPawnPreviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-2 md:p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-2 md:p-4 print:hidden">
       <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-slate-800">
         <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800 md:flex-row md:items-center md:justify-between">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
@@ -261,7 +261,7 @@ const PrintPawnPreviewModal: React.FC<PrintPawnPreviewModalProps> = ({
 
             {isMobileDevice && !isNative && (
               <button
-                onClick={onPrint}
+                onClick={() => onPrint(selectedPaperSizeKey)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-sm text-white transition hover:bg-slate-700"
                 title="Dùng hộp thoại in của trình duyệt nếu điện thoại hỗ trợ"
               >
