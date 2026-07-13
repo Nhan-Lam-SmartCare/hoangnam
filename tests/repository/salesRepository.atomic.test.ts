@@ -122,6 +122,13 @@ describe("salesRepository.createSaleAtomic compatibility", () => {
     mockSalesInsert.mockResolvedValue({ error: null });
     mockWarrantyInsert.mockResolvedValue({ error: null });
     mockRpc.mockImplementation((rpcName: string, params: any) => {
+      if (rpcName === "sale_create_atomic") {
+        // RPC nguyên tử là đường duy nhất tạo đơn — trả thành công.
+        return Promise.resolve({
+          data: { success: true, saleId: params?.p_sale?.id },
+          error: null,
+        });
+      }
       if (rpcName === "sale_decrement_stock_atomic") {
         return Promise.resolve({ data: { failedParts: [] }, error: null });
       }
@@ -241,13 +248,86 @@ describe("salesRepository.createSaleAtomic compatibility", () => {
     expect(state.paymentSources[0].balance.CN1).toBe(185000);
     expect(state.cartItems).toHaveLength(0);
 
+    // Đơn được tạo qua RPC nguyên tử, KHÔNG còn client tự insert vào bảng sales.
     await waitFor(() => {
-      expect(mockSalesInsert).toHaveBeenCalledTimes(1);
+      expect(mockRpc).toHaveBeenCalledWith(
+        "sale_create_atomic",
+        expect.objectContaining({ p_branch_id: "CN1", p_paid_amount: 185000 })
+      );
     });
 
-    const insertedPayload = mockSalesInsert.mock.calls[0][0][0];
-    expect(insertedPayload.refunded).toBe(false);
-    expect(insertedPayload.total).toBe(185000);
+    const rpcCall = mockRpc.mock.calls.find(
+      (c: any[]) => c[0] === "sale_create_atomic"
+    );
+    expect(rpcCall).toBeTruthy();
+    expect(rpcCall![1].p_sale.total).toBe(185000);
+    expect(mockSalesInsert).not.toHaveBeenCalled();
     expect(showToast.warning).not.toHaveBeenCalled();
+  });
+
+  it("finalizeSale thanh toán tách -> gọi sale_create_atomic_v2 và cộng nhiều nguồn", async () => {
+    const { state, deps } = createDeps({
+      paymentSources: [
+        { id: "cash", balance: { CN1: 0 } },
+        { id: "bank", balance: { CN1: 0 } },
+      ],
+    });
+
+    // v2 trả thành công.
+    mockRpc.mockImplementation((rpcName: string, params: any) => {
+      if (rpcName === "sale_create_atomic_v2") {
+        return Promise.resolve({
+          data: { success: true, saleId: params?.p_sale?.id, paidTotal: 185000 },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { result } = renderHook(() => useFinanceActions(deps as any));
+
+    act(() => {
+      result.current.finalizeSale({
+        items: [
+          {
+            partId: "P-1",
+            partName: "Bugi",
+            sellingPrice: 100000,
+            quantity: 2,
+            discount: 10000,
+            sku: "SKU-1",
+          },
+        ] as any,
+        discount: 5000,
+        paymentMethod: "cash",
+        customer: { name: "Khách lẻ" },
+        payments: [
+          { source: "cash", amount: 100000 },
+          { source: "bank", amount: 85000 },
+        ],
+      });
+    });
+
+    // 2 giao dịch sổ quỹ + cộng đúng từng nguồn.
+    expect(state.cashTransactions).toHaveLength(2);
+    const cash = state.paymentSources.find((p: any) => p.id === "cash");
+    const bank = state.paymentSources.find((p: any) => p.id === "bank");
+    expect(cash.balance.CN1).toBe(100000);
+    expect(bank.balance.CN1).toBe(85000);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        "sale_create_atomic_v2",
+        expect.objectContaining({ p_branch_id: "CN1" })
+      );
+    });
+
+    const v2Call = mockRpc.mock.calls.find(
+      (c: any[]) => c[0] === "sale_create_atomic_v2"
+    );
+    expect(v2Call![1].p_payments).toEqual([
+      { source: "cash", amount: 100000 },
+      { source: "bank", amount: 85000 },
+    ]);
   });
 });

@@ -42,6 +42,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     clearCart: actions.clearCart,
     setSales: state.setSales,
     deleteSale: actions.deleteSale,
+    returnSaleItems: actions.returnSaleItems,
     finalizeSale: actions.finalizeSale,
     setPaymentSources: state.setPaymentSources,
     setCashTransactions: state.setCashTransactions,

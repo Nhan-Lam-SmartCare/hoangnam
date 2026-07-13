@@ -807,11 +807,6 @@ export default function ReportsOverview() {
                     ? "bg-white/20 text-white"
                     : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20";
                   break;
-                case "employee_report":
-                  iconColorSchema = isActive
-                    ? "bg-white/20 text-white"
-                    : "bg-teal-500/10 text-teal-600 dark:text-teal-400 group-hover:bg-teal-500/20";
-                  break;
               }
 
 
@@ -1027,6 +1022,8 @@ export default function ReportsOverview() {
             employees={employees}
             salaryMonth={selectedMonth}
             salaryYear={selectedYear}
+            salesData={salesData}
+            currentBranchId={currentBranchId}
           />
         )}
 
@@ -1039,7 +1036,6 @@ export default function ReportsOverview() {
         {activeTab === "tax" && (
           <TaxReportExport />
         )}
-
       </div>
 
     </div>

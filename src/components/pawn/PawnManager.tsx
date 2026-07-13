@@ -429,7 +429,7 @@ export default function PawnManager() {
         storeSettings={storeSettings}
         onPrint={(paperSizeKey: string) => {
           printElementById("pawn-receipt", {
-            pageStyle: `
+            customStyle: `
               @page { size: ${paperSizeKey === "80mm" || paperSizeKey === "58mm" ? paperSizeKey + " auto" : paperSizeKey + " portrait"}; margin: 0; }
               body { margin: 0; padding: 0; display: flex; justify-content: center; }
               @media print {
