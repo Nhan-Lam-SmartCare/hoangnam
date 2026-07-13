@@ -29,7 +29,6 @@ import {
   X,
   Menu,
   Home,
-  ClipboardList,
   Scale,
 } from "lucide-react";
 
@@ -381,20 +380,12 @@ export function Nav() {
               />
             )}
             {can.viewInventory && (
-              <>
-                <NavLink
-                  to="/inventory"
-                  colorKey="amber"
-                  icon={<Boxes className="w-4 h-4" />}
-                  label="Quản lý kho"
-                />
-                <NavLink
-                  to="/inventory?tab=purchase-orders"
-                  colorKey="amber"
-                  icon={<ClipboardList className="w-4 h-4" />}
-                  label="Đơn đặt hàng"
-                />
-              </>
+              <NavLink
+                to="/inventory"
+                colorKey="amber"
+                icon={<Boxes className="w-4 h-4" />}
+                label="Quản lý kho"
+              />
             )}
             <NavLink
               to="/customers"
