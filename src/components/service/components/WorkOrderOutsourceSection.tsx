@@ -93,6 +93,7 @@ export const WorkOrderOutsourceSection: React.FC<WorkOrderOutsourceSectionProps>
                         description: "",
                         quantity: 1,
                         price: 0,
+                        laborPrice: 0,
                         costPrice: 0,
                       });
                     }

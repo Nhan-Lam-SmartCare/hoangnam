@@ -229,6 +229,7 @@ export function useWorkOrderFormState({
       description: string;
       quantity: number;
       price: number;
+      laborPrice?: number;
       costPrice?: number;
     }>
   >([]);
@@ -236,6 +237,7 @@ export function useWorkOrderFormState({
     description: "",
     quantity: 1,
     price: 0,
+    laborPrice: 0,
     costPrice: 0,
   });
   
@@ -623,7 +625,7 @@ export function useWorkOrderFormState({
         return {
           service_id: undefined,
           service_name: `[Gia công] ${s.description}`,
-          labor_calc_type: "fixed",
+          labor_calc_type: "fixed" as const,
           labor_fixed_amount: laborAmount,
           labor_percent_of_cost: 0,
           minimum_labor_amount: 0,
