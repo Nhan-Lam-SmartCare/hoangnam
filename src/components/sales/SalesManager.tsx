@@ -952,20 +952,20 @@ Cam on quy khach da tin tuong!
         soldBy,
       });
 
-      setDiscount(0);
-      setDiscountType("vnd");
-      setPaidAmount("full");
-      setSplitPayment(false);
-      setSplitCash(0);
-      setSplitBank(0);
-      setNote("");
-      setCustomerName("Khách lẻ");
-      setCustomerSearch("Khách lẻ");
-      setCustomerPhone("");
-      setSelectedCustomerId(null);
-      setActiveTab("products");
-
       if (result.ok) {
+        setDiscount(0);
+        setDiscountType("vnd");
+        setPaidAmount("full");
+        setSplitPayment(false);
+        setSplitCash(0);
+        setSplitBank(0);
+        setNote("");
+        setCustomerName("Khách lẻ");
+        setCustomerSearch("Khách lẻ");
+        setCustomerPhone("");
+        setSelectedCustomerId(null);
+        setActiveTab("products");
+
         if (autoPrintInvoice) {
           setPrintPayload({
             ...payload,

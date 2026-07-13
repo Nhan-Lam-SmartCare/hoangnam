@@ -197,11 +197,26 @@ export function useFinanceActions(
         : total;
 
       // Danh sách nguồn để ghi sổ quỹ + cập nhật số dư (1 hoặc nhiều nguồn).
-      const payments: { source: string; amount: number }[] = rawPayments.length
-        ? rawPayments
-        : actualPaidAmount > 0
-        ? [{ source: data.paymentMethod, amount: actualPaidAmount }]
-        : [];
+      let payments: { source: string; amount: number }[] = [];
+      if (rawPayments.length > 0) {
+        let remainingToAllocate = actualPaidAmount;
+        // Ưu tiên bank trước để nếu dư thì giảm trừ vào cash (trả lại tiền thừa)
+        const sortedRaw = [...rawPayments].sort((a, b) => {
+          if (a.source === "bank" && b.source === "cash") return -1;
+          if (a.source === "cash" && b.source === "bank") return 1;
+          return 0;
+        });
+
+        for (const p of sortedRaw) {
+          if (p.amount > 0 && remainingToAllocate > 0) {
+            const allocated = Math.min(p.amount, remainingToAllocate);
+            payments.push({ source: p.source, amount: allocated });
+            remainingToAllocate -= allocated;
+          }
+        }
+      } else if (actualPaidAmount > 0) {
+        payments = [{ source: data.paymentMethod, amount: actualPaidAmount }];
+      }
       const isSplitPayment = payments.length > 1;
 
       const saleItems = data.items.map((it) => ({
@@ -459,6 +474,7 @@ export function useFinanceActions(
       setParts,
       setPaymentSources,
       setSales,
+      createWarrantyCardsForSale,
     ]
   );
 
@@ -514,7 +530,9 @@ export function useFinanceActions(
           setCustomerDebts((prev) =>
             prev.filter(
               (d) =>
-                (d as any).saleId !== saleId && (d as any).sale_id !== saleId
+                d.id !== `CDEBT-SALE-${saleId}` &&
+                (d as any).saleId !== saleId &&
+                (d as any).sale_id !== saleId
             )
           );
         }
