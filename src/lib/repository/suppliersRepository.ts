@@ -23,6 +23,59 @@ export async function fetchSuppliers(): Promise<RepoResult<Supplier[]>> {
   }
 }
 
+/** Lấy 1 nhà cung cấp theo id (null nếu không có). */
+export async function fetchSupplierById(
+  id: string
+): Promise<RepoResult<Supplier | null>> {
+  try {
+    const { data, error } = await supabase
+      .from(SUPPLIERS_TABLE)
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error)
+      return failure({
+        code: "supabase",
+        message: "Không thể tải nhà cung cấp",
+        cause: error,
+      });
+    return success((data as Supplier) || null);
+  } catch (e: any) {
+    return failure({ code: "network", message: "Lỗi kết nối", cause: e });
+  }
+}
+
+/**
+ * Tìm nhà cung cấp theo TÊN; nếu chưa có thì tạo mới. Trả về Supplier.
+ * Faithful với logic resolve trong luồng nhập kho (suppliers select by name → insert).
+ */
+export async function resolveOrCreateSupplier(
+  name: string,
+  phone?: string
+): Promise<RepoResult<Supplier>> {
+  try {
+    const { data: found, error: findErr } = await supabase
+      .from(SUPPLIERS_TABLE)
+      .select("*")
+      .eq("name", name)
+      .maybeSingle();
+    if (findErr)
+      return failure({
+        code: "supabase",
+        message: "Không thể tìm nhà cung cấp",
+        cause: findErr,
+      });
+    if (found) return success(found as Supplier);
+    return await createSupplier({ name, phone });
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi resolve nhà cung cấp",
+      cause: e,
+    });
+  }
+}
+
 export async function createSupplier(
   input: Partial<Supplier>
 ): Promise<RepoResult<Supplier>> {

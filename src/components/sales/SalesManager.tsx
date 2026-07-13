@@ -20,6 +20,7 @@ import {
   Package,
   History,
 } from "lucide-react";
+import PrintSalesPreviewModal, { PrintSalesPayload } from "./modals/PrintSalesPreviewModal";
 import { useAppContext } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { canDo } from "../../utils/permissions";
@@ -136,6 +137,9 @@ const SalesManager: React.FC = () => {
   const [paidAmount, setPaidAmount] = useState<number | "full">("full");
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
+
+  const [printPayload, setPrintPayload] = useState<PrintSalesPayload | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitLockRef = React.useRef(false);
   const [editingLines, setEditingLines] = useState<Record<string, boolean>>({});
@@ -359,17 +363,7 @@ Cam on quy khach da tin tuong!
 \n\n\n\n`;
   };
 
-  const printInvoice = async (payload: {
-    customer: { name: string; phone?: string };
-    items: CartItem[];
-    subtotalValue: number;
-    discountValue: number;
-    totalValue: number;
-    payment: "cash" | "bank";
-    noteText?: string;
-    dateValue?: string;
-    saleId?: string;
-  }) => {
+  const printInvoice = async (payload: PrintSalesPayload) => {
     const printMode = localStorage.getItem("motocare_print_mode") || "wifi";
 
     if (isNative && printMode === "bluetooth") {
@@ -870,10 +864,11 @@ Cam on quy khach da tin tuong!
 
       if (result.ok) {
         if (autoPrintInvoice) {
-          printInvoice({
+          setPrintPayload({
             ...payload,
             saleId: result.saleId,
           });
+          setIsPrintModalOpen(true);
         }
         showToast.success("Đã tạo phiếu bán hàng thành công.");
       }
@@ -906,7 +901,7 @@ Cam on quy khach da tin tuong!
 
   // B6: in lại hóa đơn từ một phiếu đã lưu (dùng đúng ngày của phiếu)
   const reprintSale = (sale: Sale) => {
-    printInvoice({
+    setPrintPayload({
       customer: {
         name: sale.customer?.name || "Khách lẻ",
         phone: sale.customer?.phone || undefined,
@@ -920,6 +915,7 @@ Cam on quy khach da tin tuong!
       dateValue: sale.date,
       saleId: sale.id,
     });
+    setIsPrintModalOpen(true);
   };
 
   const historyPageSize = 6;
@@ -1610,8 +1606,8 @@ Cam on quy khach da tin tuong!
             </div>
 
             <button
-              onClick={() =>
-                printInvoice({
+              onClick={() => {
+                setPrintPayload({
                   customer: {
                     name: customerName.trim() || "Khách lẻ",
                     phone: customerPhone.trim() || undefined,
@@ -1622,8 +1618,10 @@ Cam on quy khach da tin tuong!
                   totalValue: total,
                   payment: paymentMethod,
                   noteText: note.trim() || undefined,
-                })
-              }
+                  saleId: "DRAFT",
+                });
+                setIsPrintModalOpen(true);
+              }}
               disabled={!cartItems.length}
               className="w-full h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 text-slate-700 dark:text-slate-200 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
             >
@@ -1827,9 +1825,21 @@ Cam on quy khach da tin tuong!
         onScan={handleScannedBarcode}
         title="Quét mã sản phẩm"
       />
+
+      <PrintSalesPreviewModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        printPayload={printPayload}
+        storeSettings={storeSettings}
+        onPrint={() => {
+          if (printPayload) {
+            printInvoice(printPayload);
+            setIsPrintModalOpen(false);
+          }
+        }}
+      />
     </div>
   );
 };
 
 export default SalesManager;
-

@@ -125,12 +125,133 @@ export async function fetchParts(): Promise<RepoResult<Part[]>> {
   }
 }
 
+/**
+ * Lấy TẤT CẢ phụ tùng để tính tổng tồn kho/giá trị (không phân trang).
+ * Dùng "*" để tương thích DB thiếu cột optional. Lọc theo category nếu có.
+ */
+export async function fetchAllPartsForTotals(
+  categoryFilter?: string
+): Promise<RepoResult<Part[]>> {
+  try {
+    let query = supabase.from(PARTS_TABLE).select("*").order("name");
+    if (categoryFilter && categoryFilter !== "all") {
+      query = query.eq("category", categoryFilter);
+    }
+    const { data, error } = await query;
+    if (error)
+      return failure({
+        code: "supabase",
+        message: "Không thể tải phụ tùng để tính tồn kho",
+        cause: error,
+      });
+    return success((data || []).map((row: any) => normalizePartRow(row)));
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi tải phụ tùng",
+      cause: e,
+    });
+  }
+}
+
+/** Lấy các phụ tùng theo danh sách SKU (dùng cho lọc SKU trùng). */
+export async function fetchPartsBySkus(
+  skus: string[]
+): Promise<RepoResult<Part[]>> {
+  try {
+    if (!skus || skus.length === 0) return success([]);
+    const { data, error } = await supabase
+      .from(PARTS_TABLE)
+      .select("*")
+      .in("sku", skus)
+      .order("sku");
+    if (error)
+      return failure({
+        code: "supabase",
+        message: "Không thể tải phụ tùng theo SKU",
+        cause: error,
+      });
+    return success((data || []).map((row: any) => normalizePartRow(row)));
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi tải phụ tùng theo SKU",
+      cause: e,
+    });
+  }
+}
+
+/** Tạo hàng loạt phụ tùng từ danh sách row đã dựng sẵn (dùng cho import Excel). */
+export async function bulkCreateParts(
+  rows: any[]
+): Promise<RepoResult<void>> {
+  try {
+    if (!rows || rows.length === 0) return success(undefined);
+    const { error } = await supabase.from(PARTS_TABLE).insert(rows).select();
+    if (error)
+      return failure({
+        code: "supabase",
+        message: `Lỗi tạo phụ tùng: ${error.message}`,
+        cause: error,
+      });
+    return success(undefined);
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi tạo phụ tùng hàng loạt",
+      cause: e,
+    });
+  }
+}
+
+/**
+ * Cập nhật hàng loạt tồn kho/giá phụ tùng (dùng cho import Excel).
+ * Tolerant: lỗi từng item chỉ ghi log, không dừng cả batch (faithful với luồng cũ).
+ * Trả danh sách id lỗi (nếu có) trong meta.
+ */
+export async function bulkUpdatePartStock(
+  updates: Array<{
+    id: string;
+    stock?: any;
+    costPrice?: any;
+    retailPrice?: any;
+    wholesalePrice?: any;
+  }>
+): Promise<RepoResult<{ failedIds: string[] }>> {
+  const failedIds: string[] = [];
+  try {
+    for (const update of updates) {
+      const { error } = await supabase
+        .from(PARTS_TABLE)
+        .update({
+          stock: update.stock,
+          costPrice: update.costPrice,
+          retailPrice: update.retailPrice,
+          wholesalePrice: update.wholesalePrice,
+        })
+        .eq("id", update.id);
+      if (error) {
+        console.error(`❌ Update error for part ${update.id}:`, error);
+        failedIds.push(update.id);
+      }
+    }
+    return success({ failedIds });
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi cập nhật phụ tùng hàng loạt",
+      cause: e,
+    });
+  }
+}
+
 // Fetch parts with pagination & optional filters
 export async function fetchPartsPaged(params?: {
   page?: number; // 1-based
   pageSize?: number;
   search?: string; // match name or sku
   category?: string; // exact match
+  branchId?: string; // lọc theo chi nhánh (hoặc sản phẩm global chưa gán)
 }): Promise<RepoResult<Part[]>> {
   try {
     const pageSize =

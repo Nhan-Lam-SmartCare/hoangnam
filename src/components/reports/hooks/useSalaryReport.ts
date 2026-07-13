@@ -4,6 +4,7 @@ import { showToast } from "../../../utils/toast";
 import {
   getWorkerMonthlyLaborDetails,
   getWorkerMonthlySalary,
+  upsertEmployeeBonusPenalty,
   type WorkerLaborDetailRow,
 } from "../../../lib/repository/repairLaborRepository";
 import { supabase } from "../../../supabaseClient";
@@ -18,6 +19,7 @@ export const useSalaryReport = (
   const [staffSalaryRows, setStaffSalaryRows] = useState<any[]>([]);
   const [loadingSalaryRows, setLoadingSalaryRows] = useState(false);
   const [selectedSalaryWorker, setSelectedSalaryWorker] = useState<any | null>(null);
+  const [editingBonusPenalty, setEditingBonusPenalty] = useState<any | null>(null);
   const [salaryDetailRows, setSalaryDetailRows] = useState<WorkerLaborDetailRow[]>([]);
   const [loadingSalaryDetails, setLoadingSalaryDetails] = useState(false);
   const salaryRowsCacheRef = useRef<Record<string, any[]>>({});
@@ -161,6 +163,22 @@ export const useSalaryReport = (
     }
   };
 
+  const handleSaveBonusPenalty = async (workerId: string, bonus: number, penalty: number) => {
+    const res = await upsertEmployeeBonusPenalty(workerId, salaryMonth, salaryYear, bonus, penalty);
+    if (!res.ok) {
+      showToast.error(res.error?.message || "Không thể lưu thưởng/phạt");
+      return false;
+    }
+    
+    // Invalidate cache and trigger reload
+    const salaryCacheKey = `${salaryYear}-${String(salaryMonth).padStart(2, "0")}::${salaryStaffIdsKey}`;
+    delete salaryRowsCacheRef.current[salaryCacheKey];
+    setStaffSalaryRows((prev) => prev.map(r => r.workerId === workerId ? { ...r, bonus, penalty, finalSalary: (r.baseSalary || 0) + (r.totalWorkerAmount || 0) + bonus - penalty - (r.advance || 0) } : r));
+    
+    showToast.success("Đã cập nhật thưởng/phạt thành công");
+    return true;
+  };
+
   const formatDateTime = (value?: string) => {
     if (!value) return "--";
     const dt = new Date(value);
@@ -244,5 +262,8 @@ export const useSalaryReport = (
     loadingSalaryDetails,
     handleOpenSalaryDetails,
     handleExportSalaryDetailsExcel,
+    editingBonusPenalty,
+    setEditingBonusPenalty,
+    handleSaveBonusPenalty,
   };
 };

@@ -1,5 +1,5 @@
 import React from "react";
-import { BriefcaseBusiness, X } from "lucide-react";
+import { BriefcaseBusiness, X, Edit3, Save } from "lucide-react";
 import { formatCurrency } from "../../../utils/format";
 
 interface PayrollReportProps {
@@ -35,8 +35,10 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
     setSelectedSalaryWorker,
     salaryDetailRows,
     loadingSalaryDetails,
-    handleOpenSalaryDetails,
     handleExportSalaryDetailsExcel,
+    editingBonusPenalty,
+    setEditingBonusPenalty,
+    handleSaveBonusPenalty,
   } = salaryReportProps;
 
   return (
@@ -84,12 +86,15 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
                 <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
                   Lương tạm tính
                 </th>
+                <th className="text-right py-3 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody>
               {loadingSalaryRows && staffSalaryRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                     Đang tính lương công sửa...
                   </td>
                 </tr>
@@ -124,11 +129,21 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
                     <td className="py-3 px-3 text-sm text-right font-semibold text-blue-600 dark:text-cyan-300">
                       {formatCurrency(Number(row.finalSalary || 0))} đ
                     </td>
+                    <td className="py-3 px-3 text-sm text-right">
+                      <button
+                        type="button"
+                        onClick={() => setEditingBonusPenalty({ workerId: row.workerId, workerName: row.workerName, bonus: Number(row.bonus || 0), penalty: Number(row.penalty || 0) })}
+                        className="text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                        title="Chỉnh sửa thưởng/phạt"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               {!loadingSalaryRows && staffSalaryRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                     Chưa có dữ liệu công sửa trong kỳ đã chọn.
                   </td>
                 </tr>
@@ -150,13 +165,22 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
                 key={row.workerId}
                 className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/40 p-3"
               >
-                <button
-                  type="button"
-                  onClick={() => handleOpenSalaryDetails(row)}
-                  className="text-sm font-semibold text-blue-600 dark:text-cyan-300 hover:text-blue-500 dark:hover:text-cyan-200"
-                >
-                  {row.workerName}
-                </button>
+                <div className="flex justify-between items-start">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSalaryDetails(row)}
+                    className="text-sm font-semibold text-blue-600 dark:text-cyan-300 hover:text-blue-500 dark:hover:text-cyan-200"
+                  >
+                    {row.workerName}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingBonusPenalty({ workerId: row.workerId, workerName: row.workerName, bonus: Number(row.bonus || 0), penalty: Number(row.penalty || 0) })}
+                    className="text-slate-400 hover:text-blue-600 dark:hover:text-cyan-400 p-1 rounded-md"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                </div>
                 <div className="mt-2 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                   <div className="flex justify-between gap-2">
                     <span className="text-slate-500 dark:text-slate-400">Số công việc</span>
@@ -196,6 +220,79 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
           )}
         </div>
       </div>
+
+      {/* Edit Bonus/Penalty Modal */}
+      {editingBonusPenalty && (
+        <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                Thưởng / Phạt
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingBonusPenalty(null)}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4">
+                  Nhân viên: <span className="text-blue-600 dark:text-cyan-400">{editingBonusPenalty.workerName}</span>
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Tiền thưởng (VNĐ)
+                    </label>
+                    <input
+                      type="number"
+                      value={editingBonusPenalty.bonus || ""}
+                      onChange={(e) => setEditingBonusPenalty({ ...editingBonusPenalty, bonus: Number(e.target.value) })}
+                      className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:border-blue-500 dark:focus:border-cyan-400 outline-none text-slate-900 dark:text-white"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Tiền phạt (VNĐ)
+                    </label>
+                    <input
+                      type="number"
+                      value={editingBonusPenalty.penalty || ""}
+                      onChange={(e) => setEditingBonusPenalty({ ...editingBonusPenalty, penalty: Number(e.target.value) })}
+                      className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:border-blue-500 dark:focus:border-cyan-400 outline-none text-slate-900 dark:text-white"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const success = await handleSaveBonusPenalty(
+                      editingBonusPenalty.workerId,
+                      editingBonusPenalty.bonus || 0,
+                      editingBonusPenalty.penalty || 0
+                    );
+                    if (success) {
+                      setEditingBonusPenalty(null);
+                    }
+                  }}
+                  className="w-full h-10 flex items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors shadow-sm"
+                >
+                  <Save className="w-4 h-4" />
+                  Lưu thay đổi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Chi tiết Modal */}
       {selectedSalaryWorker && (

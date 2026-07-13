@@ -735,3 +735,37 @@ export async function getWorkerMonthlyLaborDetails(
     });
   }
 }
+
+export async function upsertEmployeeBonusPenalty(
+  employeeId: string,
+  month: number,
+  year: number,
+  bonus: number,
+  penalty: number,
+  branchId: string = "CN1"
+): Promise<RepoResult<void>> {
+  try {
+    const { error } = await supabase.rpc("upsert_employee_bonus_penalty", {
+      p_employee_id: employeeId,
+      p_month: month,
+      p_year: year,
+      p_bonus: bonus,
+      p_penalty: penalty,
+      p_branch_id: branchId,
+    });
+    if (error) {
+      return failure({
+        code: "supabase",
+        message: "Không thể lưu thưởng/phạt",
+        cause: error,
+      });
+    }
+    return success(undefined);
+  } catch (cause) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi lưu thưởng/phạt",
+      cause,
+    });
+  }
+}

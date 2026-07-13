@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Share2, Printer, X } from "lucide-react";
 import { formatCurrency, formatWorkOrderId } from "../../../utils/format";
@@ -86,8 +86,17 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
 
   const isNative = Capacitor.isNativePlatform();
 
-  const paperSizeKey = storeSettings?.print_paper_size_receipt || "80mm";
-  const paperSize = resolvePaperSize(paperSizeKey, "80mm");
+  const [selectedPaperSizeKey, setSelectedPaperSizeKey] = useState<string>(
+    storeSettings?.print_paper_size_receipt || "80mm"
+  );
+
+  useEffect(() => {
+    if (storeSettings?.print_paper_size_receipt && isOpen) {
+      setSelectedPaperSizeKey(storeSettings.print_paper_size_receipt);
+    }
+  }, [storeSettings?.print_paper_size_receipt, isOpen]);
+
+  const paperSize = resolvePaperSize(selectedPaperSizeKey, "80mm");
 
   const getReceiptFileName = () =>
     `Phieu_${formatWorkOrderId(
@@ -266,6 +275,16 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
           </h2>
 
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            <select
+              value={selectedPaperSizeKey}
+              onChange={(e) => setSelectedPaperSizeKey(e.target.value)}
+              className="px-2 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500"
+            >
+              <option value="58mm">Khổ 58mm</option>
+              <option value="80mm">Khổ 80mm</option>
+              <option value="A5">Khổ A5</option>
+              <option value="A4">Khổ A4</option>
+            </select>
             <button
               onClick={handleShare}
               className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm text-white transition hover:bg-green-700"

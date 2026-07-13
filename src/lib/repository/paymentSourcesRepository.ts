@@ -26,6 +26,32 @@ export async function fetchPaymentSources(): Promise<
   }
 }
 
+/**
+ * Lấy raw rows nguồn tiền, thử lần lượt tên bảng "payment_sources" rồi
+ * "paymentsources" (tương thích schema cũ). Trả rows của bảng ĐẦU TIÊN có dữ
+ * liệu. Dùng cho luồng nhập kho cần resolve payment source id (giữ shape raw).
+ */
+export async function fetchPaymentSourceRows(): Promise<RepoResult<any[]>> {
+  const tableCandidates = ["payment_sources", "paymentsources"];
+  try {
+    for (const tableName of tableCandidates) {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select("*")
+        .limit(100);
+      if (error || !data || data.length === 0) continue;
+      return success(data);
+    }
+    return success([]);
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi tải nguồn tiền",
+      cause: e,
+    });
+  }
+}
+
 // Atomic balance update (fetch current -> merge -> update). Expect balance JSON shape.
 export async function updatePaymentSourceBalance(
   id: string,

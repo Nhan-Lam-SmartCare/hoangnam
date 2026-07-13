@@ -57,9 +57,20 @@ import {
 import { useWorkOrdersRepo, useUpdateWorkOrderAtomicRepo } from "../../hooks/useWorkOrdersRepository";
 import { useCategories } from "../../hooks/useCategories";
 import type { Part, InventoryTransaction, WorkOrder } from "../../types";
-import { createPart, updatePart } from "../../lib/repository/partsRepository";
+import {
+  createPart,
+  updatePart,
+  fetchAllPartsForTotals,
+  fetchPartsBySkus,
+  bulkCreateParts,
+  bulkUpdatePartStock,
+} from "../../lib/repository/partsRepository";
 import { useSupplierDebtsRepo } from "../../hooks/useDebtsRepository";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
+import { fetchSupplierById } from "../../lib/repository/suppliersRepository";
+import { fetchPaymentSourceRows } from "../../lib/repository/paymentSourcesRepository";
+import { createSupplierDebt } from "../../lib/repository/debtsRepository";
+import { bulkCreateInventoryTransactions } from "../../lib/repository/inventoryTransactionsRepository";
 import InventoryHistorySectionMobile from "../inventory/InventoryHistorySectionMobile";
 import BatchPrintBarcodeModal from "../inventory/BatchPrintBarcodeModal";
 import BarcodeScannerModal from "../common/BarcodeScannerModal";
@@ -231,21 +242,9 @@ const InventoryManagerNew: React.FC = () => {
   const { data: allPartsData, refetch: refetchAllParts } = useQuery({
     queryKey: ["allPartsForTotals", currentBranchId, categoryFilter],
     queryFn: async () => {
-      let query = supabase
-        .from("parts")
-        // Use "*" to be compatible with demo DBs that may not have optional columns
-        // like reserved/costPrice yet. Selecting missing columns causes PostgREST 400.
-        .select("*")
-        .order("name");
-
-      if (categoryFilter && categoryFilter !== "all") {
-        query = query.eq("category", categoryFilter);
-      }
-      // NOTE: Removed search filter from this query - it's only for stock counts
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      const res = await fetchAllPartsForTotals(categoryFilter);
+      if (!res.ok) throw res.error.cause || new Error(res.error.message);
+      return res.data;
     },
     staleTime: 30_000, // Cache for 30s to reduce refetches
   });
@@ -345,16 +344,9 @@ const InventoryManagerNew: React.FC = () => {
     queryKey: ["duplicateParts", currentBranchId, Array.from(duplicateSkus)],
     queryFn: async () => {
       if (duplicateSkus.size === 0) return [];
-
-      // Fetch all parts with duplicate SKUs
-      const { data, error } = await supabase
-        .from("parts")
-        .select("*")
-        .in("sku", Array.from(duplicateSkus))
-        .order("sku");
-
-      if (error) throw error;
-      return data || [];
+      const res = await fetchPartsBySkus(Array.from(duplicateSkus));
+      if (!res.ok) throw res.error.cause || new Error(res.error.message);
+      return res.data;
     },
     enabled: showDuplicatesOnly && duplicateSkus.size > 0,
     staleTime: 30_000, // Cache for 30s
@@ -653,12 +645,9 @@ const InventoryManagerNew: React.FC = () => {
 
 
       // Get supplier name
-      const { data: suppliers } = await supabase
-        .from("suppliers")
-        .select("name")
-        .eq("id", supplierId)
-        .single();
-      const supplierName = suppliers?.name || "Không xác định";
+      const supplierRes = await fetchSupplierById(supplierId);
+      const supplierName =
+        (supplierRes.ok && supplierRes.data?.name) || "Không xác định";
 
       // Calculate debt amount
       const paidAmount = paymentInfo?.paidAmount || 0;
@@ -836,7 +825,6 @@ const InventoryManagerNew: React.FC = () => {
                 paymentMethod: "cash" | "bank"
               ): Promise<string[]> => {
                 const preferred = paymentMethod === "bank" ? "bank" : "cash";
-                const tableCandidates = ["payment_sources", "paymentsources"];
                 const candidates: string[] = [];
 
                 const pushCandidate = (value: unknown) => {
@@ -847,15 +835,11 @@ const InventoryManagerNew: React.FC = () => {
                   }
                 };
 
-                for (const tableName of tableCandidates) {
-                  const { data, error } = await supabase
-                    .from(tableName)
-                    .select("*")
-                    .limit(100);
+                const rowsRes = await fetchPaymentSourceRows();
+                const rows = rowsRes.ok ? rowsRes.data : [];
 
-                  if (error || !data || data.length === 0) continue;
-
-                  const normalized = data.map((row: any) => ({
+                if (rows.length > 0) {
+                  const normalized = rows.map((row: any) => ({
                     id: String(
                       row?.id ||
                       row?.paymentSourceId ||
@@ -937,26 +921,19 @@ const InventoryManagerNew: React.FC = () => {
           // 2. Create supplier debt
           (async () => {
             if (debtAmount > 0 && paymentInfo) {
-              const debtId = `DEBT-${dateStr}-${Math.random()
-                .toString(36)
-                .substring(2, 5)
-                .toUpperCase()}`;
-              const { error: debtError } = await supabase
-                .from("supplier_debts")
-                .insert({
-                  id: debtId,
-                  supplier_id: supplierId,
-                  supplier_name: supplierName,
-                  branch_id: currentBranchId,
-                  total_amount: debtAmount,
-                  paid_amount: 0,
-                  remaining_amount: debtAmount,
-                  description: `Nợ tiền nhập hàng (Phiếu ${receiptCode})${note ? ` - ${note}` : ""}`,
-                  created_date: new Date().toISOString(),
-                });
+              const debtRes = await createSupplierDebt({
+                supplierId,
+                supplierName,
+                branchId: currentBranchId,
+                totalAmount: debtAmount,
+                paidAmount: 0,
+                remainingAmount: debtAmount,
+                description: `Nợ tiền nhập hàng (Phiếu ${receiptCode})${note ? ` - ${note}` : ""}`,
+                createdDate: new Date().toISOString(),
+              });
 
-              if (debtError) {
-                console.error("❌ Lỗi tạo công nợ:", debtError);
+              if (!debtRes.ok) {
+                console.error("❌ Lỗi tạo công nợ:", debtRes.error.cause);
                 debtFailed = true;
               } else {
                 // Invalidate supplier debts query to refresh UI
@@ -3020,22 +2997,17 @@ const InventoryManagerNew: React.FC = () => {
 
               for (let i = 0; i < uniqueSkus.length; i += CHUNK_SIZE) {
                 const chunk = uniqueSkus.slice(i, i + CHUNK_SIZE);
-                const { data, error } = await supabase
-                  .from("parts")
-                  .select("*")
-                  .in("sku", chunk);
+                const chunkRes = await fetchPartsBySkus(chunk);
 
-                if (error) {
+                if (!chunkRes.ok) {
                   console.error(
                     `❌ Fetch chunk ${i / CHUNK_SIZE + 1} error:`,
-                    error
+                    chunkRes.error.cause
                   );
-                  throw new Error(`Lỗi kiểm tra phụ tùng: ${error.message}`);
+                  throw new Error(`Lỗi kiểm tra phụ tùng: ${chunkRes.error.message}`);
                 }
 
-                if (data) {
-                  allExistingParts.push(...data);
-                }
+                allExistingParts.push(...chunkRes.data);
               }
 
 
@@ -3147,45 +3119,23 @@ const InventoryManagerNew: React.FC = () => {
 
               // BATCH: Execute all creates
               if (partsToCreate.length > 0) {
-                const { error: createError } =
-                  await supabase.from("parts").insert(partsToCreate).select();
-
-                if (createError) {
-                  console.error("❌ Batch create error:", createError);
-                  throw new Error(`Lỗi tạo phụ tùng: ${createError.message}`);
+                const createRes = await bulkCreateParts(partsToCreate);
+                if (!createRes.ok) {
+                  console.error("❌ Batch create error:", createRes.error.cause);
+                  throw new Error(createRes.error.message);
                 }
               }
 
               // BATCH: Execute all updates
               if (partsToUpdate.length > 0) {
-                for (const update of partsToUpdate) {
-                  const { error } = await supabase
-                    .from("parts")
-                    .update({
-                      stock: update.stock,
-                      costPrice: update.costPrice,
-                      retailPrice: update.retailPrice,
-                      wholesalePrice: update.wholesalePrice,
-                    })
-                    .eq("id", update.id);
-
-                  if (error) {
-                    console.error(
-                      `❌ Update error for part ${update.id}:`,
-                      error
-                    );
-                  }
-                }
+                await bulkUpdatePartStock(partsToUpdate);
               }
 
               // BATCH: Create inventory transactions
               if (inventoryTxToCreate.length > 0) {
-                const { error: txError } = await supabase
-                  .from("inventory_transactions")
-                  .insert(inventoryTxToCreate);
-
-                if (txError) {
-                  console.warn("⚠️ Inventory transactions error:", txError);
+                const txRes = await bulkCreateInventoryTransactions(inventoryTxToCreate);
+                if (!txRes.ok) {
+                  console.warn("⚠️ Inventory transactions error:", txRes.error.cause);
                   // Don't throw - transactions are not critical
                 }
               }
@@ -3193,25 +3143,6 @@ const InventoryManagerNew: React.FC = () => {
               // Invalidate queries to refresh UI
               queryClient.invalidateQueries({ queryKey: ["partsRepo"] });
               queryClient.invalidateQueries({ queryKey: ["partsRepoPaged"] });
-
-              // Audit summary for import (best-effort)
-              try {
-                await supabase.auth.getUser();
-                // await safeAudit(userData?.user?.id || null, {
-                //   action: "inventory.import",
-                //   tableName: "inventory_transactions",
-                //   oldData: null,
-                //   newData: {
-                //     totalRows: importedData.length + rowErrors.length,
-                //     created: createdCount,
-                //     updated: updatedCount,
-                //     skipped: rowErrors.length,
-                //     sampleErrors: rowErrors.slice(0, 10),
-                //     branchId: currentBranchId,
-                //     at: importDate,
-                //   },
-                // });
-              } catch { }
 
               setShowImportModal(false);
 

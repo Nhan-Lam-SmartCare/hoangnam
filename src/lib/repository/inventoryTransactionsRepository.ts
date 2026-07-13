@@ -6,6 +6,32 @@ import { safeAudit } from "./auditLogsRepository";
 
 const TABLE = "inventory_transactions";
 
+/**
+ * Ghi hàng loạt giao dịch kho từ row dựng sẵn (dùng cho import Excel).
+ * Không critical: caller có thể bỏ qua lỗi. Trả failure nếu insert lỗi.
+ */
+export async function bulkCreateInventoryTransactions(
+  rows: any[]
+): Promise<RepoResult<void>> {
+  try {
+    if (!rows || rows.length === 0) return success(undefined);
+    const { error } = await supabase.from(TABLE).insert(rows);
+    if (error)
+      return failure({
+        code: "supabase",
+        message: `Lỗi ghi giao dịch kho: ${error.message}`,
+        cause: error,
+      });
+    return success(undefined);
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi ghi giao dịch kho hàng loạt",
+      cause: e,
+    });
+  }
+}
+
 export interface CreateInventoryTxInput {
   type: InventoryTransaction["type"]; // "Nhập kho" | "Xuất kho"
   partId: string;
