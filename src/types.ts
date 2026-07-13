@@ -108,6 +108,7 @@ export interface CartItem {
   stockSnapshot: number; // Stock at time added for validation
   discount?: number; // Per-line discount (absolute)
   isService?: boolean; // Mark as service item to skip stock validation
+  returnedQty?: number; // Số lượng đã trả (đổi/trả một phần)
 }
 
 export interface Sale {
@@ -331,7 +332,23 @@ export interface CashTransaction {
   employeeId?: string;
 }
 
-// Employee & Payroll Types
+/** Ca quỹ — đối soát tiền đầu/cuối ca theo từng nguồn tiền. */
+export interface CashSession {
+  id: string;
+  branchId?: string;
+  status: "open" | "closed";
+  openedBy?: string;
+  openedByName?: string;
+  openedAt: string;
+  openingBalance: Record<string, number>;
+  closedBy?: string;
+  closedByName?: string;
+  closedAt?: string;
+  counted: Record<string, number>;
+  expected: Record<string, number>;
+  note?: string;
+}
+
 export interface Employee {
   id: string;
   name: string;

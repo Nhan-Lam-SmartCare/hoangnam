@@ -48,6 +48,13 @@ export interface AppContextType {
   clearCart: () => void;
   setSales: React.Dispatch<React.SetStateAction<Sale[]>>;
   deleteSale: (saleId: string) => void;
+  returnSaleItems: (input: {
+    saleId: string;
+    items: { partId: string; quantity: number }[];
+    refundAmount: number;
+    refundSource: string;
+    reason?: string;
+  }) => Promise<{ ok: boolean; message?: string }>;
   finalizeSale: (data: {
     items: CartItem[];
     discount: number;
@@ -55,6 +62,8 @@ export interface AppContextType {
     customer: { id?: string; name: string; phone?: string };
     note?: string;
     paidAmount?: number;
+    payments?: { source: string; amount: number }[];
+    soldBy?: { id: string; name: string };
   }) => Promise<{ ok: boolean; saleId: string }>;
   setPaymentSources: React.Dispatch<React.SetStateAction<PaymentSource[]>>;
   setCashTransactions: React.Dispatch<React.SetStateAction<CashTransaction[]>>;
@@ -124,6 +133,7 @@ export interface AppActions {
   upsertWorkOrder: AppContextType["upsertWorkOrder"];
   clearCart: AppContextType["clearCart"];
   deleteSale: AppContextType["deleteSale"];
+  returnSaleItems: AppContextType["returnSaleItems"];
   finalizeSale: AppContextType["finalizeSale"];
   recordInventoryTransaction: AppContextType["recordInventoryTransaction"];
   upsertEmployee: AppContextType["upsertEmployee"];

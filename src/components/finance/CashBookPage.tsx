@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Printer, Trash2 } from "lucide-react";
+import { Printer, Trash2, Plus, X } from "lucide-react";
+import { CashSessionPanel } from "./CashSessionPanel";
 import { useAppContext } from "../../contexts/AppContext";
 import {
   useCashTxRepo,
@@ -584,6 +585,7 @@ type CashTxFormModalProps = {
   onPaymentSourceChange: (value: string) => void;
   onNotesChange: (value: string) => void;
   onSubmit: () => void;
+  onOpenManageCategories?: () => void;
 };
 
 const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
@@ -609,6 +611,7 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
   onPaymentSourceChange,
   onNotesChange,
   onSubmit,
+  onOpenManageCategories,
 }) => {
   if (!isOpen) {
     return null;
@@ -627,17 +630,27 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
         </div>
 
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <select
-            value={formCategory}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200"
-          >
-            {formCategoryOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-1.5 items-center">
+            <select
+              value={formCategory}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 outline-none"
+            >
+              {formCategoryOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onOpenManageCategories}
+              className="p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 hover:dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800/40 transition-colors flex items-center justify-center h-[38px] w-[38px]"
+              title="Quản lý danh mục"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
 
           <input
             type="number"
@@ -742,23 +755,86 @@ const CashBookPage: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [printTx, setPrintTx] = useState<any | null>(null);
   const [branchName, setBranchName] = useState<string>("");
+  const [showSession, setShowSession] = useState(false);
   const createCashTxMutation = useCreateCashTxRepo();
   const deleteCashTxMutation = useDeleteCashTxRepo();
 
-  const incomeCategoryOptions = useMemo(
-    () => [
+  const [customIncomeCategories, setCustomIncomeCategories] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("custom_income_categories_v1");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [customExpenseCategories, setCustomExpenseCategories] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("custom_expense_categories_v1");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [manageCategoryType, setManageCategoryType] = useState<"income" | "expense">("income");
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const handleAddCategory = () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+
+    if (manageCategoryType === "income") {
+      if (customIncomeCategories.includes(trimmed)) return;
+      const updated = [...customIncomeCategories, trimmed];
+      setCustomIncomeCategories(updated);
+      localStorage.setItem("custom_income_categories_v1", JSON.stringify(updated));
+    } else {
+      if (customExpenseCategories.includes(trimmed)) return;
+      const updated = [...customExpenseCategories, trimmed];
+      setCustomExpenseCategories(updated);
+      localStorage.setItem("custom_expense_categories_v1", JSON.stringify(updated));
+    }
+    setNewCategoryName("");
+  };
+
+  const handleDeleteCategory = (nameToDelete: string, type: "income" | "expense") => {
+    const ok = window.confirm(`Bạn có chắc muốn xóa danh mục "${nameToDelete}"?`);
+    if (!ok) return;
+
+    if (type === "income") {
+      const updated = customIncomeCategories.filter((name) => name !== nameToDelete);
+      setCustomIncomeCategories(updated);
+      localStorage.setItem("custom_income_categories_v1", JSON.stringify(updated));
+      if (formCategory === nameToDelete) {
+        setFormCategory("other_income");
+      }
+    } else {
+      const updated = customExpenseCategories.filter((name) => name !== nameToDelete);
+      setCustomExpenseCategories(updated);
+      localStorage.setItem("custom_expense_categories_v1", JSON.stringify(updated));
+      if (formCategory === nameToDelete) {
+        setFormCategory("other_expense");
+      }
+    }
+  };
+
+  const incomeCategoryOptions = useMemo(() => {
+    const base = [
       { value: "sale_income", label: "Bán hàng" },
       { value: "service_income", label: "Dịch vụ" },
       { value: "debt_collection", label: "Thu nợ khách hàng" },
       { value: "collection_on_behalf", label: "Thu hộ" },
       { value: "other_income", label: "Thu khác" },
       { value: "general_income", label: "Thu chung" },
-    ],
-    []
-  );
+    ];
+    const custom = customIncomeCategories.map((name) => ({ value: name, label: name }));
+    return [...base, ...custom];
+  }, [customIncomeCategories]);
 
-  const expenseCategoryOptions = useMemo(
-    () => [
+  const expenseCategoryOptions = useMemo(() => {
+    const base = [
       { value: "inventory_purchase", label: "Mua hàng" },
       { value: "supplier_payment", label: "Chi trả nhà cung cấp" },
       { value: "salary", label: "Lương nhân viên" },
@@ -767,9 +843,10 @@ const CashBookPage: React.FC = () => {
       { value: "loan_payment", label: "Trả nợ vay" },
       { value: "other_expense", label: "Chi khác" },
       { value: "general_expense", label: "Chi chung" },
-    ],
-    []
-  );
+    ];
+    const custom = customExpenseCategories.map((name) => ({ value: name, label: name }));
+    return [...base, ...custom];
+  }, [customExpenseCategories]);
 
   const formCategoryOptions = formType === "income" ? incomeCategoryOptions : expenseCategoryOptions;
 
@@ -904,6 +981,12 @@ const CashBookPage: React.FC = () => {
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
               <button
+                onClick={() => setShowSession(true)}
+                className="w-full sm:w-auto px-3.5 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+              >
+                Chốt ca
+              </button>
+              <button
                 onClick={() => openTxModal("income")}
                 className="w-full sm:w-auto px-3.5 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
               >
@@ -970,6 +1053,10 @@ const CashBookPage: React.FC = () => {
         onPaymentSourceChange={setFormPaymentSourceId}
         onNotesChange={setFormNotes}
         onSubmit={handleCreateCashTx}
+        onOpenManageCategories={() => {
+          setManageCategoryType(formType);
+          setIsManageCategoriesOpen(true);
+        }}
       />
 
       <CashTxPrintModal
@@ -980,6 +1067,156 @@ const CashBookPage: React.FC = () => {
         paymentSources={paymentSources || []}
         onClose={() => setPrintTx(null)}
       />
+
+      {/* Modal Quản lý danh mục */}
+      {isManageCategoriesOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                Quản lý danh mục Thu / Chi
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(false)}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              {/* Toggle Tab */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setManageCategoryType("income")}
+                  className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    manageCategoryType === "income"
+                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Danh mục Thu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManageCategoryType("expense")}
+                  className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    manageCategoryType === "expense"
+                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Danh mục Chi
+                </button>
+              </div>
+
+              {/* Form thêm mới */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder={manageCategoryType === "income" ? "Nhập tên danh mục thu..." : "Nhập tên danh mục chi..."}
+                  className="flex-1 h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:border-blue-500 dark:focus:border-cyan-400 outline-none text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCategory}
+                  disabled={!newCategoryName.trim()}
+                  className="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold shadow-sm transition"
+                >
+                  Thêm
+                </button>
+              </div>
+
+              {/* Danh sách danh mục */}
+              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                {manageCategoryType === "income" ? (
+                  <>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Danh mục hệ thống (Không thể xóa)</div>
+                    {[
+                      { label: "Bán hàng" },
+                      { label: "Dịch vụ" },
+                      { label: "Thu nợ khách hàng" },
+                      { label: "Thu hộ" },
+                      { label: "Thu khác" },
+                      { label: "Thu chung" },
+                    ].map((cat) => (
+                      <div key={cat.label} className="flex justify-between items-center py-2 px-3 rounded-lg bg-slate-50 dark:bg-slate-850/40 border border-slate-100 dark:border-slate-800">
+                        <span className="text-xs text-slate-700 dark:text-slate-350">{cat.label}</span>
+                        <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Hệ thống</span>
+                      </div>
+                    ))}
+                    
+                    {customIncomeCategories.length > 0 && (
+                      <>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-4 mb-2">Danh mục tự định nghĩa</div>
+                        {customIncomeCategories.map((name) => (
+                          <div key={name} className="flex justify-between items-center py-2 px-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                            <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">{name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(name, "income")}
+                              className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1"
+                              title="Xóa danh mục này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Danh mục hệ thống (Không thể xóa)</div>
+                    {[
+                      { label: "Mua hàng" },
+                      { label: "Chi trả nhà cung cấp" },
+                      { label: "Lương nhân viên" },
+                      { label: "Ứng lương" },
+                      { label: "Trả nợ nhà cung cấp" },
+                      { label: "Trả nợ vay" },
+                      { label: "Chi khác" },
+                      { label: "Chi chung" },
+                    ].map((cat) => (
+                      <div key={cat.label} className="flex justify-between items-center py-2 px-3 rounded-lg bg-slate-50 dark:bg-slate-850/40 border border-slate-100 dark:border-slate-800">
+                        <span className="text-xs text-slate-700 dark:text-slate-350">{cat.label}</span>
+                        <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Hệ thống</span>
+                      </div>
+                    ))}
+                    
+                    {customExpenseCategories.length > 0 && (
+                      <>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-4 mb-2">Danh mục tự định nghĩa</div>
+                        {customExpenseCategories.map((name) => (
+                          <div key={name} className="flex justify-between items-center py-2 px-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                            <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">{name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(name, "expense")}
+                              className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 p-1"
+                              title="Xóa danh mục này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSession && (
+        <CashSessionPanel onClose={() => setShowSession(false)} />
+      )}
     </div>
   );
 };

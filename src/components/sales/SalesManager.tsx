@@ -9,6 +9,7 @@ import {
   ReceiptText,
   Printer,
   RefreshCcw,
+  RotateCcw,
   ArrowLeft,
   ArrowRight,
   ChevronUp,
@@ -29,10 +30,13 @@ import { showToast } from "../../utils/toast";
 import type { CartItem, Part, Sale } from "../../types";
 import { useCustomers, useSales, useCreateCustomer } from "../../hooks/useSupabase";
 import BarcodeScannerModal from "../common/BarcodeScannerModal";
+import { ReturnSaleModal } from "./ReturnSaleModal";
 import { usePartsRepo, usePartsRepoPaged } from "../../hooks/usePartsRepository";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { usePrinter } from "../../hooks/usePrinter";
 import { fetchStoreSettingsForBranch, getDynamicQrUrl } from "../service/utils/service.utils";
+import { useEmployeesDirectoryRepo } from "../../hooks/useEmployeesRepository";
+import { getSelectableEmployees } from "../../utils/employees";
 
 const getBranchStock = (part: Part, branchId: string): number => {
   const stock = Math.max(0, Number(part.stock?.[branchId] || 0));
@@ -130,11 +134,31 @@ const SalesManager: React.FC = () => {
   const [customerName, setCustomerName] = useState("Khách lẻ");
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+
+  const { data: employeesList = [] } = useEmployeesDirectoryRepo();
+  const selectableEmployees = useMemo(() => {
+    return getSelectableEmployees(employeesList, currentBranchId);
+  }, [employeesList, currentBranchId]);
+
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+
+  // Set default seller to current logged-in user if they are in the selectable employee list
+  useEffect(() => {
+    if (profile?.id && selectableEmployees.some((emp) => emp.id === profile.id)) {
+      setSelectedEmployeeId(profile.id);
+    } else if (selectableEmployees.length > 0 && !selectedEmployeeId) {
+      setSelectedEmployeeId(selectableEmployees[0].id);
+    }
+  }, [profile, selectableEmployees, selectedEmployeeId]);
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<"vnd" | "percent">("vnd");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank">("cash");
   const [note, setNote] = useState("");
   const [paidAmount, setPaidAmount] = useState<number | "full">("full");
+  // Thanh toán tách: khách trả một phần tiền mặt + một phần chuyển khoản.
+  const [splitPayment, setSplitPayment] = useState(false);
+  const [splitCash, setSplitCash] = useState<number>(0);
+  const [splitBank, setSplitBank] = useState<number>(0);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
 
@@ -144,6 +168,7 @@ const SalesManager: React.FC = () => {
   const submitLockRef = React.useRef(false);
   const [editingLines, setEditingLines] = useState<Record<string, boolean>>({});
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [returnSale, setReturnSale] = useState<Sale | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const createCustomer = useCreateCustomer();
   const heldStorageKey = `motocare_held_orders_${currentBranchId}`;
@@ -557,7 +582,9 @@ Cam on quy khach da tin tuong!
 
       if (existing) {
         return prev.map((item) =>
-          item.partId === part.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.partId === part.id
+            ? { ...item, quantity: item.quantity + 1, stockSnapshot: branchStock }
+            : item
         );
       }
 
@@ -581,16 +608,26 @@ Cam on quy khach da tin tuong!
       return;
     }
 
+    // #3: Chặn theo tồn kho LIVE (tra từ danh sách phụ tùng hiện tại) thay vì
+    // snapshot chụp lúc thêm giỏ — snapshot có thể đã cũ nếu tồn kho thay đổi.
+    const livePart =
+      parts.find((p) => p.id === partId) ||
+      inventoryParts.find((p) => p.id === partId);
+
     setCartItems((prev) =>
       prev.map((item) => {
         if (item.partId !== partId) return item;
-        if (nextQty > item.stockSnapshot) {
-          showToast.warning(`Tồn kho chỉ còn ${item.stockSnapshot}.`);
+        const liveStock = livePart
+          ? getBranchStock(livePart, currentBranchId)
+          : item.stockSnapshot;
+        if (nextQty > liveStock) {
+          showToast.warning(`Tồn kho chỉ còn ${liveStock}.`);
           return item;
         }
         return {
           ...item,
           quantity: nextQty,
+          stockSnapshot: liveStock,
           discount: Math.min(item.discount || 0, item.sellingPrice * nextQty),
         };
       })
@@ -604,6 +641,16 @@ Cam on quy khach da tin tuong!
   // A2: sửa đơn giá theo từng dòng
   const updateLinePrice = (partId: string, nextPrice: number) => {
     const safePrice = Math.max(0, Number(nextPrice) || 0);
+    // Cảnh báo (không chặn) khi bán dưới giá vốn của chi nhánh hiện tại.
+    const livePart =
+      parts.find((p) => p.id === partId) ||
+      inventoryParts.find((p) => p.id === partId);
+    const cost = livePart?.costPrice?.[currentBranchId] || 0;
+    if (cost > 0 && safePrice > 0 && safePrice < cost) {
+      showToast.warning(
+        `Giá bán (${formatCurrency(safePrice)}) thấp hơn giá vốn (${formatCurrency(cost)}).`
+      );
+    }
     setCartItems((prev) =>
       prev.map((item) =>
         item.partId === partId
@@ -760,7 +807,35 @@ Cam on quy khach da tin tuong!
     setPaidAmount("full");
     setHeldOrders((prev) => prev.filter((h) => h.id !== held.id));
     setActiveTab("cart");
-    showToast.success("Đã mở lại đơn giữ.");
+
+    // Kiểm tồn kho live: kẹp số lượng theo tồn hiện tại (tồn có thể đã đổi khi giữ đơn).
+    const liveStockOf = (pid: string) => {
+      const p =
+        parts.find((x) => x.id === pid) ||
+        inventoryParts.find((x) => x.id === pid);
+      return p ? getBranchStock(p, currentBranchId) : 0;
+    };
+    const adjusted: string[] = [];
+    const restoredItems = held.items
+      .map((it) => {
+        if (it.isService) return it;
+        const live = liveStockOf(it.partId);
+        if (it.quantity > live) {
+          adjusted.push(`${it.partName} (còn ${live})`);
+          return { ...it, quantity: live, stockSnapshot: live };
+        }
+        return { ...it, stockSnapshot: live };
+      })
+      .filter((it) => it.isService || it.quantity > 0);
+    setCartItems(restoredItems);
+
+    if (adjusted.length) {
+      showToast.warning(
+        `Đã điều chỉnh theo tồn kho hiện tại: ${adjusted.join(", ")}.`
+      );
+    } else {
+      showToast.success("Đã mở lại đơn giữ.");
+    }
   };
 
   const removeHeldOrder = (id: string) => {
@@ -804,7 +879,11 @@ Cam on quy khach da tin tuong!
       }
     }
 
-    const actualPaidAmount = paidAmount === "full" ? total : paidAmount;
+    const actualPaidAmount = splitPayment
+      ? splitCash + splitBank
+      : paidAmount === "full"
+      ? total
+      : paidAmount;
     if (actualPaidAmount < 0) {
       showToast.warning("Số tiền khách trả không hợp lệ.");
       return;
@@ -843,6 +922,19 @@ Cam on quy khach da tin tuong!
     submitLockRef.current = true;
     setIsSubmitting(true);
     try {
+      const sellerEmp = selectableEmployees.find((emp) => emp.id === selectedEmployeeId);
+      const soldBy = sellerEmp
+        ? {
+            id: sellerEmp.id,
+            name: sellerEmp.name || "Nhân viên",
+          }
+        : profile
+        ? {
+            id: profile.id,
+            name: profile.name || profile.full_name || profile.email || "Nhân viên",
+          }
+        : undefined;
+
       const result = await finalizeSale({
         items: cartItems,
         discount: discountAmount,
@@ -850,11 +942,22 @@ Cam on quy khach da tin tuong!
         customer: payload.customer,
         note: note.trim() || undefined,
         paidAmount: finalPaidAmount,
+        // Thanh toán tách -> truyền mảng nguồn; đơn 1 nguồn giữ nguyên (v1).
+        payments: splitPayment
+          ? [
+              { source: "cash", amount: splitCash },
+              { source: "bank", amount: splitBank },
+            ].filter((p) => p.amount > 0)
+          : undefined,
+        soldBy,
       });
 
       setDiscount(0);
       setDiscountType("vnd");
       setPaidAmount("full");
+      setSplitPayment(false);
+      setSplitCash(0);
+      setSplitBank(0);
       setNote("");
       setCustomerName("Khách lẻ");
       setCustomerSearch("Khách lẻ");
@@ -923,6 +1026,12 @@ Cam on quy khach da tin tuong!
   const filteredSalesHistory = useMemo(() => {
     const keyword = historyQuery.trim().toLowerCase();
     const normalized = sales.filter((sale) => {
+      // #1: Chỉ hiển thị đơn thuộc chi nhánh đang chọn (đơn thiếu branchId coi
+      // như thuộc chi nhánh hiện tại để không ẩn nhầm).
+      const saleBranch =
+        sale.branchId || (sale as any).branchid || (sale as any).branch_id;
+      if (saleBranch && saleBranch !== currentBranchId) return false;
+
       if (!keyword) return true;
       const customerName = (sale.customer?.name || "").toLowerCase();
       const customerPhone = (sale.customer?.phone || "").toLowerCase();
@@ -939,8 +1048,10 @@ Cam on quy khach da tin tuong!
         cashTxCode.includes(keyword)
       );
     });
-    return normalized.slice(0, 200);
-  }, [sales, historyQuery]);
+    // #4: không cắt cứng 200 — để phân trang (prev/next) duyệt được toàn bộ đơn
+    // của chi nhánh; mỗi trang chỉ render historyPageSize dòng nên DOM vẫn nhẹ.
+    return normalized;
+  }, [sales, historyQuery, currentBranchId]);
 
   const totalHistoryPages = Math.max(
     1,
@@ -1428,6 +1539,32 @@ Cam on quy khach da tin tuong!
               </label>
             </div>
 
+            {/* Nhân viên bán hàng */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Nhân viên bán hàng
+              </div>
+              <label className="block">
+                <span className="text-xs text-slate-500">Chọn nhân viên ghi nhận doanh số</span>
+                <select
+                  value={selectedEmployeeId || ""}
+                  onChange={(e) => setSelectedEmployeeId(e.target.value || null)}
+                  className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60 text-sm"
+                >
+                  {selectableEmployees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.position || "Nhân viên"})
+                    </option>
+                  ))}
+                  {!selectableEmployees.some((emp) => emp.id === selectedEmployeeId) && profile && (
+                    <option value={profile.id}>
+                      {profile.name || profile.full_name || profile.email} (Hiện tại)
+                    </option>
+                  )}
+                </select>
+              </label>
+            </div>
+
             <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Tổng kết đơn hàng
@@ -1489,81 +1626,155 @@ Cam on quy khach da tin tuong!
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Phương thức thanh toán
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("cash")}
-                  className={`h-11 rounded-xl border text-sm font-semibold transition ${
-                    paymentMethod === "cash"
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
-                  }`}
-                >
-                  Tiền mặt
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod("bank")}
-                  className={`h-11 rounded-xl border text-sm font-semibold transition ${
-                    paymentMethod === "bank"
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
-                  }`}
-                >
-                  Chuyển khoản
-                </button>
-              </div>
 
-              <label className="block">
-                <span className="text-xs text-slate-500">Khách thanh toán</span>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
                 <input
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  value={paidAmount === "full" ? total : paidAmount}
+                  type="checkbox"
+                  checked={splitPayment}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    setPaidAmount(val === "" ? "full" : Number(val));
+                    setSplitPayment(e.target.checked);
+                    if (e.target.checked) {
+                      // Mặc định: toàn bộ vào tiền mặt để người dùng chỉnh nhanh.
+                      setSplitCash(total);
+                      setSplitBank(0);
+                    }
                   }}
-                  className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                  className="rounded border-slate-300"
                 />
+                Thanh toán tách (tiền mặt + chuyển khoản)
               </label>
-              {/* A3: nút tiền nhanh */}
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setPaidAmount("full")}
-                  className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
-                    paidAmount === "full"
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                      : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
-                  }`}
-                >
-                  Đủ tiền
-                </button>
-                {[50000, 100000, 200000, 500000].map((amount) => (
+
+              {!splitPayment ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("cash")}
+                      className={`h-11 rounded-xl border text-sm font-semibold transition ${
+                        paymentMethod === "cash"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                      }`}
+                    >
+                      Tiền mặt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("bank")}
+                      className={`h-11 rounded-xl border text-sm font-semibold transition ${
+                        paymentMethod === "bank"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                      }`}
+                    >
+                      Chuyển khoản
+                    </button>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-xs text-slate-500">Khách thanh toán</span>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={paidAmount === "full" ? total : paidAmount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPaidAmount(val === "" ? "full" : Number(val));
+                      }}
+                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                    />
+                  </label>
+                  {/* A3: nút tiền nhanh */}
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPaidAmount("full")}
+                      className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
+                        paidAmount === "full"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
+                      }`}
+                    >
+                      Đủ tiền
+                    </button>
+                    {[50000, 100000, 200000, 500000].map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setPaidAmount(amount)}
+                        className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
+                          paidAmount === amount
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                            : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
+                        }`}
+                      >
+                        {formatCurrency(amount)}
+                      </button>
+                    ))}
+                  </div>
+                  {paidAmount !== "full" && paidAmount > total && (
+                    <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      Tiền thừa trả khách: {formatCurrency(paidAmount - total)}
+                    </div>
+                  )}
+                  {paidAmount !== "full" && total - paidAmount > 0 && (
+                    <div className="text-sm font-semibold text-rose-500">
+                      Ghi nhận khách nợ: {formatCurrency(total - paidAmount)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block">
+                    <span className="text-xs text-slate-500">Tiền mặt</span>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={splitCash}
+                      onChange={(e) =>
+                        setSplitCash(Math.max(0, Number(e.target.value) || 0))
+                      }
+                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-slate-500">Chuyển khoản</span>
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={splitBank}
+                      onChange={(e) =>
+                        setSplitBank(Math.max(0, Number(e.target.value) || 0))
+                      }
+                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                    />
+                  </label>
                   <button
-                    key={amount}
                     type="button"
-                    onClick={() => setPaidAmount(amount)}
-                    className={`h-9 px-3 rounded-lg text-xs font-bold border transition ${
-                      paidAmount === amount
-                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                        : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
-                    }`}
+                    onClick={() => setSplitBank(Math.max(0, total - splitCash))}
+                    className="h-8 px-3 rounded-lg text-xs font-bold border border-slate-300/80 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-emerald-400"
                   >
-                    {formatCurrency(amount)}
+                    CK phần còn lại
                   </button>
-                ))}
-              </div>
-              {paidAmount !== "full" && paidAmount > total && (
-                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                  Tiền thừa trả khách: {formatCurrency(paidAmount - total)}
-                </div>
-              )}
-              {paidAmount !== "full" && total - paidAmount > 0 && (
-                <div className="text-sm font-semibold text-rose-500">
-                  Ghi nhận khách nợ: {formatCurrency(total - paidAmount)}
+                  <div className="flex items-center justify-between text-sm font-semibold">
+                    <span className="text-slate-500">Tổng thu</span>
+                    <span className="text-slate-800 dark:text-slate-100">
+                      {formatCurrency(splitCash + splitBank)}
+                    </span>
+                  </div>
+                  {total - (splitCash + splitBank) > 0 && (
+                    <div className="text-sm font-semibold text-rose-500">
+                      Ghi nhận khách nợ: {formatCurrency(total - (splitCash + splitBank))}
+                    </div>
+                  )}
+                  {splitCash + splitBank > total && (
+                    <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      Vượt tổng — sẽ tính thu tối đa {formatCurrency(total)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1675,6 +1886,17 @@ Cam on quy khach da tin tuong!
                       {canDeleteSale && (
                         <button
                           type="button"
+                          onClick={() => setReturnSale(sale)}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                          title="Đổi/Trả hàng"
+                          aria-label="Đổi/Trả hàng"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDeleteSale && (
+                        <button
+                          type="button"
                           onClick={() => handleDeleteSale(sale.id)}
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                           title="Xóa phiếu bán hàng"
@@ -1715,6 +1937,9 @@ Cam on quy khach da tin tuong!
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 mt-1">
                         <span className="text-slate-500">
                           {sale.paymentMethod === "bank" ? "Chuyển khoản" : "Tiền mặt"}
+                        </span>
+                        <span className="text-slate-500">
+                          Người bán: <span className="font-semibold text-slate-700 dark:text-slate-300">{sale.userName}</span>
                         </span>
                         <span className="font-bold text-emerald-600 dark:text-emerald-400">
                           {formatCurrency(sale.total)}
@@ -1838,6 +2063,12 @@ Cam on quy khach da tin tuong!
           }
         }}
       />
+      {returnSale && (
+        <ReturnSaleModal
+          sale={returnSale}
+          onClose={() => setReturnSale(null)}
+        />
+      )}
     </div>
   );
 };

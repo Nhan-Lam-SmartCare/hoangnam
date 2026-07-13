@@ -301,7 +301,13 @@ export const supabaseHelpers = {
       .order("date", { ascending: false });
 
     if (error) throw error;
-    return data;
+    // Chuẩn hóa userid/username (snake) -> userId/userName (camel) để báo cáo
+    // doanh số nhân viên đọc đúng field. Additive, giữ nguyên các cột khác.
+    return (data || []).map((row: any) => ({
+      ...row,
+      userId: row.userId || row.userid || null,
+      userName: row.userName || row.username || null,
+    }));
   },
 
   async getSalesPaged(params?: { page?: number; pageSize?: number }) {

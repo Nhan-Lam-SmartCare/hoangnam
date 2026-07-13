@@ -1,42 +1,27 @@
 -- ============================================================================
--- sale_create_atomic — Tạo phiếu bán hàng NGUYÊN TỬ (root fix cho #1 và #8)
--- Date: 2026-06-17
+-- sale_create_atomic_v2 — Tạo đơn bán với THANH TOÁN TÁCH (nhiều nguồn tiền)
+-- Date: 2026-07-13
 -- ============================================================================
 --
--- Gom toàn bộ luồng tiền/kho/công nợ của một đơn bán vào MỘT transaction:
---   1) Khóa + kiểm tra + trừ kho (chống bán âm/oversell, không còn "đơn lưu mà
---      kho chưa trừ").
---   2) Insert phiếu sales.
---   3) Nếu có thực thu: ghi cash_transactions + cộng số dư payment_sources.
---   4) Nếu còn thiếu: tạo customer_debts (cột sale_id).
---   5) Cộng thống kê khách hàng (totalspent/visitcount) ngay trong transaction
---      -> hết race read-modify-write phía client (#8).
--- Bất kỳ bước nào lỗi -> RAISE EXCEPTION -> rollback toàn bộ, không để dữ liệu
--- nửa vời.
+-- Cho phép một đơn trả bằng NHIỀU nguồn (vd tiền mặt + chuyển khoản). Đối xứng
+-- sale_create_atomic (v1) nhưng thay p_paid_amount (scalar) bằng:
+--   p_payments jsonb = [{ "source": "cash", "amount": 100000 },
+--                       { "source": "bank", "amount": 50000 }, ...]
+-- Với mỗi payment amount>0: ghi 1 cash_transactions + cộng số dư đúng nguồn.
+-- Nợ còn lại = total - Σamount -> customer_debts như v1.
 --
--- ✅ TRẠNG THÁI: client (useFinanceActions.finalizeSale) ĐÃ gọi RPC này làm đường
--- DUY NHẤT tạo đơn (nhánh fallback từng-bước phía client đã được GỠ). Đơn tách
--- nguồn thanh toán dùng biến thể sale_create_atomic_v2 (p_payments[]).
+-- v1 vẫn giữ nguyên (client chỉ gọi v2 khi thực sự tách nguồn; đơn 1 nguồn dùng v1).
 --
--- p_sale: { id, date, items, subtotal, discount, total, customer(jsonb),
---           paymentMethod, userId, userName, note, customerId }
--- p_items: [{ partId, quantity }, ...]
--- p_branch_id: mã chi nhánh
--- p_paid_amount: số tiền khách thực trả (>= 0, <= total)
--- p_cash_tx_id: id giao dịch sổ quỹ sẽ tạo (truyền từ client để liên kết)
---
--- Trả về:
---   { success: true, saleId, cashTransactionId }
---   { success: false, message, insufficient: [{partId, available, requested}] }
+-- ⚠️ exec_sql RPC KHÔNG tồn tại -> APPLY qua Supabase SQL Editor.
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.sale_create_atomic(
+CREATE OR REPLACE FUNCTION public.sale_create_atomic_v2(
   p_sale jsonb,
   p_items jsonb,
   p_branch_id text,
-  p_paid_amount numeric,
-  p_cash_tx_id text DEFAULT NULL
+  p_payments jsonb,
+  p_cash_tx_prefix text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -52,10 +37,16 @@ DECLARE
   v_insufficient jsonb := '[]'::jsonb;
   v_sale_id      text := p_sale->>'id';
   v_total        numeric := COALESCE((p_sale->>'total')::numeric, 0);
-  v_paid         numeric := GREATEST(0, LEAST(COALESCE(p_paid_amount, 0), COALESCE((p_sale->>'total')::numeric, 0)));
+  v_pay          jsonb;
+  v_pay_src      text;
+  v_pay_amt      numeric;
+  v_paid_total   numeric := 0;
   v_remaining    numeric;
-  v_cash_tx_id   text := COALESCE(p_cash_tx_id, 'CT-' || v_sale_id);
-  v_payment      text := COALESCE(p_sale->>'paymentMethod', 'cash');
+  v_cash_prefix  text := COALESCE(p_cash_tx_prefix, 'CT-' || (p_sale->>'id'));
+  v_pay_count    int := 0;
+  v_pay_idx      int := 0;
+  v_first_tx_id  text := NULL;
+  v_payment_label text;
   v_customer_id  text := NULLIF(p_sale->>'customerId', '');
 BEGIN
   IF v_sale_id IS NULL OR length(trim(v_sale_id)) = 0 THEN
@@ -65,7 +56,22 @@ BEGIN
     RAISE EXCEPTION 'BRANCH_ID_REQUIRED';
   END IF;
 
-  v_remaining := v_total - v_paid;
+  -- Tổng thực thu (kẹp trong [0, total]).
+  FOR v_pay IN SELECT * FROM jsonb_array_elements(COALESCE(p_payments, '[]'::jsonb))
+  LOOP
+    v_pay_amt := COALESCE((v_pay->>'amount')::numeric, 0);
+    IF v_pay_amt > 0 THEN
+      v_paid_total := v_paid_total + v_pay_amt;
+      v_pay_count := v_pay_count + 1;
+    END IF;
+  END LOOP;
+  IF v_paid_total > v_total THEN
+    v_paid_total := v_total;   -- không cho thu quá tổng (phần dư = tiền thối, không ghi)
+  END IF;
+  v_remaining := v_total - v_paid_total;
+
+  v_payment_label := CASE WHEN v_pay_count > 1 THEN 'mixed'
+                          ELSE COALESCE((p_payments->0->>'source'), 'cash') END;
 
   -- 1) Khóa + kiểm tra tồn kho.
   FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_items, '[]'::jsonb))
@@ -90,7 +96,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'message', 'Không đủ tồn kho để xuất bán', 'insufficient', v_insufficient);
   END IF;
 
-  -- 2) Trừ kho (hàng vẫn đang khóa trong transaction).
+  -- 2) Trừ kho.
   FOR v_item IN SELECT * FROM jsonb_array_elements(COALESCE(p_items, '[]'::jsonb))
   LOOP
     v_part_id := v_item->>'partId';
@@ -106,8 +112,8 @@ BEGIN
     WHERE id = v_part_id;
   END LOOP;
 
-  -- 3) Insert phiếu bán (trigger sync_sales_branch_columns sẽ đồng bộ branch).
-  INSERT INTO public.sales (id, date, items, subtotal, discount, total, customer, paymentmethod, userid, branchid, note, refunded)
+  -- 3) Insert phiếu bán (paymentmethod = 'mixed' nếu tách nguồn).
+  INSERT INTO public.sales (id, date, items, subtotal, discount, total, customer, paymentmethod, userid, username, branchid, note, refunded)
   VALUES (
     v_sale_id,
     COALESCE((p_sale->>'date')::timestamptz, now()),
@@ -116,37 +122,54 @@ BEGIN
     COALESCE((p_sale->>'discount')::numeric, 0),
     v_total,
     p_sale->'customer',
-    v_payment,
+    v_payment_label,
     NULLIF(p_sale->>'userId', ''),
+    NULLIF(p_sale->>'userName', ''),
     p_branch_id,
     NULLIF(p_sale->>'note', ''),
     false
   );
 
-  -- 4) Thực thu -> ghi sổ quỹ + cộng số dư nguồn tiền.
-  IF v_paid > 0 THEN
-    INSERT INTO public.cash_transactions (id, type, amount, branchid, category, date, description, paymentsource, saleid, recipient)
-    VALUES (
-      v_cash_tx_id, 'income', v_paid, p_branch_id, 'sale_income',
-      COALESCE((p_sale->>'date')::timestamptz, now()),
-      COALESCE(NULLIF(p_sale->>'note', ''), 'Thu tiền bán hàng'),
-      v_payment, v_sale_id,
-      COALESCE(p_sale#>>'{customer,name}', 'Khách lẻ')
-    );
+  -- 4) Ghi sổ quỹ + cộng số dư cho TỪNG nguồn thanh toán (amount>0).
+  FOR v_pay IN SELECT * FROM jsonb_array_elements(COALESCE(p_payments, '[]'::jsonb))
+  LOOP
+    v_pay_src := COALESCE(v_pay->>'source', 'cash');
+    v_pay_amt := COALESCE((v_pay->>'amount')::numeric, 0);
+    IF v_pay_amt <= 0 THEN CONTINUE; END IF;
 
-    UPDATE public.sales SET cashtransactionid = v_cash_tx_id WHERE id = v_sale_id;
+    v_pay_idx := v_pay_idx + 1;
+    DECLARE
+      v_tx_id text := CASE WHEN v_pay_count > 1
+                           THEN v_cash_prefix || '-' || v_pay_idx
+                           ELSE v_cash_prefix END;
+    BEGIN
+      INSERT INTO public.cash_transactions (id, type, amount, branchid, category, date, description, paymentsource, saleid, recipient)
+      VALUES (
+        v_tx_id, 'income', v_pay_amt, p_branch_id, 'sale_income',
+        COALESCE((p_sale->>'date')::timestamptz, now()),
+        COALESCE(NULLIF(p_sale->>'note', ''), 'Thu tiền bán hàng'),
+        v_pay_src, v_sale_id,
+        COALESCE(p_sale#>>'{customer,name}', 'Khách lẻ')
+      );
 
-    PERFORM 1 FROM public.payment_sources WHERE id = v_payment FOR UPDATE;
-    UPDATE public.payment_sources
-    SET balance = jsonb_set(
-      COALESCE(balance, '{}'::jsonb),
-      ARRAY[p_branch_id],
-      to_jsonb(COALESCE((balance->>p_branch_id)::numeric, 0) + v_paid)
-    )
-    WHERE id = v_payment;
+      IF v_first_tx_id IS NULL THEN v_first_tx_id := v_tx_id; END IF;
+
+      PERFORM 1 FROM public.payment_sources WHERE id = v_pay_src FOR UPDATE;
+      UPDATE public.payment_sources
+      SET balance = jsonb_set(
+        COALESCE(balance, '{}'::jsonb),
+        ARRAY[p_branch_id],
+        to_jsonb(COALESCE((balance->>p_branch_id)::numeric, 0) + v_pay_amt)
+      )
+      WHERE id = v_pay_src;
+    END;
+  END LOOP;
+
+  IF v_first_tx_id IS NOT NULL THEN
+    UPDATE public.sales SET cashtransactionid = v_first_tx_id WHERE id = v_sale_id;
   END IF;
 
-  -- 5) Còn thiếu -> tạo công nợ (cột sale_id, id CDEBT-SALE-...).
+  -- 5) Còn thiếu -> tạo công nợ.
   IF v_remaining > 0 THEN
     INSERT INTO public.customer_debts (id, customer_id, customer_name, phone, description, total_amount, paid_amount, remaining_amount, created_date, branch_id, sale_id)
     VALUES (
@@ -155,7 +178,7 @@ BEGIN
       COALESCE(NULLIF(p_sale#>>'{customer,name}', ''), 'Khách lẻ'),
       NULLIF(p_sale#>>'{customer,phone}', ''),
       'Mua hàng (Hóa đơn #' || v_sale_id || ')',
-      v_total, v_paid, v_remaining,
+      v_total, v_paid_total, v_remaining,
       to_char(now(), 'YYYY-MM-DD'),
       p_branch_id, v_sale_id
     )
@@ -165,7 +188,7 @@ BEGIN
           remaining_amount = EXCLUDED.remaining_amount;
   END IF;
 
-  -- 6) Cộng thống kê khách hàng nguyên tử (#8) + phân hạng segment (khớp client).
+  -- 6) Cộng thống kê khách hàng + segment.
   IF v_customer_id IS NOT NULL THEN
     UPDATE public.customers
     SET totalspent = COALESCE(totalspent, 0) + v_total,
@@ -180,10 +203,10 @@ BEGIN
     WHERE id = v_customer_id;
   END IF;
 
-  RETURN jsonb_build_object('success', true, 'saleId', v_sale_id, 'cashTransactionId', CASE WHEN v_paid > 0 THEN v_cash_tx_id ELSE NULL END);
+  RETURN jsonb_build_object('success', true, 'saleId', v_sale_id, 'cashTransactionId', v_first_tx_id, 'paidTotal', v_paid_total);
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.sale_create_atomic(jsonb, jsonb, text, numeric, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.sale_create_atomic_v2(jsonb, jsonb, text, jsonb, text) TO authenticated;
 
 COMMIT;

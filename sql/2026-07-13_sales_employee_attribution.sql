@@ -1,35 +1,23 @@
 -- ============================================================================
--- sale_create_atomic — Tạo phiếu bán hàng NGUYÊN TỬ (root fix cho #1 và #8)
--- Date: 2026-06-17
+-- Gắn NHÂN VIÊN BÁN HÀNG vào đơn — phục vụ báo cáo doanh số/thưởng theo tháng
+-- Date: 2026-07-13
 -- ============================================================================
 --
--- Gom toàn bộ luồng tiền/kho/công nợ của một đơn bán vào MỘT transaction:
---   1) Khóa + kiểm tra + trừ kho (chống bán âm/oversell, không còn "đơn lưu mà
---      kho chưa trừ").
---   2) Insert phiếu sales.
---   3) Nếu có thực thu: ghi cash_transactions + cộng số dư payment_sources.
---   4) Nếu còn thiếu: tạo customer_debts (cột sale_id).
---   5) Cộng thống kê khách hàng (totalspent/visitcount) ngay trong transaction
---      -> hết race read-modify-write phía client (#8).
--- Bất kỳ bước nào lỗi -> RAISE EXCEPTION -> rollback toàn bộ, không để dữ liệu
--- nửa vời.
+-- Vấn đề gốc đã phát hiện:
+--   * Bảng `sales` KHÔNG có cột lưu TÊN người bán (chỉ có userid).
+--   * RPC sale_create_atomic chỉ INSERT userid, bỏ userName client gửi lên.
+--   => Khi đọc lại luôn fallback "Local User" -> báo cáo doanh số NV = 0.
 --
--- ✅ TRẠNG THÁI: client (useFinanceActions.finalizeSale) ĐÃ gọi RPC này làm đường
--- DUY NHẤT tạo đơn (nhánh fallback từng-bước phía client đã được GỠ). Đơn tách
--- nguồn thanh toán dùng biến thể sale_create_atomic_v2 (p_payments[]).
+-- Migration này:
+--   1) Thêm cột sales.username (idempotent).
+--   2) CREATE OR REPLACE sale_create_atomic để GHI THÊM username vào sales.
 --
--- p_sale: { id, date, items, subtotal, discount, total, customer(jsonb),
---           paymentMethod, userId, userName, note, customerId }
--- p_items: [{ partId, quantity }, ...]
--- p_branch_id: mã chi nhánh
--- p_paid_amount: số tiền khách thực trả (>= 0, <= total)
--- p_cash_tx_id: id giao dịch sổ quỹ sẽ tạo (truyền từ client để liên kết)
---
--- Trả về:
---   { success: true, saleId, cashTransactionId }
---   { success: false, message, insufficient: [{partId, available, requested}] }
+-- ⚠️ exec_sql RPC KHÔNG tồn tại trên DB này -> APPLY BẰNG Supabase SQL Editor
+--    (dán toàn bộ file, Run), KHÔNG dùng scripts/setup/apply-sql.mjs.
 
 BEGIN;
+
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS username text;
 
 CREATE OR REPLACE FUNCTION public.sale_create_atomic(
   p_sale jsonb,
@@ -106,8 +94,8 @@ BEGIN
     WHERE id = v_part_id;
   END LOOP;
 
-  -- 3) Insert phiếu bán (trigger sync_sales_branch_columns sẽ đồng bộ branch).
-  INSERT INTO public.sales (id, date, items, subtotal, discount, total, customer, paymentmethod, userid, branchid, note, refunded)
+  -- 3) Insert phiếu bán (GHI THÊM username = tên nhân viên bán hàng).
+  INSERT INTO public.sales (id, date, items, subtotal, discount, total, customer, paymentmethod, userid, username, branchid, note, refunded)
   VALUES (
     v_sale_id,
     COALESCE((p_sale->>'date')::timestamptz, now()),
@@ -118,6 +106,7 @@ BEGIN
     p_sale->'customer',
     v_payment,
     NULLIF(p_sale->>'userId', ''),
+    NULLIF(p_sale->>'userName', ''),
     p_branch_id,
     NULLIF(p_sale->>'note', ''),
     false

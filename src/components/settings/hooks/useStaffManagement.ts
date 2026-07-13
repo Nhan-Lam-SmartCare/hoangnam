@@ -529,23 +529,38 @@ export const useStaffManagement = (activeTab: string) => {
       return;
     }
 
+    const trimmedName = newName.trim();
     setSavingBranch(true);
     try {
-      let error: any = null;
-      if (!readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
-        const updateRes = await supabase
-          .from("branches")
-          .update({ name: newName.trim() })
-          .eq("id", id);
-        error = updateRes.error;
-      }
-
-      setBranchOverrides((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, name: newName.trim() } : b))
-      );
+      // Always persist the new name into branchOverrides (localStorage) first,
+      // so it survives refreshStaffScreen() which re-fetches from Supabase.
+      // mergeBranches() passes branchOverrides AFTER Supabase data, so overrides win.
+      setBranchOverrides((prev) => {
+        const existing = prev.find((b) => b.id === id);
+        if (existing) {
+          return prev.map((b) => (b.id === id ? { ...b, name: trimmedName } : b));
+        }
+        // Branch came from Supabase, add it to overrides now
+        return [...prev, { id, name: trimmedName }];
+      });
       setBranches((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, name: newName.trim() } : b))
+        prev.map((b) => (b.id === id ? { ...b, name: trimmedName } : b))
       );
+
+      // Best-effort update to Supabase (will silently fail if table missing)
+      if (!readLocalFlag(BRANCH_TABLE_DISABLED_KEY)) {
+        try {
+          const updateRes = await supabase
+            .from("branches")
+            .update({ name: trimmedName })
+            .eq("id", id);
+          if (isMissingTableError(updateRes.error)) {
+            writeLocalFlag(BRANCH_TABLE_DISABLED_KEY);
+          }
+        } catch {
+          // Non-critical: name is already saved in localStorage
+        }
+      }
 
       showToast.success("Đã cập nhật tên chi nhánh thành công!");
       await refreshStaffScreen();

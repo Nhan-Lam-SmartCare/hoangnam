@@ -224,6 +224,7 @@ export function useAppActions(state: AppState): AppActions {
     upsertWorkOrder,
     clearCart: financeActions.clearCart,
     deleteSale: financeActions.deleteSale,
+    returnSaleItems: financeActions.returnSaleItems,
     finalizeSale: financeActions.finalizeSale,
     recordInventoryTransaction: financeActions.recordInventoryTransaction,
     upsertEmployee,

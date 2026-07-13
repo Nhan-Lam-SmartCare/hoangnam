@@ -175,4 +175,48 @@ describe("salesRepository.refundSale compatibility", () => {
       "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
     );
   });
+
+  it("deleteSale dùng RPC sale_delete_atomic khi đã deploy (không chạy fallback từng bước)", async () => {
+    const { state, deps } = createDeps();
+
+    // Ghi đè: RPC xóa đơn nguyên tử đã deploy -> trả kết quả hoàn tiền.
+    mockRpc.mockImplementation((rpcName: string) => {
+      if (rpcName === "sale_delete_atomic") {
+        return Promise.resolve({
+          data: {
+            success: true,
+            branchId: "CN1",
+            refunds: { cash: 185000 },
+            removedCashTxIds: ["CT-1"],
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const { result } = renderHook(() => useFinanceActions(deps as any));
+
+    act(() => {
+      result.current.deleteSale("SALE-1");
+    });
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith("sale_delete_atomic", {
+        p_sale_id: "SALE-1",
+        p_branch_id: "CN1",
+      });
+    });
+
+    // Trạng thái cục bộ được cập nhật từ kết quả RPC.
+    expect(state.sales).toHaveLength(0);
+    expect(state.parts[0].stock.CN1).toBe(9);
+    expect(state.cashTransactions).toHaveLength(0);
+    expect(state.paymentSources[0].balance.CN1).toBe(115000);
+    // KHÔNG chạy nhánh fallback (không tự delete bảng sales phía client).
+    expect(mockSalesDeleteEq).not.toHaveBeenCalled();
+    expect(showToast.success).toHaveBeenCalledWith(
+      "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
+    );
+  });
 });

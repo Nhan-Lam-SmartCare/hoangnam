@@ -4,20 +4,15 @@ import {
   deleteCashTransaction,
 } from "../../lib/repository/cashTransactionsRepository";
 import { updatePaymentSourceBalance } from "../../lib/repository/paymentSourcesRepository";
-import {
-  decrementStockForSale,
-  incrementStockForReturn,
-} from "../../lib/repository/partsRepository";
-import {
-  createCustomerDebt,
-  deleteCustomerDebt,
-} from "../../lib/repository/debtsRepository";
+import { incrementStockForReturn } from "../../lib/repository/partsRepository";
+import { deleteCustomerDebt } from "../../lib/repository/debtsRepository";
 import { showToast } from "../../utils/toast";
 import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { supabase } from "../../supabaseClient";
 import type {
   CashTransaction,
   CartItem,
+  CustomerDebt,
   InventoryTransaction,
   Sale,
 } from "../../types";
@@ -116,6 +111,7 @@ export function useFinanceActions(
   | "clearCart"
   | "finalizeSale"
   | "deleteSale"
+  | "returnSaleItems"
   | "recordInventoryTransaction"
   | "payCustomerDebts"
   | "paySupplierDebts"
@@ -124,8 +120,6 @@ export function useFinanceActions(
     currentBranchId,
     parts,
     sales,
-    cashTransactions,
-    customerDebts,
     setSales,
     setParts,
     setCashTransactions,
@@ -146,6 +140,10 @@ export function useFinanceActions(
       customer: { id?: string; name: string; phone?: string };
       note?: string;
       paidAmount?: number;
+      /** Thanh toán tách: nhiều nguồn trên 1 đơn. Nếu có, sẽ ưu tiên thay cho paymentMethod/paidAmount. */
+      payments?: { source: string; amount: number }[];
+      /** Nhân viên bán hàng (lấy từ profile đăng nhập) — gắn vào đơn để tính doanh số. */
+      soldBy?: { id: string; name: string };
     }): Promise<{ ok: boolean; saleId: string }> => {
       if (!data.items.length)
         return Promise.resolve({ ok: false, saleId: "" });
@@ -173,17 +171,38 @@ export function useFinanceActions(
         total,
         customer: data.customer,
         paymentMethod: data.paymentMethod,
-        userId: "local-user",
-        userName: "Local User",
+        userId: data.soldBy?.id || "local-user",
+        userName: data.soldBy?.name || "Local User",
         branchId: currentBranchId,
         cashTransactionId: undefined,
       };
 
+      // Chuẩn hóa nguồn thanh toán. Nếu client truyền `payments` (tách nguồn) ->
+      // dùng nguyên; nếu không -> suy ra 1 nguồn từ (paymentMethod, paidAmount).
+      const rawPayments = (data.payments || [])
+        .map((p) => ({
+          source: p.source,
+          amount: Math.max(0, Number(p.amount) || 0),
+        }))
+        .filter((p) => p.amount > 0);
+
       // Số tiền khách thực trả (kẹp trong [0, total]); phần còn lại ghi công nợ.
-      const actualPaidAmount =
-        data.paidAmount !== undefined
-          ? Math.max(0, Math.min(total, data.paidAmount))
-          : total;
+      const actualPaidAmount = rawPayments.length
+        ? Math.min(
+            total,
+            rawPayments.reduce((s, p) => s + p.amount, 0)
+          )
+        : data.paidAmount !== undefined
+        ? Math.max(0, Math.min(total, data.paidAmount))
+        : total;
+
+      // Danh sách nguồn để ghi sổ quỹ + cập nhật số dư (1 hoặc nhiều nguồn).
+      const payments: { source: string; amount: number }[] = rawPayments.length
+        ? rawPayments
+        : actualPaidAmount > 0
+        ? [{ source: data.paymentMethod, amount: actualPaidAmount }]
+        : [];
+      const isSplitPayment = payments.length > 1;
 
       const saleItems = data.items.map((it) => ({
         partId: it.partId,
@@ -211,18 +230,26 @@ export function useFinanceActions(
         if (actualPaidAmount > 0) {
           setCashTransactions((prev) => prev.filter((ct) => ct.saleId !== saleId));
           setPaymentSources((prev) =>
-            prev.map((ps) =>
-              ps.id === data.paymentMethod
-                ? {
-                    ...ps,
-                    balance: {
-                      ...ps.balance,
-                      [currentBranchId]:
-                        (ps.balance[currentBranchId] || 0) - actualPaidAmount,
-                    },
-                  }
-                : ps
-            )
+            prev.map((ps) => {
+              const revert = payments
+                .filter((p) => p.source === ps.id)
+                .reduce((s, p) => s + p.amount, 0);
+              if (!revert) return ps;
+              return {
+                ...ps,
+                balance: {
+                  ...ps.balance,
+                  [currentBranchId]:
+                    (ps.balance[currentBranchId] || 0) - revert,
+                },
+              };
+            })
+          );
+        }
+        // Gỡ công nợ optimistic đã tạo cho đơn này (nếu có).
+        if (total - actualPaidAmount > 0) {
+          setCustomerDebts((prev) =>
+            prev.filter((d) => d.id !== `CDEBT-SALE-${saleId}`)
           );
         }
         setCartItems(data.items);
@@ -231,10 +258,15 @@ export function useFinanceActions(
       const persistence = (async (): Promise<{ ok: boolean }> => {
         const { data: userData } = await supabase.auth.getUser();
         const currentUser = userData?.user;
+        // Ưu tiên nhân viên do client truyền (từ bảng profiles — chuẩn, không tự
+        // sửa được như user_metadata); fallback auth session; cuối cùng "Local User".
         const issuedBy =
+          data.soldBy?.name ||
           currentUser?.user_metadata?.name ||
           currentUser?.email ||
           newSale.userName;
+        const soldByUserId =
+          data.soldBy?.id || currentUser?.id || newSale.userId;
 
         // Xác định customer id thật (ưu tiên id, sau đó tra theo phone).
         let resolvedCustomerId: string | null = newSale.customer.id || null;
@@ -251,108 +283,7 @@ export function useFinanceActions(
 
         const cashTxId = `CT-${saleId}`;
 
-        // ── Thử gọi RPC nguyên tử trước ──────────────────────────────────
-        const rpcPayload = {
-          p_sale: {
-            id: newSale.id,
-            date: newSale.date,
-            items: newSale.items,
-            subtotal: newSale.subtotal,
-            discount: newSale.discount,
-            total: newSale.total,
-            customer: newSale.customer,
-            paymentMethod: newSale.paymentMethod,
-            userId: currentUser?.id || newSale.userId,
-            userName: issuedBy,
-            note: data.note || null,
-            customerId: resolvedCustomerId,
-          },
-          p_items: saleItems,
-          p_branch_id: newSale.branchId,
-          p_paid_amount: actualPaidAmount,
-          p_cash_tx_id: cashTxId,
-        };
-
-        const { data: rpcResult, error: rpcError } = await supabase.rpc(
-          "sale_create_atomic",
-          rpcPayload
-        );
-
-        // Nếu RPC tồn tại và trả kết quả
-        if (!rpcError && rpcResult) {
-          const result = typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
-
-          if (!result.success) {
-            rollbackOptimistic();
-            // Hiển thị chi tiết sản phẩm thiếu kho nếu có
-            if (result.insufficient && Array.isArray(result.insufficient)) {
-              const details = result.insufficient
-                .map((i: any) => {
-                  const part = parts.find((p) => p.id === i.partId);
-                  return `${part?.name || i.partId}: cần ${i.requested}, còn ${i.available}`;
-                })
-                .join("; ");
-              showToast.error(`Không đủ tồn kho: ${details}`);
-            } else {
-              showToast.error(
-                `Không thể tạo đơn: ${result.message || "Lỗi không xác định"}`
-              );
-            }
-            return { ok: false };
-          }
-
-          // RPC thành công — tạo warranty cards (non-critical, chạy sau)
-          await createWarrantyCardsForSale(newSale, parts, issuedBy);
-
-          return { ok: true };
-        }
-
-        // ── Fallback: RPC chưa deploy (404/PGRST202) — dùng luồng từng bước ──
-        if (rpcError) {
-          const isRpcMissing =
-            rpcError.code === "PGRST202" ||
-            rpcError.message?.includes("could not find") ||
-            (rpcError as any).status === 404;
-
-          if (!isRpcMissing) {
-            // Lỗi thật (không phải thiếu function) → rollback
-            rollbackOptimistic();
-            showToast.error(
-              `Lỗi tạo đơn bán: ${rpcError.message || "Lỗi CSDL"}`
-            );
-            return { ok: false };
-          }
-
-          // Fallback: chạy từng bước (phòng thủ cho DB chưa apply migration)
-          // ⚠️ NỢ KỸ THUẬT / P0: luồng dưới đây KHÔNG atomic — nếu lỗi giữa
-          // chừng có thể để đơn/kho/sổ quỹ lệch nhau. Chỉ chạy khi RPC
-          // sale_create_atomic CHƯA deploy. Sau khi xác nhận RPC đã có trên
-          // production (SELECT proname FROM pg_proc ...), HÃY GỠ cả nhánh này.
-          console.warn(
-            "[finalizeSale] RPC sale_create_atomic chưa có, dùng fallback từng bước"
-          );
-          showToast.warning(
-            "Hệ thống đang chạy chế độ dự phòng (chưa cập nhật CSDL). " +
-              "Vui lòng báo quản trị viên deploy RPC sale_create_atomic để đảm bảo an toàn số liệu."
-          );
-        }
-
-        // ── FALLBACK: Luồng từng bước (giữ tương thích ngược) ────────────
-
-        // 1) Trừ kho
-        const decRes = await decrementStockForSale(saleItems, newSale.branchId);
-        if (!decRes.ok) {
-          rollbackOptimistic();
-          showToast.error(
-            `Không thể tạo đơn (kho): ${mapRepoErrorForUser(decRes.error)}`
-          );
-          return { ok: false };
-        }
-        const stockFailedParts =
-          decRes.data.mode === "fallback" ? decRes.data.failedParts || [] : [];
-
-        // 2) Lưu đơn
-        const payload = {
+        const pSale = {
           id: newSale.id,
           date: newSale.date,
           items: newSale.items,
@@ -360,145 +291,73 @@ export function useFinanceActions(
           discount: newSale.discount,
           total: newSale.total,
           customer: newSale.customer,
-          paymentmethod: newSale.paymentMethod,
-          userid: currentUser?.id || newSale.userId,
-          username: issuedBy,
-          branchid: newSale.branchId,
-          branch_id: newSale.branchId,
-          branchId: newSale.branchId,
-          cashtransactionid: newSale.cashTransactionId || null,
+          paymentMethod: newSale.paymentMethod,
+          userId: soldByUserId,
+          userName: issuedBy,
           note: data.note || null,
-          refunded: false,
+          customerId: resolvedCustomerId,
         };
 
-        const { error } = await supabase.from("sales").insert([payload]);
-        if (error) {
-          await incrementStockForReturn(saleItems, newSale.branchId);
+        // ── Thử gọi RPC nguyên tử trước ──────────────────────────────────
+        // Tách nguồn -> v2 (p_payments[]); 1 nguồn -> v1 (giữ nguyên, đã deploy).
+        const { data: rpcResult, error: rpcError } = isSplitPayment
+          ? await supabase.rpc("sale_create_atomic_v2", {
+              p_sale: pSale,
+              p_items: saleItems,
+              p_branch_id: newSale.branchId,
+              p_payments: payments,
+              p_cash_tx_prefix: cashTxId,
+            })
+          : await supabase.rpc("sale_create_atomic", {
+              p_sale: pSale,
+              p_items: saleItems,
+              p_branch_id: newSale.branchId,
+              p_paid_amount: actualPaidAmount,
+              p_cash_tx_id: cashTxId,
+            });
+
+        // RPC nguyên tử là đường DUY NHẤT tạo đơn: kho + phiếu + sổ quỹ + công nợ
+        // + thống kê khách được xử lý trong MỘT transaction ở DB (đã deploy trên
+        // production). Không còn nhánh fallback từng-bước (không atomic) trước đây.
+        if (rpcError) {
           rollbackOptimistic();
-          const mappedError = {
-            code: "supabase" as const,
-            message: error.message || "Lỗi CSDL khi lưu đơn bán",
-          };
+          const isRpcMissing =
+            rpcError.code === "PGRST202" ||
+            rpcError.message?.includes("could not find") ||
+            (rpcError as any).status === 404;
           showToast.error(
-            `Lưu đơn thất bại, đã hoàn kho: ${mapRepoErrorForUser(mappedError)}`
+            isRpcMissing
+              ? `RPC ${
+                  isSplitPayment ? "sale_create_atomic_v2" : "sale_create_atomic"
+                } chưa được deploy trên CSDL. Vui lòng báo quản trị viên áp dụng migration.`
+              : `Lỗi tạo đơn bán: ${rpcError.message || "Lỗi CSDL"}`
           );
           return { ok: false };
         }
 
-        if (stockFailedParts.length > 0) {
-          showToast.warning(
-            `Đơn đã lưu nhưng chưa trừ kho CSDL cho: ${stockFailedParts.join(", ")}`
-          );
-        }
+        const result =
+          typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
 
-        // 3) Ghi sổ quỹ + cập nhật số dư
-        if (actualPaidAmount > 0) {
-          const cashRes = await createCashTransaction({
-            type: "income",
-            amount: actualPaidAmount,
-            branchId: newSale.branchId,
-            paymentSourceId: newSale.paymentMethod,
-            date: newSale.date,
-            category: "sale_income",
-            notes: data.note || "Thu tiền bán hàng",
-            saleId: newSale.id,
-            recipient: newSale.customer?.name || "Khách lẻ",
-            skipBalanceUpdate: true,
-          });
-
-          if (!cashRes.ok) {
-            showToast.warning(
-              `Đơn bán đã lưu nhưng chưa ghi sổ quỹ: ${mapRepoErrorForUser(cashRes.error)}`
-            );
-          } else {
-            const effectivePaymentSourceId =
-              cashRes.data.paymentSourceId || newSale.paymentMethod;
-            const balRes = await updatePaymentSourceBalance(
-              effectivePaymentSourceId,
-              newSale.branchId,
-              actualPaidAmount
-            );
-            if (!balRes.ok) {
-              showToast.warning(
-                `Đơn bán đã lưu nhưng chưa cập nhật số dư nguồn tiền: ${mapRepoErrorForUser(
-                  balRes.error
-                )}`
-              );
-            }
-
-            await supabase
-              .from("sales")
-              .update({ cashtransactionid: cashRes.data.id })
-              .eq("id", newSale.id);
-          }
-        }
-
-        // 4) Công nợ
-        const remainingAmount = total - actualPaidAmount;
-        if (remainingAmount > 0) {
-          const safeCustomerName =
-            newSale.customer.name?.trim() ||
-            newSale.customer.phone ||
-            "Khách lẻ";
-
-          const debtRes = await createCustomerDebt({
-            customerId:
-              resolvedCustomerId ||
-              newSale.customer.phone ||
-              `CUST-ANON-${saleId}`,
-            customerName: safeCustomerName,
-            phone: newSale.customer.phone,
-            description: `Mua hàng (Hóa đơn #${newSale.id})`,
-            totalAmount: total,
-            paidAmount: actualPaidAmount,
-            remainingAmount,
-            createdDate: new Date().toISOString().split("T")[0],
-            branchId: newSale.branchId,
-            saleId: newSale.id,
-          } as any);
-
-          if (!debtRes.ok) {
-            console.error("Error creating customer debt for sale:", debtRes.error);
-            showToast.error("Đơn bán đã lưu nhưng không thể tạo công nợ tự động.");
-          } else {
-            showToast.success(
-              `Đã tạo công nợ ${remainingAmount.toLocaleString()}đ cho ${safeCustomerName}`
-            );
-          }
-        }
-
-        // 5) Cập nhật thống kê khách hàng
-        if (resolvedCustomerId) {
-          try {
-            const { data: currentStats } = await supabase
-              .from("customers")
-              .select("totalspent, visitcount")
-              .eq("id", resolvedCustomerId)
-              .single();
-
-            const newTotalSpent = Number(currentStats?.totalspent || 0) + total;
-            const newVisitCount = Number(currentStats?.visitcount || 0) + 1;
-
-            let newSegment = "New";
-            if (newTotalSpent > 10000000) newSegment = "VIP";
-            else if (newTotalSpent > 3000000) newSegment = "Loyal";
-            else if (newVisitCount > 1) newSegment = "Potential";
-
-            await supabase
-              .from("customers")
-              .update({
-                totalspent: newTotalSpent,
-                visitcount: newVisitCount,
-                lastvisit: new Date().toISOString(),
-                segment: newSegment,
+        if (!result || !result.success) {
+          rollbackOptimistic();
+          // Hiển thị chi tiết sản phẩm thiếu kho nếu có.
+          if (result?.insufficient && Array.isArray(result.insufficient)) {
+            const details = result.insufficient
+              .map((i: any) => {
+                const part = parts.find((p) => p.id === i.partId);
+                return `${part?.name || i.partId}: cần ${i.requested}, còn ${i.available}`;
               })
-              .eq("id", resolvedCustomerId);
-          } catch (e) {
-            console.error("Lỗi cập nhật số liệu khách hàng:", e);
+              .join("; ");
+            showToast.error(`Không đủ tồn kho: ${details}`);
+          } else {
+            showToast.error(
+              `Không thể tạo đơn: ${result?.message || "Lỗi không xác định"}`
+            );
           }
+          return { ok: false };
         }
 
-        // 6) Warranty cards (fallback path)
+        // RPC thành công — tạo warranty cards (non-critical, chạy sau).
         await createWarrantyCardsForSale(newSale, parts, issuedBy);
 
         return { ok: true };
@@ -523,36 +382,67 @@ export function useFinanceActions(
       );
 
       // Chỉ ghi nhận tiền vào sổ quỹ/số dư theo SỐ THỰC THU (phần còn lại là
-      // công nợ), khớp với những gì persistence ghi xuống CSDL (#2).
+      // công nợ), khớp với những gì persistence ghi xuống CSDL (#2). Hỗ trợ
+      // thanh toán tách: 1 giao dịch + cộng số dư cho MỖI nguồn.
       if (actualPaidAmount > 0) {
-        const ctId = `CT-${Date.now()}`;
-        const cashTx: CashTransaction = {
-          id: ctId,
-          type: "income",
-          date: new Date().toISOString(),
-          amount: actualPaidAmount,
-          notes: data.note || "Thu tiền bán hàng",
-          paymentSourceId: data.paymentMethod,
-          branchId: currentBranchId,
-          category: "sale_income",
-          saleId,
-        };
-        setCashTransactions((prev) => [cashTx, ...prev]);
+        payments.forEach((p, idx) => {
+          const cashTx: CashTransaction = {
+            id: `CT-${Date.now()}-${idx}`,
+            type: "income",
+            date: new Date().toISOString(),
+            amount: p.amount,
+            notes: data.note || "Thu tiền bán hàng",
+            paymentSourceId: p.source,
+            branchId: currentBranchId,
+            category: "sale_income",
+            saleId,
+          };
+          setCashTransactions((prev) => [cashTx, ...prev]);
+        });
 
         setPaymentSources((prev) =>
-          prev.map((ps) =>
-            ps.id === data.paymentMethod
-              ? {
-                  ...ps,
-                  balance: {
-                    ...ps.balance,
-                    [currentBranchId]:
-                      (ps.balance[currentBranchId] || 0) + actualPaidAmount,
-                  },
-                }
-              : ps
-          )
+          prev.map((ps) => {
+            const add = payments
+              .filter((p) => p.source === ps.id)
+              .reduce((s, p) => s + p.amount, 0);
+            if (!add) return ps;
+            return {
+              ...ps,
+              balance: {
+                ...ps.balance,
+                [currentBranchId]: (ps.balance[currentBranchId] || 0) + add,
+              },
+            };
+          })
         );
+      }
+
+      // #2: Phần còn thiếu -> tạo công nợ optimistic ngay ở client cho CẢ hai luồng
+      // (RPC atomic lẫn fallback đều chỉ ghi công nợ xuống DB, không cập nhật state),
+      // để màn Công nợ hiển thị ngay mà không cần reload. Dùng cùng id với RPC/DB
+      // (CDEBT-SALE-...) nên khi tải lại từ CSDL sẽ khớp, không nhân đôi.
+      const remainingDebt = total - actualPaidAmount;
+      if (remainingDebt > 0) {
+        const optimisticDebt: CustomerDebt = {
+          id: `CDEBT-SALE-${saleId}`,
+          customerId:
+            data.customer.id ||
+            data.customer.phone ||
+            `CUST-ANON-${saleId}`,
+          customerName:
+            data.customer.name?.trim() || data.customer.phone || "Khách lẻ",
+          phone: data.customer.phone,
+          description: `Mua hàng (Hóa đơn #${saleId})`,
+          totalAmount: total,
+          paidAmount: actualPaidAmount,
+          remainingAmount: remainingDebt,
+          createdDate: new Date().toISOString().split("T")[0],
+          branchId: currentBranchId,
+        };
+        setCustomerDebts((prev) => [
+          optimisticDebt,
+          ...prev.filter((d) => d.id !== optimisticDebt.id),
+        ]);
       }
 
       clearCart();
@@ -565,6 +455,7 @@ export function useFinanceActions(
       parts,
       setCartItems,
       setCashTransactions,
+      setCustomerDebts,
       setParts,
       setPaymentSources,
       setSales,
@@ -578,7 +469,100 @@ export function useFinanceActions(
 
       const saleBranchId = sale.branchId || currentBranchId;
 
+      // Cập nhật state cục bộ sau khi CSDL đã hoàn tất xóa/hoàn (dùng chung cho
+      // cả nhánh RPC và fallback).
+      const applyLocalDelete = (
+        branch: string,
+        refundBySource: Record<string, number>,
+        hadDebts: boolean
+      ) => {
+        setSales((prev) => prev.filter((s) => s.id !== saleId));
+
+        setParts((prev) =>
+          prev.map((p) => {
+            const soldQty = sale.items
+              .filter((i) => i.partId === p.id)
+              .reduce((s, i) => s + i.quantity, 0);
+            if (!soldQty) return p;
+            return {
+              ...p,
+              stock: {
+                ...p.stock,
+                [branch]: (p.stock[branch] || 0) + soldQty,
+              },
+            };
+          })
+        );
+
+        setCashTransactions((prev) => prev.filter((ct) => ct.saleId !== saleId));
+
+        setPaymentSources((prev) =>
+          prev.map((ps) => {
+            const refund = refundBySource[ps.id] || 0;
+            if (!refund) return ps;
+            return {
+              ...ps,
+              balance: {
+                ...ps.balance,
+                [branch]: (ps.balance[branch] || 0) - refund,
+              },
+            };
+          })
+        );
+
+        if (hadDebts) {
+          setCustomerDebts((prev) =>
+            prev.filter(
+              (d) =>
+                (d as any).saleId !== saleId && (d as any).sale_id !== saleId
+            )
+          );
+        }
+      };
+
       void (async () => {
+        // ── Thử RPC nguyên tử trước (hoàn kho + hoàn tiền + xóa nợ trong 1 TX) ──
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          "sale_delete_atomic",
+          { p_sale_id: saleId, p_branch_id: saleBranchId }
+        );
+
+        const isRpcMissing =
+          !!rpcError &&
+          (rpcError.code === "PGRST202" ||
+            rpcError.message?.includes("could not find") ||
+            (rpcError as any).status === 404);
+
+        if (!rpcError && rpcResult) {
+          const result =
+            typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
+          if (!result.success) {
+            showToast.error(
+              `Không thể xóa đơn: ${result.message || "Lỗi không xác định"}`
+            );
+            return;
+          }
+          const branch = result.branchId || saleBranchId;
+          const refunds: Record<string, number> = result.refunds || {};
+          applyLocalDelete(branch, refunds, true);
+          showToast.success(
+            "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
+          );
+          return;
+        }
+
+        if (rpcError && !isRpcMissing) {
+          showToast.error(
+            `Không thể xóa đơn trên CSDL: ${rpcError.message || "Lỗi CSDL"}`
+          );
+          return;
+        }
+
+        // ── Fallback: RPC chưa deploy -> luồng từng bước (không atomic) ──────
+        console.warn(
+          "[deleteSale] RPC sale_delete_atomic chưa có, dùng fallback từng bước"
+        );
+
         // Query linked cash transactions directly from the database (bypass stale client state)
         const { data: dbLinkedTx } = await supabase
           .from("cash_transactions")
@@ -739,6 +723,145 @@ export function useFinanceActions(
     ]
   );
 
+  const returnSaleItems = useCallback(
+    (input: {
+      saleId: string;
+      items: { partId: string; quantity: number }[];
+      refundAmount: number;
+      refundSource: string;
+      reason?: string;
+    }): Promise<{ ok: boolean; message?: string }> => {
+      const sale = sales.find((s) => s.id === input.saleId);
+      const branch = sale?.branchId || currentBranchId;
+      const items = input.items.filter((i) => i.quantity > 0);
+      if (!items.length)
+        return Promise.resolve({ ok: false, message: "Chưa chọn số lượng trả" });
+
+      return (async () => {
+        const returnId = `RET-${input.saleId}-${Date.now()}`;
+        const { data: userData } = await supabase.auth.getUser();
+
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          "sale_return_partial_atomic",
+          {
+            p_sale_id: input.saleId,
+            p_branch_id: branch,
+            p_items: items,
+            p_refund_amount: Math.max(0, input.refundAmount || 0),
+            p_refund_source: input.refundSource || "cash",
+            p_reason: input.reason || null,
+            p_return_id: returnId,
+            p_created_by: userData?.user?.id || null,
+          }
+        );
+
+        if (rpcError) {
+          const isMissing =
+            rpcError.code === "PGRST202" ||
+            rpcError.message?.includes("could not find") ||
+            (rpcError as any).status === 404;
+          showToast.error(
+            isMissing
+              ? "RPC sale_return_partial_atomic chưa được deploy. Vui lòng áp dụng migration."
+              : `Lỗi trả hàng: ${rpcError.message || "Lỗi CSDL"}`
+          );
+          return { ok: false, message: rpcError.message };
+        }
+
+        const result =
+          typeof rpcResult === "string" ? JSON.parse(rpcResult) : rpcResult;
+        if (!result || !result.success) {
+          if (result?.invalid && Array.isArray(result.invalid)) {
+            showToast.error("Số lượng trả vượt quá số còn lại của đơn.");
+          } else {
+            showToast.error(
+              `Không thể trả hàng: ${result?.message || "Lỗi không xác định"}`
+            );
+          }
+          return { ok: false, message: result?.message };
+        }
+
+        // 1) Hoàn kho cục bộ.
+        setParts((prev) =>
+          prev.map((p) => {
+            const q = items
+              .filter((i) => i.partId === p.id)
+              .reduce((s, i) => s + i.quantity, 0);
+            if (!q) return p;
+            return {
+              ...p,
+              stock: { ...p.stock, [branch]: (p.stock[branch] || 0) + q },
+            };
+          })
+        );
+
+        // 2) Cập nhật returnedQty + cờ refunded trên đơn.
+        setSales((prev) =>
+          prev.map((s) => {
+            if (s.id !== input.saleId) return s;
+            const newItems = s.items.map((it) => {
+              const q = items
+                .filter((i) => i.partId === it.partId)
+                .reduce((sum, i) => sum + i.quantity, 0);
+              if (!q) return it;
+              return { ...it, returnedQty: (it.returnedQty || 0) + q };
+            });
+            return {
+              ...s,
+              items: newItems,
+              refunded: result.fullyReturned || (s as any).refunded,
+            } as any;
+          })
+        );
+
+        // 3) Hoàn tiền -> cash tx (chi) + trừ số dư nguồn.
+        const refunds: Record<string, number> = result.refunds || {};
+        const refundTotal = Object.values(refunds).reduce(
+          (s, n) => s + Number(n || 0),
+          0
+        );
+        if (refundTotal > 0) {
+          const ct: CashTransaction = {
+            id: `CT-${returnId}`,
+            type: "expense",
+            date: new Date().toISOString(),
+            amount: refundTotal,
+            notes: `Hoàn tiền trả hàng (HĐ #${input.saleId})`,
+            paymentSourceId: input.refundSource,
+            branchId: branch,
+            category: "sale_refund",
+            saleId: input.saleId,
+          };
+          setCashTransactions((prev) => [ct, ...prev]);
+          setPaymentSources((prev) =>
+            prev.map((ps) => {
+              const amt = refunds[ps.id] || 0;
+              if (!amt) return ps;
+              return {
+                ...ps,
+                balance: {
+                  ...ps.balance,
+                  [branch]: (ps.balance[branch] || 0) - amt,
+                },
+              };
+            })
+          );
+        }
+
+        showToast.success("Đã trả hàng và hoàn kho thành công.");
+        return { ok: true };
+      })();
+    },
+    [
+      sales,
+      currentBranchId,
+      setParts,
+      setSales,
+      setCashTransactions,
+      setPaymentSources,
+    ]
+  );
+
   const recordInventoryTransaction = useCallback(
     (tx: Omit<InventoryTransaction, "id">) => {
       const id = `INV-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -878,6 +1001,7 @@ export function useFinanceActions(
     clearCart,
     finalizeSale,
     deleteSale,
+    returnSaleItems,
     recordInventoryTransaction,
     payCustomerDebts,
     paySupplierDebts,

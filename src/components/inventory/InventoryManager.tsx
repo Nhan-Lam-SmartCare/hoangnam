@@ -68,7 +68,7 @@ import {
 } from "../../lib/repository/partsRepository";
 import { useSupplierDebtsRepo } from "../../hooks/useDebtsRepository";
 import { createCashTransaction } from "../../lib/repository/cashTransactionsRepository";
-import { fetchSupplierById } from "../../lib/repository/suppliersRepository";
+import { fetchSupplierById, resolveOrCreateSupplier } from "../../lib/repository/suppliersRepository";
 import { fetchPaymentSourceRows } from "../../lib/repository/paymentSourcesRepository";
 import { createSupplierDebt } from "../../lib/repository/debtsRepository";
 import { bulkCreateInventoryTransactions } from "../../lib/repository/inventoryTransactionsRepository";
@@ -81,6 +81,7 @@ import { PODetailView } from "../purchase-orders/PODetailView";
 import { ExternalDataImport } from "../inventory/ExternalDataImport";
 import type { PurchaseOrder } from "../../types";
 import EditReceiptModal from "./modals/EditReceiptModal";
+import { fetchReceiptTransactions, rollbackReceiptStock, deleteReceiptRecords } from "../../lib/repository/goodsReceiptRepository";
 // Extracted modals
 import GoodsReceiptMobileWrapper from "./modals/GoodsReceiptMobileWrapper";
 import GoodsReceiptModal from "./modals/GoodsReceiptModal";
@@ -271,7 +272,7 @@ const InventoryManagerNew: React.FC = () => {
 
     allPartsData.forEach((part) => {
       const stock = part.stock?.[branchKey] || 0;
-      const reserved = part.reserved?.[branchKey] || 0;
+      const reserved = part.reservedStock?.[branchKey] || 0;
       const available = stock - reserved; // ✅ Calculate available stock
 
       if (available > 0) summary.inStock += 1;
@@ -412,7 +413,7 @@ const InventoryManagerNew: React.FC = () => {
 
       filtered = baseList.filter((part: any) => {
         const stock = part.stock?.[branchKey] || 0;
-        const reserved = part.reserved?.[branchKey] || 0;
+        const reserved = part.reservedStock?.[branchKey] || 0;
         const available = stock - reserved; // ✅ Calculate available stock
 
         if (stockFilter === "in-stock") return available > 0;
@@ -505,7 +506,7 @@ const InventoryManagerNew: React.FC = () => {
     if (!allPartsData) return 0;
     return allPartsData.reduce((sum, part: any) => {
       const stock = part.stock?.[currentBranchId] || 0;
-      const reserved = part.reserved?.[currentBranchId] || 0;
+      const reserved = part.reservedStock?.[currentBranchId] || 0;
       return sum + (stock - reserved); // ✅ Use available stock
     }, 0);
   }, [allPartsData, currentBranchId]);
@@ -514,7 +515,7 @@ const InventoryManagerNew: React.FC = () => {
     if (!allPartsData) return 0;
     return allPartsData.reduce((sum, part: any) => {
       const stock = part.stock?.[currentBranchId] || 0;
-      const reserved = part.reserved?.[currentBranchId] || 0;
+      const reserved = part.reservedStock?.[currentBranchId] || 0;
       const available = stock - reserved; // ✅ Calculate available
       // Prefer costPrice if present; otherwise fallback to retailPrice for demo datasets
       // where import/cost price hasn't been filled.
@@ -1222,6 +1223,9 @@ const InventoryManagerNew: React.FC = () => {
         updatedData.supplierPhone
       );
       let supplierId = supplierRes.ok ? supplierRes.data?.id : undefined;
+      if (!supplierId) {
+        throw new Error(supplierRes.ok ? "Không thể định danh nhà cung cấp" : supplierRes.error?.message || "Lỗi định danh nhà cung cấp");
+      }
 
       // 4. Resolve part IDs for items (some might be new or existing)
       const processedItems = await Promise.all(
@@ -2232,7 +2236,7 @@ const InventoryManagerNew: React.FC = () => {
                       filteredParts.map((part) => {
                         const branchKey = currentBranchId || "";
                         const stock = part.stock?.[branchKey] || 0;
-                        const reserved = part.reserved?.[branchKey] || 0;
+                        const reserved = part.reservedStock?.[branchKey] || 0;
                         const available = stock - reserved; // ✅ Calculate available stock
                         const retailPrice = part.retailPrice?.[branchKey] || 0;
                         const hasLaborCost = Object.prototype.hasOwnProperty.call(part, "laborCost");
@@ -2295,7 +2299,7 @@ const InventoryManagerNew: React.FC = () => {
                                       ? undefined
                                       : {
                                         backgroundColor: getAvatarColor(
-                                          part.category
+                                          part.category || ""
                                         ),
                                       }
                                   }
@@ -2707,7 +2711,7 @@ const InventoryManagerNew: React.FC = () => {
                       </p>
                       {/* Debug Info */}
                       <div className="mt-4 p-2 bg-slate-100 dark:bg-slate-900 rounded text-[10px] text-slate-400 font-mono text-left w-full overflow-hidden">
-                        Part Reserved Qty: {part.reserved?.[currentBranchId] || 0} <br />
+                        Part Reserved Qty: {part.reservedStock?.[currentBranchId] || 0} <br />
                         Nghi vấn: Số liệu bị lệch. Hãy thử tạo phiếu mới rồi xóa để reset.
                       </div>
                     </div>

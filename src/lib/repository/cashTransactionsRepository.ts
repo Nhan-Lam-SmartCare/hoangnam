@@ -154,9 +154,22 @@ export async function createCashTransaction(
     const getMissingColumnFromSupabaseError = (err: any): string | null => {
       const message = String(err?.message || "");
       const details = String(err?.details || "");
-      const text = `${message} ${details}`;
-      const match = text.match(/Could not find the '([^']+)' column/i);
-      return match?.[1] || null;
+      const hint = String(err?.hint || "");
+      const text = `${message} ${details} ${hint}`;
+      
+      const match1 = text.match(/Could not find the '([^']+)' column/i);
+      if (match1) return match1[1];
+      
+      const match2 = text.match(/column "([^"]+)"/i);
+      if (match2) return match2[1];
+      
+      const match3 = text.match(/column '([^']+)'/i);
+      if (match3) return match3[1];
+      
+      const match4 = text.match(/'([^']+)'/i);
+      if (match4) return match4[1];
+      
+      return null;
     };
 
     const insertWithSchemaFallback = async (
