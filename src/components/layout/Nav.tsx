@@ -94,6 +94,7 @@ export function Nav() {
   const canCreateSale = canDo(profile, "sale.create");
   const canViewCashBook =
     canDo(profile, "cashbook.view") || canDo(profile, "finance.view");
+  const canManagePawn = canDo(profile, "pawn.manage");
   const can = {
     viewFinance: canViewCashBook,
     viewPayroll: false,
@@ -104,6 +105,7 @@ export function Nav() {
     viewInventory: canViewInventory,
     viewDashboard: isOwnerOrManager,
     viewReports: canViewReports,
+    managePawn: canManagePawn,
   } as const;
 
   useEffect(() => {
@@ -364,12 +366,14 @@ export function Nav() {
               icon={<Shield className="w-4 h-4" />}
               label="Bảo hành"
             />
-            <NavLink
-              to="/pawn"
-              colorKey="orange"
-              icon={<Scale className="w-4 h-4" />}
-              label="Cầm đồ"
-            />
+            {can.managePawn && (
+              <NavLink
+                to="/pawn"
+                colorKey="orange"
+                icon={<Scale className="w-4 h-4" />}
+                label="Cầm đồ"
+              />
+            )}
 
             {canCreateSale && (
               <NavLink

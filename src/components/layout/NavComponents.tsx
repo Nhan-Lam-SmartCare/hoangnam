@@ -197,6 +197,7 @@ export const BottomNav: React.FC = () => {
   const canViewReports = canDo(profile, "reports.view");
   const canViewCashBook =
     canDo(profile, "cashbook.view") || canDo(profile, "finance.view");
+  const canManagePawn = canDo(profile, "pawn.manage");
   const [showMenu, setShowMenu] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
@@ -220,7 +221,7 @@ export const BottomNav: React.FC = () => {
       icon: <Scale className="w-6 h-6" />,
       label: "Cầm đồ",
       color: "orange",
-      show: true,
+      show: canManagePawn,
     },
 
     {
@@ -427,13 +428,15 @@ export const BottomNav: React.FC = () => {
                     color="emerald"
                     onClick={() => setShowMenu(false)}
                   />
-                  <MobileDrawerLink
-                    to="/pawn"
-                    icon={<Scale className="w-5 h-5" />}
-                    label="Cầm đồ"
-                    color="orange"
-                    onClick={() => setShowMenu(false)}
-                  />
+                  {canManagePawn && (
+                    <MobileDrawerLink
+                      to="/pawn"
+                      icon={<Scale className="w-5 h-5" />}
+                      label="Cầm đồ"
+                      color="orange"
+                      onClick={() => setShowMenu(false)}
+                    />
+                  )}
                   {canViewReports && (
                     <MobileDrawerLink
                       to="/reports"

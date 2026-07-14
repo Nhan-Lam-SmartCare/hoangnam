@@ -23,6 +23,9 @@ import {
   useDeletePawnRecordRepo,
 } from "../../hooks/usePawnRepository";
 import { useAppContext } from "../../contexts/AppContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { canDo } from "../../utils/permissions";
+import type { PawnRecord } from "../../types";
 import { supabase } from "../../supabaseClient";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
@@ -32,6 +35,7 @@ import PrintPawnPreviewModal from "./modals/PrintPawnPreviewModal";
 
 export default function PawnManager() {
   const { currentBranchId } = useAppContext();
+  const { profile } = useAuth();
   const { data: pawnRecords = [], isLoading } = usePawnRecordsRepo(currentBranchId);
   const createMutation = useCreatePawnRecordRepo();
   const updateMutation = useUpdatePawnRecordRepo();
@@ -40,9 +44,9 @@ export default function PawnManager() {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "redeemed" | "liquidated">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<any>(null);
-  const [showStatusModal, setShowStatusModal] = useState<any>(null);
-  const [printRecord, setPrintRecord] = useState<any>(null);
+  const [editingRecord, setEditingRecord] = useState<PawnRecord | null>(null);
+  const [showStatusModal, setShowStatusModal] = useState<PawnRecord | null>(null);
+  const [printRecord, setPrintRecord] = useState<PawnRecord | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Form states
@@ -122,7 +126,7 @@ export default function PawnManager() {
     setShowAddModal(true);
   };
 
-  const handleOpenEdit = (record: any) => {
+  const handleOpenEdit = (record: PawnRecord) => {
     setFormData({
       customerName: record.customerName || "",
       customerPhone: record.customerPhone || "",
@@ -233,7 +237,7 @@ export default function PawnManager() {
     }
   };
 
-  const handleDoPrint = (record: any) => {
+  const handleDoPrint = (record: PawnRecord) => {
     setPrintRecord(record);
     setIsPrintModalOpen(true);
   };
@@ -252,13 +256,15 @@ export default function PawnManager() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-500/20 active:scale-95 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Lập biên nhận</span>
-        </button>
+        {canDo(profile, "pawn.manage") && (
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Lập biên nhận</span>
+          </button>
+        )}
       </div>
 
       {/* Tabs and search bar */}
@@ -382,36 +388,38 @@ export default function PawnManager() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setShowStatusModal(record)}
-                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-bold"
-                            title="Đổi trạng thái"
-                          >
-                            Đổi trạng thái
-                          </button>
-                          <button
-                            onClick={() => handleDoPrint(record)}
-                            className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition"
-                            title="In biên nhận"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(record)}
-                            className="p-1.5 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition"
-                            title="Sửa biên nhận"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(record.id)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition"
-                            title="Xóa biên nhận"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {canDo(profile, "pawn.manage") && (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setShowStatusModal(record)}
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-bold"
+                              title="Đổi trạng thái"
+                            >
+                              Đổi trạng thái
+                            </button>
+                            <button
+                              onClick={() => handleDoPrint(record)}
+                              className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition"
+                              title="In biên nhận"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(record)}
+                              className="p-1.5 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition"
+                              title="Sửa biên nhận"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(record.id)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition"
+                              title="Xóa biên nhận"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -443,7 +451,9 @@ export default function PawnManager() {
           setIsPrintModalOpen(false);
         }}
       >
-        <PawnReceiptTemplate record={printRecord} storeSettings={storeSettings} forceVisible={true} />
+        {printRecord && (
+          <PawnReceiptTemplate record={printRecord} storeSettings={storeSettings} forceVisible={true} />
+        )}
       </PrintPawnPreviewModal>
 
       {/* Hidden print rendering block */}

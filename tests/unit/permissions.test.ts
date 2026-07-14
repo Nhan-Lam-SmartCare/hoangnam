@@ -25,6 +25,7 @@ describe("Permissions", () => {
         expect(canDo(role, "reports.view")).toBe(true);
         expect(canDo(role, "employees.view")).toBe(true);
         expect(canDo(role, "debt.view")).toBe(true);
+        expect(canDo(role, "pawn.manage")).toBe(true);
       });
     });
 
@@ -41,6 +42,7 @@ describe("Permissions", () => {
         expect(canDo(role, "reports.view")).toBe(true);
         expect(canDo(role, "employees.view")).toBe(true);
         expect(canDo(role, "debt.view")).toBe(true);
+        expect(canDo(role, "pawn.manage")).toBe(true);
       });
     });
 
@@ -60,13 +62,15 @@ describe("Permissions", () => {
         expect(canDo(role, "analytics.view")).toBe(false);
         expect(canDo(role, "employees.view")).toBe(false);
         expect(canDo(role, "debt.view")).toBe(false);
+        expect(canDo(role, "pawn.manage")).toBe(false);
       });
     });
 
     describe("per-action permission overrides", () => {
       it("grants a restricted action when override is true for a staff profile", () => {
-        const profile = { role: "staff" as UserRole, permissions: { "finance.view": true } };
+        const profile = { role: "staff" as UserRole, permissions: { "finance.view": true, "pawn.manage": true } };
         expect(canDo(profile, "finance.view")).toBe(true);
+        expect(canDo(profile, "pawn.manage")).toBe(true);
       });
 
       it("revokes a default-allowed action when override is false", () => {

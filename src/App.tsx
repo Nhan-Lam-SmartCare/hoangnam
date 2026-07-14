@@ -303,7 +303,17 @@ const MainLayout: React.FC = () => {
             }
           />
           <Route path="/warranty" element={<WarrantyPage />} />
-          <Route path="/pawn" element={<Pawn />} />
+          <Route
+            path="/pawn"
+            element={
+              <ProtectedRoute
+                allow={({ profile }) => canDo(profile, "pawn.manage")}
+                denyMessage="Không có quyền truy cập."
+              >
+                <Pawn />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/customers" element={<Customers />} />
 
           <Route

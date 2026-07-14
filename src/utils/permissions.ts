@@ -40,7 +40,8 @@ export type AppAction =
   | "analytics.view"
   | "reports.view"
   | "employees.view"
-  | "debt.view";
+  | "debt.view"
+  | "pawn.manage";
 
 export type PermissionMap = Partial<Record<AppAction, boolean>>;
 
@@ -101,6 +102,7 @@ export const APP_ACTION_OPTIONS: Array<{
   { key: "reports.view", label: "Xem báo cáo", group: "admin" },
   { key: "employees.view", label: "Xem/quản lý nhân viên", group: "admin" },
   { key: "settings.update", label: "Chỉnh sửa cài đặt hệ thống", group: "admin" },
+  { key: "pawn.manage", label: "Quản lý cầm đồ", group: "finance" },
 ];
 
 const POLICIES: Record<AppAction, UserRole[]> = {
@@ -147,6 +149,7 @@ const POLICIES: Record<AppAction, UserRole[]> = {
   "reports.view": ["owner", "manager"],
   "employees.view": ["owner", "manager"],
   "debt.view": ["owner", "manager"],
+  "pawn.manage": ["owner", "manager"],
 };
 
 type RoleOrProfileLike =
