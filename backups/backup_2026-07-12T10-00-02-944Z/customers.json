@@ -1,0 +1,1213 @@
+[
+  {
+    "id": "CUST-1775448936049",
+    "name": "Kle",
+    "phone": "0945679060",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1775448936049",
+        "model": "Radio",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-06T04:16:26.07366+00:00",
+    "updated_at": "2026-04-06T04:16:26.07366+00:00"
+  },
+  {
+    "id": "temp-1775449463456",
+    "name": "Sơn Nam",
+    "phone": "0868111101",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "temp-veh-1775449463456",
+        "model": "iPhone 15 Pro",
+        "licensePlate": "321"
+      }
+    ],
+    "created_at": "2026-04-06T04:25:41.465258+00:00",
+    "updated_at": "2026-04-06T04:25:41.465258+00:00"
+  },
+  {
+    "id": "CUST-1775449648352",
+    "name": "Thọ mập",
+    "phone": "0909123123",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1775449648352",
+        "model": "Xe xbyke",
+        "isPrimary": true,
+        "licensePlate": "123123"
+      }
+    ],
+    "created_at": "2026-04-06T04:27:29.924779+00:00",
+    "updated_at": "2026-04-06T04:27:29.924779+00:00"
+  },
+  {
+    "id": "CUST-1775526801327",
+    "name": "Như Ý",
+    "phone": "0377712453",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1775526801327",
+        "model": "133",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-07T01:53:22.330587+00:00",
+    "updated_at": "2026-04-07T01:53:22.330587+00:00"
+  },
+  {
+    "id": "CUST-1775546902670",
+    "name": "Quynh Thanh Tuyền ",
+    "phone": "0941223428",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1775546902670",
+        "model": "Xe đạp điện Asama ",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-07T07:28:25.270668+00:00",
+    "updated_at": "2026-04-07T07:28:25.270668+00:00"
+  },
+  {
+    "id": "CUST-1775695385561",
+    "name": "Xuân Nhạn",
+    "phone": "0915449550",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1775695385561",
+        "model": "iPhone 15 Pro",
+        "isPrimary": true,
+        "licensePlate": "48654654656"
+      }
+    ],
+    "created_at": "2026-04-09T00:43:12.563696+00:00",
+    "updated_at": "2026-04-09T00:43:12.563696+00:00"
+  },
+  {
+    "id": "CUST-1775785231476",
+    "name": "Khách lẻ",
+    "phone": "0356389669",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-10T01:40:32.668687+00:00",
+    "updated_at": "2026-04-10T01:40:32.668687+00:00"
+  },
+  {
+    "id": "CUS-1775985904928-63b153",
+    "name": "Anh An",
+    "phone": null,
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-12T09:25:05.242487+00:00",
+    "updated_at": "2026-04-12T09:25:05.242487+00:00"
+  },
+  {
+    "id": "CUS-1776002839451-1f0d90",
+    "name": "Liên An",
+    "phone": "0982939996",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-12T14:08:10.225898+00:00",
+    "updated_at": "2026-04-12T14:08:10.225898+00:00"
+  },
+  {
+    "id": "CUS-1776215209508-d1e5d0",
+    "name": "Anh Út",
+    "phone": "0392756443",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-15T01:06:51.567556+00:00",
+    "updated_at": "2026-04-15T01:06:51.567556+00:00"
+  },
+  {
+    "id": "CUS-1776221502752-b5253f",
+    "name": "Kim Phat",
+    "phone": "0332245371",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-15T02:51:44.120489+00:00",
+    "updated_at": "2026-04-15T02:51:44.120489+00:00"
+  },
+  {
+    "id": "CUST-1776237763132",
+    "name": "Thọ",
+    "phone": "0989141941",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1776237763132",
+        "model": "Xe điên bxc",
+        "isPrimary": true,
+        "licensePlate": "123456"
+      }
+    ],
+    "created_at": "2026-04-15T07:22:45.130597+00:00",
+    "updated_at": "2026-04-15T07:22:45.130597+00:00"
+  },
+  {
+    "id": "CUST-1776482635932",
+    "name": "Khách mời ",
+    "phone": "0392349969",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1776482635932",
+        "model": "Thay vành Trản ba day thắng trước ",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-18T03:23:57.751512+00:00",
+    "updated_at": "2026-04-18T03:23:57.751512+00:00"
+  },
+  {
+    "id": "CUST-1776505736862",
+    "name": "Khách mời ",
+    "phone": "0392349969",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1776505736862",
+        "model": "Thay vành Trản ba day thắng trước ",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-18T09:49:48.92754+00:00",
+    "updated_at": "2026-04-18T09:49:48.92754+00:00"
+  },
+  {
+    "id": "CUS-1776506092415-4d4346",
+    "name": "Nguyên Văn Tùng",
+    "phone": "066265662",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-18T09:55:44.186974+00:00",
+    "updated_at": "2026-04-18T09:55:44.186974+00:00"
+  },
+  {
+    "id": "CUS-1776508982291-843caa",
+    "name": "Chị Vân",
+    "phone": "0908446570",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-18T10:43:03.078421+00:00",
+    "updated_at": "2026-04-18T10:43:03.078421+00:00"
+  },
+  {
+    "id": "CUS-1776600117254-8d59ab",
+    "name": "Neang Pholly",
+    "phone": "0357603392",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-19T12:01:57.809957+00:00",
+    "updated_at": "2026-04-19T12:01:57.809957+00:00"
+  },
+  {
+    "id": "CUS-1776658133988-f5f939",
+    "name": "Chú Sơn",
+    "phone": "0789654655",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-20T04:08:54.25243+00:00",
+    "updated_at": "2026-04-20T04:08:54.25243+00:00"
+  },
+  {
+    "id": "CUST-1776734871637",
+    "name": "Khách mời ",
+    "phone": "0392349969",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1776734871637",
+        "model": "Thay vành Trản ba day thắng trước ",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-21T01:28:43.398356+00:00",
+    "updated_at": "2026-04-21T01:28:43.398356+00:00"
+  },
+  {
+    "id": "CUST-1776753644030",
+    "name": "Chị Linh ",
+    "phone": "0977244661",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1776753644030",
+        "model": "Laptop ",
+        "isPrimary": true,
+        "licensePlate": "0193587"
+      }
+    ],
+    "created_at": "2026-04-21T06:40:44.325485+00:00",
+    "updated_at": "2026-04-21T06:40:44.325485+00:00"
+  },
+  {
+    "id": "CUS-1776756919712-95bc35",
+    "name": "Lệ Thị Diễm",
+    "phone": "0399866314",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-21T07:35:19.237793+00:00",
+    "updated_at": "2026-04-21T07:35:19.237793+00:00"
+  },
+  {
+    "id": "temp-1776821093267",
+    "name": "Tô Trúc Trinh",
+    "phone": "0912608953",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "temp-veh-1776821093267",
+        "model": "Xe đạp điện V1 plus",
+        "licensePlate": "VC 11677"
+      }
+    ],
+    "created_at": "2026-04-22T01:25:05.206243+00:00",
+    "updated_at": "2026-04-22T01:25:05.206243+00:00"
+  },
+  {
+    "id": "temp-1776821114941",
+    "name": "Thọ",
+    "phone": "0989141941",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "temp-veh-1776821114941",
+        "model": "Xe điên bxc",
+        "licensePlate": "123456"
+      }
+    ],
+    "created_at": "2026-04-22T01:25:22.763589+00:00",
+    "updated_at": "2026-04-22T01:25:22.763589+00:00"
+  },
+  {
+    "id": "CUST-1776850805307",
+    "name": "Anh Dang ",
+    "phone": "094477617",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1776850805307",
+        "model": "CPU",
+        "isPrimary": true,
+        "licensePlate": "1234"
+      }
+    ],
+    "created_at": "2026-04-22T09:40:06.152387+00:00",
+    "updated_at": "2026-04-22T09:40:06.152387+00:00"
+  },
+  {
+    "id": "CUS-1777198120689-d28225",
+    "name": "Ngọc Trầm",
+    "phone": "0963905049",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-26T10:08:41.315286+00:00",
+    "updated_at": "2026-04-26T10:08:41.315286+00:00"
+  },
+  {
+    "id": "CUS-1777257090579-b1ad39",
+    "name": "Chị Diễm",
+    "phone": "0369962346",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-27T02:31:31.000047+00:00",
+    "updated_at": "2026-04-27T02:31:31.000047+00:00"
+  },
+  {
+    "id": "CUS-1777259990712-6c8302",
+    "name": "Anh Huy",
+    "phone": "0918789380",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-27T03:19:50.948555+00:00",
+    "updated_at": "2026-04-27T03:19:50.948555+00:00"
+  },
+  {
+    "id": "CUST-1777272842186",
+    "name": "Chú phố ",
+    "phone": "0974673707",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1777272842186",
+        "model": "Loa kéo ",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-27T06:54:04.365409+00:00",
+    "updated_at": "2026-04-27T06:54:04.365409+00:00"
+  },
+  {
+    "id": "CUST-1777448101301",
+    "name": "Khách lẻ",
+    "phone": null,
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1777448087743",
+        "model": "Xe đạp điện",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-04-29T07:35:02.771883+00:00",
+    "updated_at": "2026-04-29T07:35:02.771883+00:00"
+  },
+  {
+    "id": "CUS-1777449528263-72a699",
+    "name": "Chú Vũ",
+    "phone": "0984183565",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-29T07:58:48.769619+00:00",
+    "updated_at": "2026-04-29T07:58:48.769619+00:00"
+  },
+  {
+    "id": "CUS-1777516930371-02826c",
+    "name": "Nguyễn Ngọc Anh Thư",
+    "phone": "0974222753",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-30T02:42:11.107395+00:00",
+    "updated_at": "2026-04-30T02:42:11.107395+00:00"
+  },
+  {
+    "id": "CUST-1777535342900",
+    "name": "Trần Công Nguyện",
+    "phone": "0979340095",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-04-30T07:49:04.07852+00:00",
+    "updated_at": "2026-04-30T07:49:04.07852+00:00"
+  },
+  {
+    "id": "CUS-1777603206942-ce58bb",
+    "name": "Chau Khương",
+    "phone": "0387695237",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-01T02:40:07.255889+00:00",
+    "updated_at": "2026-05-01T02:40:07.255889+00:00"
+  },
+  {
+    "id": "CUS-1777618656241-fea5e5",
+    "name": "Anh Pha",
+    "phone": "0335862847",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-01T06:57:36.514927+00:00",
+    "updated_at": "2026-05-01T06:57:36.514927+00:00"
+  },
+  {
+    "id": "CUS-1777689827983-deaa6c",
+    "name": "TRẦN THỊ KẺ",
+    "phone": "0966249174",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-02T02:43:47.901182+00:00",
+    "updated_at": "2026-05-02T02:43:47.901182+00:00"
+  },
+  {
+    "id": "CUS-1777692631117-0dc0f7",
+    "name": "Trần Văn Vinh",
+    "phone": "0971161959",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-02T03:30:31.276508+00:00",
+    "updated_at": "2026-05-02T03:30:31.276508+00:00"
+  },
+  {
+    "id": "CUS-1777706810060-1add40",
+    "name": "NEANG RANH",
+    "phone": "0363745963",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-02T07:26:49.827889+00:00",
+    "updated_at": "2026-05-02T07:26:49.827889+00:00"
+  },
+  {
+    "id": "CUS-1777793531780-9a1e95",
+    "name": "Chị Loan",
+    "phone": "0327645393",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-03T07:32:12.005063+00:00",
+    "updated_at": "2026-05-03T07:32:12.005063+00:00"
+  },
+  {
+    "id": "CUST-1777857916106",
+    "name": "Nguyễn Lý",
+    "phone": "0374923374",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1777857912334",
+        "model": "Xe đạp điện",
+        "isPrimary": true,
+        "licensePlate": "DH168"
+      }
+    ],
+    "created_at": "2026-05-04T01:25:17.691211+00:00",
+    "updated_at": "2026-05-04T01:25:17.691211+00:00"
+  },
+  {
+    "id": "CUS-1777947710491-e7a118",
+    "name": "Anh Qui",
+    "phone": "0394155107",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-05T02:21:50.819435+00:00",
+    "updated_at": "2026-05-05T02:21:50.819435+00:00"
+  },
+  {
+    "id": "CUS-1777949423392-dad001",
+    "name": "Nguyễn Thị Hoa",
+    "phone": "0347019249",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-05T02:50:23.652925+00:00",
+    "updated_at": "2026-05-05T02:50:23.652925+00:00"
+  },
+  {
+    "id": "CUST-1777975707442",
+    "name": "Huỳnh Chiêu",
+    "phone": "0943525401",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-05T10:08:28.141214+00:00",
+    "updated_at": "2026-05-05T10:08:28.141214+00:00"
+  },
+  {
+    "id": "CUS-1778066573052-3010b1",
+    "name": "A Na",
+    "phone": "0868045004",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-06T11:22:53.165859+00:00",
+    "updated_at": "2026-05-06T11:22:53.165859+00:00"
+  },
+  {
+    "id": "CUS-1778127688419-efe3da",
+    "name": "Chị Hạnh",
+    "phone": "037720654",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-07T04:21:29.012901+00:00",
+    "updated_at": "2026-05-07T04:21:29.012901+00:00"
+  },
+  {
+    "id": "CUS-1778144122611-71b703",
+    "name": "Chau Phia",
+    "phone": "0339531637",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-07T08:55:23.405202+00:00",
+    "updated_at": "2026-05-07T08:55:23.405202+00:00"
+  },
+  {
+    "id": "CUS-1778201321118-a95aa1",
+    "name": "Nguyễn Thị Kim Tha",
+    "phone": "0968906775",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-08T00:48:41.899835+00:00",
+    "updated_at": "2026-05-08T00:48:41.899835+00:00"
+  },
+  {
+    "id": "CUS-1778296488614-89f66d",
+    "name": "Trần Thị Nhụy An",
+    "phone": "0373189189",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-09T03:14:49.281039+00:00",
+    "updated_at": "2026-05-09T03:14:49.281039+00:00"
+  },
+  {
+    "id": "CUST-1778299777779",
+    "name": "Trần Thị Nhụy An",
+    "phone": "0373189189",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-09T04:09:39.004842+00:00",
+    "updated_at": "2026-05-09T04:09:39.004842+00:00"
+  },
+  {
+    "id": "CUST-1778310038775",
+    "name": "Cô Lợi",
+    "phone": "0342744294",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1778310035988",
+        "model": "Xe đạp điện",
+        "isPrimary": true,
+        "licensePlate": "DH168"
+      }
+    ],
+    "created_at": "2026-05-09T07:00:40.246495+00:00",
+    "updated_at": "2026-05-09T07:00:40.246495+00:00"
+  },
+  {
+    "id": "CUS-1778317302912-bf90f8",
+    "name": "Chau Ni",
+    "phone": "0585337053",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-09T09:01:43.562272+00:00",
+    "updated_at": "2026-05-09T09:01:43.562272+00:00"
+  },
+  {
+    "id": "CUS-1778482559046-f28546",
+    "name": "Khách lẻ",
+    "phone": "0983372413",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-11T06:56:00.01172+00:00",
+    "updated_at": "2026-05-11T06:56:00.01172+00:00"
+  },
+  {
+    "id": "CUST-1778490479967",
+    "name": "Khách lẻ",
+    "phone": null,
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1778490477301",
+        "model": "Xe đạp điện",
+        "isPrimary": true,
+        "licensePlate": ""
+      }
+    ],
+    "created_at": "2026-05-11T09:08:02.340897+00:00",
+    "updated_at": "2026-05-11T09:08:02.340897+00:00"
+  },
+  {
+    "id": "CUS-1778645274535-f1573a",
+    "name": "Dương Hữu Tân",
+    "phone": "0988884234",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-13T04:07:56.149366+00:00",
+    "updated_at": "2026-05-13T04:07:56.149366+00:00"
+  },
+  {
+    "id": "CUS-1778754052820-2209ed",
+    "name": "Giang Nam",
+    "phone": "08685545",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-14T10:20:53.782808+00:00",
+    "updated_at": "2026-05-14T10:20:53.782808+00:00"
+  },
+  {
+    "id": "temp-1778754478820",
+    "name": "Chú Sơn",
+    "phone": "0789654655",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "temp-veh-1778754478820",
+        "model": "Jgfg",
+        "licensePlate": "Âmply yaobg "
+      }
+    ],
+    "created_at": "2026-05-14T10:28:25.064629+00:00",
+    "updated_at": "2026-05-14T10:28:25.064629+00:00"
+  },
+  {
+    "id": "CUS-1779007486381-504db6",
+    "name": "Chị Thảo",
+    "phone": "0963142220",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-17T08:44:45.725478+00:00",
+    "updated_at": "2026-05-17T08:44:45.725478+00:00"
+  },
+  {
+    "id": "CUS-1779158185403-367d39",
+    "name": "Anh An",
+    "phone": "0975266975",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-19T02:36:25.743063+00:00",
+    "updated_at": "2026-05-19T02:36:25.743063+00:00"
+  },
+  {
+    "id": "CUS-1779174342894-9829e2",
+    "name": "Nguyễn Thanh Tùng",
+    "phone": "0354713106",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-19T07:05:43.242247+00:00",
+    "updated_at": "2026-05-19T07:05:43.242247+00:00"
+  },
+  {
+    "id": "CUS-1779362161780-500db2",
+    "name": "Nguyễn Thanh Long",
+    "phone": "0928141242",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-21T11:16:02.367215+00:00",
+    "updated_at": "2026-05-21T11:16:02.367215+00:00"
+  },
+  {
+    "id": "CUS-1779414289166-5e019d",
+    "name": "Nguyễn Văn Đạt",
+    "phone": "0367333352",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-22T01:44:49.722283+00:00",
+    "updated_at": "2026-05-22T01:44:49.722283+00:00"
+  },
+  {
+    "id": "CUS-1779440513744-f5d8ad",
+    "name": "A. Chánh",
+    "phone": "0911192952",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-22T09:01:54.218762+00:00",
+    "updated_at": "2026-05-22T09:01:54.218762+00:00"
+  },
+  {
+    "id": "CUS-1779440549058-6f9c8d",
+    "name": "A. Chánh",
+    "phone": "0911192952",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-22T09:02:29.212162+00:00",
+    "updated_at": "2026-05-22T09:02:29.212162+00:00"
+  },
+  {
+    "id": "CUS-1779441996051-2d0fb7",
+    "name": "Thới Thuận",
+    "phone": "0393324985",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-22T09:26:36.220633+00:00",
+    "updated_at": "2026-05-22T09:26:36.220633+00:00"
+  },
+  {
+    "id": "CUS-1779502491143-875f5d",
+    "name": "Ông Ket",
+    "phone": "0354467018",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-23T02:14:51.638504+00:00",
+    "updated_at": "2026-05-23T02:14:51.638504+00:00"
+  },
+  {
+    "id": "CUS-1779594180102-86895f",
+    "name": "Lý Tiểu Long",
+    "phone": "0377005330",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-24T03:43:00.715338+00:00",
+    "updated_at": "2026-05-24T03:43:00.715338+00:00"
+  },
+  {
+    "id": "CUS-1779670699344-134474",
+    "name": "Neang Sa Mi",
+    "phone": "0399741320",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-25T00:58:19.940019+00:00",
+    "updated_at": "2026-05-25T00:58:19.940019+00:00"
+  },
+  {
+    "id": "CUS-1779857416528-b5820e",
+    "name": "Amh Hiếu",
+    "phone": "0903600759",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-27T04:50:16.537472+00:00",
+    "updated_at": "2026-05-27T04:50:16.537472+00:00"
+  },
+  {
+    "id": "CUS-1779857919562-df9360",
+    "name": "Anh Hiếu",
+    "phone": "0903600759",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-27T04:58:39.737187+00:00",
+    "updated_at": "2026-05-27T04:58:39.737187+00:00"
+  },
+  {
+    "id": "CUS-1779941808906-31550c",
+    "name": "Anh Lâm",
+    "phone": "0917100113",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-28T04:16:49.709348+00:00",
+    "updated_at": "2026-05-28T04:16:49.709348+00:00"
+  },
+  {
+    "id": "CUS-1780118092431-1a80d2",
+    "name": "Chau Si Phuon7l",
+    "phone": "0355276998",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-30T05:14:54.101671+00:00",
+    "updated_at": "2026-05-30T05:14:54.101671+00:00"
+  },
+  {
+    "id": "CUS-1780118176337-435939",
+    "name": "Chau Si Phươnl",
+    "phone": "0355276998",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-05-30T05:16:18.566619+00:00",
+    "updated_at": "2026-05-30T05:16:18.566619+00:00"
+  },
+  {
+    "id": "CUS-1780281370246-acb63a",
+    "name": "Chí Vĩnh",
+    "phone": "0344599694",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-01T02:36:10.047527+00:00",
+    "updated_at": "2026-06-01T02:36:10.047527+00:00"
+  },
+  {
+    "id": "CUS-1780282425671-288c79",
+    "name": "Sa Rinh",
+    "phone": "0355422937",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-01T02:53:45.597058+00:00",
+    "updated_at": "2026-06-01T02:53:45.597058+00:00"
+  },
+  {
+    "id": "CUST-1780361307061",
+    "name": "Tân Tân",
+    "phone": "0909090909",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-02T00:48:29.075564+00:00",
+    "updated_at": "2026-06-02T00:48:29.075564+00:00"
+  },
+  {
+    "id": "CUS-1780372212540-9dc11a",
+    "name": "a Thành",
+    "phone": "0967368415",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-02T03:50:12.095461+00:00",
+    "updated_at": "2026-06-02T03:50:12.095461+00:00"
+  },
+  {
+    "id": "CUST-1780459309402",
+    "name": "anh linh",
+    "phone": "0939229776",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-03T04:01:50.951631+00:00",
+    "updated_at": "2026-06-03T04:01:50.951631+00:00"
+  },
+  {
+    "id": "CUST-1780459857363",
+    "name": "a Minh",
+    "phone": "0909563214",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-03T04:10:58.412486+00:00",
+    "updated_at": "2026-06-03T04:10:58.412486+00:00"
+  },
+  {
+    "id": "CUST-1780460046533",
+    "name": "a Minh",
+    "phone": "0909563214",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1780460046533",
+        "model": "iPhone 16 Plus",
+        "isPrimary": true,
+        "licensePlate": "1245677"
+      }
+    ],
+    "created_at": "2026-06-03T04:15:06.619243+00:00",
+    "updated_at": "2026-06-03T04:15:06.619243+00:00"
+  },
+  {
+    "id": "CUS-1780562737692-f2d9e6",
+    "name": "A Nam Thầu",
+    "phone": "0917185898",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-04T08:45:38.079433+00:00",
+    "updated_at": "2026-06-04T08:45:38.079433+00:00"
+  },
+  {
+    "id": "CUS-1780710357048-3ed34b",
+    "name": "Diễm Hằng",
+    "phone": "0967452521",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-06T01:45:57.289631+00:00",
+    "updated_at": "2026-06-06T01:45:57.289631+00:00"
+  },
+  {
+    "id": "CUS-1780727232577-014a34",
+    "name": "Võ Thị Bích",
+    "phone": "0967020770",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-06T06:27:13.054937+00:00",
+    "updated_at": "2026-06-06T06:27:13.054937+00:00"
+  },
+  {
+    "id": "CUS-1780738559623-7fe4fb",
+    "name": "Chau Bol",
+    "phone": "0973663876",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-06T09:36:00.109324+00:00",
+    "updated_at": "2026-06-06T09:36:00.109324+00:00"
+  },
+  {
+    "id": "CUST-1780821727179",
+    "name": "Nguyên Văn Thok",
+    "phone": "0868123456",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-07T08:42:08.415652+00:00",
+    "updated_at": "2026-06-07T08:42:08.415652+00:00"
+  },
+  {
+    "id": "CUST-1780909978409",
+    "name": "A Chinh",
+    "phone": "0983945963",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-08T09:13:00.258467+00:00",
+    "updated_at": "2026-06-08T09:13:00.258467+00:00"
+  },
+  {
+    "id": "CUS-1780965754409-8810df",
+    "name": "Neang Sóc Phonl",
+    "phone": "0385324801",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-09T00:42:34.351245+00:00",
+    "updated_at": "2026-06-09T00:42:34.351245+00:00"
+  },
+  {
+    "id": "CUS-1781165472727-8763ac",
+    "name": "Đặng Minh Tài",
+    "phone": "0366677764",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-11T08:11:13.443072+00:00",
+    "updated_at": "2026-06-11T08:11:13.443072+00:00"
+  },
+  {
+    "id": "CUS-1781250215570-18d591",
+    "name": "Huỳnh Giau",
+    "phone": "0907813426",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-12T07:43:35.992468+00:00",
+    "updated_at": "2026-06-12T07:43:35.992468+00:00"
+  },
+  {
+    "id": "CUS-1781330829675-a17175",
+    "name": "Nguyễn Thị Kim Hằng",
+    "phone": "0834985878",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-13T06:07:09.801364+00:00",
+    "updated_at": "2026-06-13T06:07:09.801364+00:00"
+  },
+  {
+    "id": "CUS-1781331956068-f4bf6b",
+    "name": "Đặng Minh Tài",
+    "phone": "0366677764",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-13T06:25:56.010942+00:00",
+    "updated_at": "2026-06-13T06:25:56.010942+00:00"
+  },
+  {
+    "id": "CUST-1781438716590",
+    "name": "Sn1",
+    "phone": "0123456789",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-14T12:05:17.520059+00:00",
+    "updated_at": "2026-06-14T12:05:17.520059+00:00"
+  },
+  {
+    "id": "CUST-1781438949435",
+    "name": "Sn2",
+    "phone": "0123472580",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-14T12:09:09.867538+00:00",
+    "updated_at": "2026-06-14T12:09:09.867538+00:00"
+  },
+  {
+    "id": "CUST-1781439327116",
+    "name": "SN4",
+    "phone": "0996854415",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1781439323556",
+        "model": "Ip4",
+        "isPrimary": true,
+        "licensePlate": "124668897765667"
+      }
+    ],
+    "created_at": "2026-06-14T12:15:28.166158+00:00",
+    "updated_at": "2026-06-14T12:15:28.166158+00:00"
+  },
+  {
+    "id": "CUST-1781447334400",
+    "name": "SN5",
+    "phone": "0123548521",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1781447331080",
+        "model": "IP10",
+        "isPrimary": true,
+        "licensePlate": "115215145145144"
+      }
+    ],
+    "created_at": "2026-06-14T14:29:56.118332+00:00",
+    "updated_at": "2026-06-14T14:29:56.118332+00:00"
+  },
+  {
+    "id": "CUST-1781448239392",
+    "name": "SN6",
+    "phone": "0321546566",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-14T14:45:00.529877+00:00",
+    "updated_at": "2026-06-14T14:45:00.529877+00:00"
+  },
+  {
+    "id": "CUST-1781448670041",
+    "name": "SN7",
+    "phone": "0868111102",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1781448667872",
+        "model": "Vivo V231",
+        "isPrimary": true,
+        "licensePlate": "123456455662255"
+      }
+    ],
+    "created_at": "2026-06-14T14:52:11.693828+00:00",
+    "updated_at": "2026-06-14T14:52:11.693828+00:00"
+  },
+  {
+    "id": "CUS-1781935120713-36815e",
+    "name": "Lê Thị Kim Lộc",
+    "phone": "0385368518",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-20T05:58:41.896489+00:00",
+    "updated_at": "2026-06-20T05:58:41.896489+00:00"
+  },
+  {
+    "id": "CUS-1781950653627-c697d8",
+    "name": "A Nghị",
+    "phone": "0349955950",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-20T10:17:33.503148+00:00",
+    "updated_at": "2026-06-20T10:17:33.503148+00:00"
+  },
+  {
+    "id": "CUS-1782204310589-8a96ad",
+    "name": "Nguyễn Văn Cương",
+    "phone": "0336924274",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-23T08:45:11.97697+00:00",
+    "updated_at": "2026-06-23T08:45:11.97697+00:00"
+  },
+  {
+    "id": "CUS-1782483731866-b23522",
+    "name": "Khách hàng",
+    "phone": "0976757314",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-26T14:22:11.318258+00:00",
+    "updated_at": "2026-06-26T14:22:11.318258+00:00"
+  },
+  {
+    "id": "CUS-1782639168547-9c1a1f",
+    "name": "A Tài",
+    "phone": "0918932445",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-28T09:32:49.974381+00:00",
+    "updated_at": "2026-06-28T09:32:49.974381+00:00"
+  },
+  {
+    "id": "CUS-1782641949507-249eed",
+    "name": "Nguyễn Thị Tường Vy",
+    "phone": "0385434375",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-28T10:19:11.148735+00:00",
+    "updated_at": "2026-06-28T10:19:11.148735+00:00"
+  },
+  {
+    "id": "CUS-1782789818664-f7ab90",
+    "name": "Anh Tú",
+    "phone": "0344219953",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-30T03:23:40.053878+00:00",
+    "updated_at": "2026-06-30T03:23:40.053878+00:00"
+  },
+  {
+    "id": "CUS-1782811750189-a3c8f8",
+    "name": "Thon Ly",
+    "phone": "0865053887",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-06-30T09:29:12.050936+00:00",
+    "updated_at": "2026-06-30T09:29:12.050936+00:00"
+  },
+  {
+    "id": "CUS-1782884193460-74b758",
+    "name": "Chau Sóc An",
+    "phone": "0585794353",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-01T05:36:35.294017+00:00",
+    "updated_at": "2026-07-01T05:36:35.294017+00:00"
+  },
+  {
+    "id": "CUST-1782959539192",
+    "name": "Khách lẻ",
+    "phone": "0396069508",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1782959536720",
+        "model": "Máy in Brother L2321D",
+        "isPrimary": true,
+        "licensePlate": "E73793G5X666451"
+      }
+    ],
+    "created_at": "2026-07-02T02:32:22.503116+00:00",
+    "updated_at": "2026-07-02T02:32:22.503116+00:00"
+  },
+  {
+    "id": "CUS-1782975876280-5c582f",
+    "name": "Nguyễn Minh Điền",
+    "phone": "0865342035",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-02T07:04:37.484122+00:00",
+    "updated_at": "2026-07-02T07:04:37.484122+00:00"
+  },
+  {
+    "id": "CUS-1783048000847-7c3edb",
+    "name": "Huỳnh Văn Xuyên",
+    "phone": "0383003724",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-03T03:06:42.402701+00:00",
+    "updated_at": "2026-07-03T03:06:42.402701+00:00"
+  },
+  {
+    "id": "CUS-1783048324414-af380c",
+    "name": "Huỳnh Văn Xuyên",
+    "phone": "0383003724",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-03T03:12:05.748399+00:00",
+    "updated_at": "2026-07-03T03:12:05.748399+00:00"
+  },
+  {
+    "id": "CUS-1783077134612-08efc4",
+    "name": "Hà Việt Hoàng",
+    "phone": "0396069508",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-03T11:12:15.916329+00:00",
+    "updated_at": "2026-07-03T11:12:15.916329+00:00"
+  },
+  {
+    "id": "CUS-1783152836657-9e7c20",
+    "name": "Nguyễn Chí Thiện",
+    "phone": "0332520951",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-04T08:13:58.224443+00:00",
+    "updated_at": "2026-07-04T08:13:58.224443+00:00"
+  },
+  {
+    "id": "CUS-1783301000318-aade14",
+    "name": "Chú Liêm",
+    "phone": "0377732325",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-06T01:23:21.402154+00:00",
+    "updated_at": "2026-07-06T01:23:21.402154+00:00"
+  },
+  {
+    "id": "CUS-1783731665353-c0bcf0",
+    "name": "Nguyễn Tâm",
+    "phone": "0973572234",
+    "totalSpent": 0,
+    "vehicles": [],
+    "created_at": "2026-07-11T01:01:06.674764+00:00",
+    "updated_at": "2026-07-11T01:01:06.674764+00:00"
+  },
+  {
+    "id": "CUST-1783840981571",
+    "name": "SN7",
+    "phone": "0868111102",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1783840981571",
+        "model": "Vivo V36",
+        "isPrimary": true,
+        "licensePlate": "1234789"
+      }
+    ],
+    "created_at": "2026-07-12T07:23:03.239065+00:00",
+    "updated_at": "2026-07-12T07:23:03.239065+00:00"
+  },
+  {
+    "id": "CUST-1783844437836",
+    "name": "SN4",
+    "phone": "0996854415",
+    "totalSpent": 0,
+    "vehicles": [
+      {
+        "id": "VEH-1783844437836",
+        "model": "Ip4",
+        "isPrimary": true,
+        "licensePlate": "124668897765667"
+      }
+    ],
+    "created_at": "2026-07-12T08:20:00.880182+00:00",
+    "updated_at": "2026-07-12T08:20:00.880182+00:00"
+  }
+]

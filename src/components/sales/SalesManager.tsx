@@ -20,6 +20,8 @@ import {
   X,
   Package,
   History,
+  Banknote,
+  Landmark,
 } from "lucide-react";
 import PrintSalesPreviewModal, { PrintSalesPayload } from "./modals/PrintSalesPreviewModal";
 import { useAppContext } from "../../contexts/AppContext";
@@ -46,6 +48,16 @@ const getBranchStock = (part: Part, branchId: string): number => {
 
 const getBranchRetailPrice = (part: Part, branchId: string): number =>
   Math.max(0, Number(part.retailPrice?.[branchId] || 0));
+
+// Màu badge tồn kho theo mức: đỏ (sắp hết) → vàng (thấp) → xanh (dồi dào).
+// Giúp nhân viên nhìn lướt là biết hàng nào cần nhập thêm.
+const getStockBadgeClass = (stock: number): string => {
+  if (stock <= 5)
+    return "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300";
+  if (stock <= 20)
+    return "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300";
+  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+};
 
 const getCompactCode = (value?: string | null) => {
   const raw = String(value || "");
@@ -174,7 +186,7 @@ const SalesManager: React.FC = () => {
   const heldStorageKey = `motocare_held_orders_${currentBranchId}`;
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(20);
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
   const [activeTab, setActiveTab] = useState<"products" | "cart" | "history">("products");
@@ -1075,7 +1087,7 @@ Cam on quy khach da tin tuong!
     leftPanel: "xl:col-span-2 space-y-4",
     rightPanel: "bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 space-y-4 shadow-sm xl:sticky xl:top-[100px] h-fit",
     panelHead: "mb-4 flex flex-col sm:flex-row items-center justify-between gap-3",
-    stockBadge: "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    stockBadge: "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold",
     addBtn: "inline-flex items-center justify-center gap-1.5 h-9 w-full sm:w-auto px-4 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-bold transition border border-emerald-200 dark:border-emerald-500/30",
     syncBtn: "h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e1e2d] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-sm flex items-center justify-center font-bold",
 };
@@ -1083,7 +1095,7 @@ Cam on quy khach da tin tuong!
   return (
     <div className={`${ui.pageBg} sales-screen`}>
       <div className={ui.header}>
-        <div className="max-w-[1400px] mx-auto w-full flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-[1600px] mx-auto w-full flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-full sm:w-auto">
             <button
               onClick={() => setActiveTab("products")}
@@ -1136,7 +1148,7 @@ Cam on quy khach da tin tuong!
           </div>
         </div>
       </div>
-      <div className="relative grid max-w-[1400px] mx-auto px-4 grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
+      <div className="relative grid max-w-[1600px] mx-auto px-4 grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
         <section
           className={`${ui.leftPanel} transition-all duration-300 ease-out md:translate-x-0 md:opacity-100 md:pointer-events-auto md:static ${
             activeTab === "products"
@@ -1178,7 +1190,7 @@ Cam on quy khach da tin tuong!
           </div>
 
           <div className="px-2 py-3 sm:p-5">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
               {pagedParts.map((part) => {
                 const stock = getBranchStock(part, currentBranchId);
                 const price = getBranchRetailPrice(part, currentBranchId);
@@ -1192,52 +1204,59 @@ Cam on quy khach da tin tuong!
                     type="button"
                     key={part.id}
                     onClick={() => addPartToCart(part)}
-                    className={`text-left rounded-2xl border p-2.5 sm:p-4 transition-all duration-200 active:scale-[0.98] flex flex-col h-full ${
+                    className={`group relative text-left rounded-2xl border p-2.5 sm:p-3 transition-all duration-200 active:scale-[0.98] hover:-translate-y-0.5 flex flex-col h-full ${
                       cartItem
-                        ? "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-500/10 shadow-[0_0_0_1px_rgba(52,211,153,0.5)]"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:shadow-sm"
+                        ? "border-emerald-400 bg-emerald-50/60 dark:bg-emerald-500/10 ring-1 ring-emerald-400/60 shadow-sm"
+                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-emerald-300 dark:hover:border-emerald-500/50 hover:shadow-md"
                     }`}
                   >
+                    {cartItem && (
+                      <span className="absolute -top-2 -right-2 z-10 min-w-[22px] h-[22px] px-1.5 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[11px] font-black shadow-md ring-2 ring-white dark:ring-slate-900">
+                        {cartItem.quantity}
+                      </span>
+                    )}
                     <div className="min-w-0 mb-auto w-full">
-                      {part.imageUrl ? (
-                        <div className="w-full h-20 sm:h-24 mb-2 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <div className="w-full h-20 sm:h-24 mb-2 rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center">
+                        {part.imageUrl ? (
                           <img
                             src={part.imageUrl}
                             alt={part.name}
                             loading="lazy"
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+                              const el = e.currentTarget;
+                              el.style.display = "none";
+                              const ph = el.nextElementSibling as HTMLElement | null;
+                              if (ph) ph.style.display = "flex";
                             }}
                           />
+                        ) : null}
+                        <div
+                          className="w-full h-full items-center justify-center text-slate-300 dark:text-slate-600"
+                          style={{ display: part.imageUrl ? "none" : "flex" }}
+                        >
+                          <Package className="w-8 h-8" />
                         </div>
-                      ) : null}
-                      <div className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug break-words mb-1">
+                      </div>
+                      <div className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug break-words mb-1 line-clamp-2">
                         {part.name}
                       </div>
-                      <div className="text-[11px] font-medium text-slate-500 truncate">SKU: {part.sku}</div>
+                      <div className="text-[11px] font-medium text-slate-400 truncate">{part.sku}</div>
                     </div>
-                    
-                    <div className="mt-3 flex flex-col items-start gap-1.5 w-full">
-                      <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                        <div className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
+
+                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 w-full space-y-1.5">
+                      <div className="flex items-end justify-between gap-1">
+                        <div className="text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
                           {formatCurrency(price)}
+                          <span className="text-[11px] font-bold ml-0.5">đ</span>
                         </div>
-                        <span className={`${ui.stockBadge} self-start sm:self-auto shrink-0`}>{stock} tồn</span>
+                        <span className={`${ui.stockBadge} ${getStockBadgeClass(stock)} shrink-0`}>{stock}</span>
                       </div>
-                      <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 min-h-[20px]">
-                        {warrantyText ? (
-                          <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                            BH: {warrantyText}
-                          </div>
-                        ) : <div className="hidden sm:block"></div>}
-                        
-                        {cartItem && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm self-start sm:self-auto shrink-0">
-                            x{cartItem.quantity}
-                          </span>
-                        )}
-                      </div>
+                      {warrantyText ? (
+                        <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 truncate">
+                          BH: {warrantyText}
+                        </div>
+                      ) : null}
                     </div>
                   </button>
                 );
@@ -1270,6 +1289,7 @@ Cam on quy khach da tin tuong!
                 <option value={12}>12 / trang</option>
                 <option value={20}>20 / trang</option>
                 <option value={30}>30 / trang</option>
+                <option value={40}>40 / trang</option>
               </select>
 
               <button
@@ -1460,109 +1480,104 @@ Cam on quy khach da tin tuong!
 
           <div className="space-y-3 border-t border-slate-200/70 dark:border-slate-700 pt-4">
             <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Khách hàng</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Khách hàng &amp; Nhân viên
+                </div>
                 {selectedCustomerId && (
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-0.5 rounded font-bold">
-                    Đã liên kết thành viên
-                  </span>
-                )}
-              </div>
-              {selectedCustomerId && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCustomerId(null);
-                      setCustomerName("Khách lẻ");
-                      setCustomerSearch("Khách lẻ");
-                      setCustomerPhone("");
-                    }}
-                    className="text-[11px] text-rose-500 hover:text-rose-600 font-bold hover:underline transition"
-                  >
-                    Đặt lại về Khách lẻ
-                  </button>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    value={customerSearch}
-                    onFocus={() => setShowCustomerSuggestions(true)}
-                    onBlur={() => {
-                      setTimeout(() => setShowCustomerSuggestions(false), 120);
-                    }}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setCustomerSearch(next);
-                      setCustomerName(next);
-                      setSelectedCustomerId(null); // Clear ID when typing
-                      setShowCustomerSuggestions(true);
-                    }}
-                    placeholder="Tìm khách hàng (tên, SĐT, Serial/IMEI)"
-                    className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
-                  />
-                </div>
-              </div>
-              {showCustomerSuggestions && customerSuggestions.length > 0 && (
-                <div className="mt-1 max-h-52 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-                  {customerSuggestions.map((c) => (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 px-2 py-0.5 rounded font-bold">
+                      Thành viên
+                    </span>
                     <button
                       type="button"
-                      key={c.id}
-                      onMouseDown={() => {
-                        setCustomerName(c.name);
-                        setCustomerSearch(c.name);
-                        setCustomerPhone(c.phone || "");
-                        setSelectedCustomerId(c.id);
-                        setShowCustomerSuggestions(false);
+                      onClick={() => {
+                        setSelectedCustomerId(null);
+                        setCustomerName("Khách lẻ");
+                        setCustomerSearch("Khách lẻ");
+                        setCustomerPhone("");
                       }}
-                      className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      className="text-[11px] text-rose-500 hover:text-rose-600 font-bold hover:underline transition"
                     >
-                      <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{c.name}</div>
-                      <div className="text-xs text-slate-500">{c.phone || "Không có số điện thoại"}</div>
+                      Đặt lại
                     </button>
-                  ))}
-                </div>
-              )}
-
-              <label className="block">
-                <span className="text-xs text-slate-500">Số điện thoại</span>
-                <input
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  inputMode="tel"
-                  aria-label="Số điện thoại khách hàng"
-                  className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
-                />
-              </label>
-            </div>
-
-            {/* Nhân viên bán hàng */}
-            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Nhân viên bán hàng
+                  </div>
+                )}
               </div>
-              <label className="block">
-                <span className="text-xs text-slate-500">Chọn nhân viên ghi nhận doanh số</span>
-                <select
-                  value={selectedEmployeeId || ""}
-                  onChange={(e) => setSelectedEmployeeId(e.target.value || null)}
-                  className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60 text-sm"
-                >
-                  {selectableEmployees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.position || "Nhân viên"})
-                    </option>
-                  ))}
-                  {!selectableEmployees.some((emp) => emp.id === selectedEmployeeId) && profile && (
-                    <option value={profile.id}>
-                      {profile.name || profile.full_name || profile.email} (Hiện tại)
-                    </option>
-                  )}
-                </select>
-              </label>
+
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
+                <input
+                  value={customerSearch}
+                  onFocus={() => setShowCustomerSuggestions(true)}
+                  onBlur={() => {
+                    setTimeout(() => setShowCustomerSuggestions(false), 120);
+                  }}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setCustomerSearch(next);
+                    setCustomerName(next);
+                    setSelectedCustomerId(null); // Clear ID when typing
+                    setShowCustomerSuggestions(true);
+                  }}
+                  placeholder="Tìm khách hàng (tên, SĐT, Serial/IMEI)"
+                  className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                />
+                {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-52 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                    {customerSuggestions.map((c) => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onMouseDown={() => {
+                          setCustomerName(c.name);
+                          setCustomerSearch(c.name);
+                          setCustomerPhone(c.phone || "");
+                          setSelectedCustomerId(c.id);
+                          setShowCustomerSuggestions(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <div className="text-sm font-medium text-slate-800 dark:text-slate-100">{c.name}</div>
+                        <div className="text-xs text-slate-500">{c.phone || "Không có số điện thoại"}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs text-slate-500">Số điện thoại</span>
+                  <input
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    inputMode="tel"
+                    aria-label="Số điện thoại khách hàng"
+                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-slate-500">Nhân viên bán</span>
+                  <select
+                    value={selectedEmployeeId || ""}
+                    onChange={(e) => setSelectedEmployeeId(e.target.value || null)}
+                    aria-label="Chọn nhân viên ghi nhận doanh số"
+                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60 text-sm"
+                  >
+                    {selectableEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.position || "Nhân viên"})
+                      </option>
+                    ))}
+                    {!selectableEmployees.some((emp) => emp.id === selectedEmployeeId) && profile && (
+                      <option value={profile.id}>
+                        {profile.name || profile.full_name || profile.email} (Hiện tại)
+                      </option>
+                    )}
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-[#1a1a27] shadow-sm p-4 space-y-3">
@@ -1614,10 +1629,11 @@ Cam on quy khach da tin tuong!
                   </span>
                 </div>
               )}
-              <div className="flex items-center justify-between rounded-xl bg-emerald-600/10 dark:bg-emerald-500/20 px-3 py-2">
-                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">Thành tiền</span>
-                <span className="text-lg font-bold text-emerald-700 dark:text-emerald-100">
+              <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 dark:from-emerald-500/20 dark:to-teal-500/20 border border-emerald-200/70 dark:border-emerald-500/25 px-3.5 py-2.5 shadow-inner">
+                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-200">Thành tiền</span>
+                <span className="text-xl font-black text-emerald-700 dark:text-emerald-100">
                   {formatCurrency(total)}
+                  <span className="text-xs font-bold ml-0.5">đ</span>
                 </span>
               </div>
             </div>
@@ -1650,23 +1666,25 @@ Cam on quy khach da tin tuong!
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("cash")}
-                      className={`h-11 rounded-xl border text-sm font-semibold transition ${
+                      className={`h-11 rounded-xl border text-sm font-semibold transition inline-flex items-center justify-center gap-2 ${
                         paymentMethod === "cash"
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
                       }`}
                     >
+                      <Banknote className="w-4 h-4" />
                       Tiền mặt
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentMethod("bank")}
-                      className={`h-11 rounded-xl border text-sm font-semibold transition ${
+                      className={`h-11 rounded-xl border text-sm font-semibold transition inline-flex items-center justify-center gap-2 ${
                         paymentMethod === "bank"
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                          : "bg-white/90 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-300/80 dark:border-slate-600 hover:border-emerald-400"
                       }`}
                     >
+                      <Landmark className="w-4 h-4" />
                       Chuyển khoản
                     </button>
                   </div>
@@ -1799,48 +1817,60 @@ Cam on quy khach da tin tuong!
               </label>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            {/* CTA sticky đáy panel (desktop): Thành tiền + Xuất bán luôn trong tầm mắt, không phải cuộn */}
+            <div className="xl:sticky xl:bottom-0 xl:z-10 -mx-4 md:-mx-5 px-4 md:px-5 pt-3 pb-1 space-y-2.5 xl:bg-white/95 xl:dark:bg-[#1e1e2d]/95 xl:backdrop-blur-md xl:border-t xl:border-slate-200 xl:dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  Thành tiền
+                </span>
+                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(total)}
+                </span>
+              </div>
               <button
                 onClick={submitSale}
                 disabled={isSubmitting || !cartItems.length}
-                className="h-12 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)] hover:shadow-[0_18px_35px_-18px_rgba(16,185,129,1)] transition disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none inline-flex items-center justify-center gap-2"
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-emerald-700 text-white text-base font-bold shadow-[0_16px_30px_-18px_rgba(16,185,129,0.9)] hover:shadow-[0_18px_35px_-18px_rgba(16,185,129,1)] transition disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none inline-flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCcw className="w-4 h-4 animate-spin" />
+                    <RefreshCcw className="w-5 h-5 animate-spin" />
                     Đang xử lý...
                   </>
                 ) : (
-                  "Xuất bán"
+                  <>
+                    <ReceiptText className="w-5 h-5" />
+                    Xuất bán
+                  </>
                 )}
               </button>
-            </div>
 
-            <button
-              onClick={() => {
-                setPrintPayload({
-                  customer: {
-                    name: customerName.trim() || "Khách lẻ",
-                    phone: customerPhone.trim() || undefined,
-                  },
-                  items: cartItems,
-                  subtotalValue: subtotal,
-                  discountValue: lineDiscountTotal + discountAmount,
-                  totalValue: total,
-                  payment: paymentMethod,
-                  noteText: note.trim() || undefined,
-                  saleId: "DRAFT",
-                });
-                setIsPrintModalOpen(true);
-              }}
-              disabled={!cartItems.length}
-              className="w-full h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 text-slate-700 dark:text-slate-200 disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-            >
-              <span className="inline-flex items-center gap-2">
-                <Printer className="w-4 h-4" />
-                In hóa đơn
-              </span>
-            </button>
+              <button
+                onClick={() => {
+                  setPrintPayload({
+                    customer: {
+                      name: customerName.trim() || "Khách lẻ",
+                      phone: customerPhone.trim() || undefined,
+                    },
+                    items: cartItems,
+                    subtotalValue: subtotal,
+                    discountValue: lineDiscountTotal + discountAmount,
+                    totalValue: total,
+                    payment: paymentMethod,
+                    noteText: note.trim() || undefined,
+                    saleId: "DRAFT",
+                  });
+                  setIsPrintModalOpen(true);
+                }}
+                disabled={!cartItems.length}
+                className="w-full h-9 rounded-xl border border-slate-300/80 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Printer className="w-4 h-4" />
+                  In hóa đơn
+                </span>
+              </button>
+            </div>
           </div>
           </>
           )}

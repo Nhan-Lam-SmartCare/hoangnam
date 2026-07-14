@@ -26,10 +26,12 @@ import { useAppContext } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { canDo } from "../../utils/permissions";
 import type { PawnRecord } from "../../types";
+
 import { supabase } from "../../supabaseClient";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
 import { printElementById } from "../../utils/print";
+
 import { PawnReceiptTemplate } from "./PawnReceiptTemplate";
 import PrintPawnPreviewModal from "./modals/PrintPawnPreviewModal";
 
@@ -278,7 +280,7 @@ export default function PawnManager() {
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() => setActiveTab(tab.key as "all" | "active" | "redeemed" | "liquidated")}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition border ${
                 activeTab === tab.key
                   ? "bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900"
@@ -631,7 +633,7 @@ export default function PawnManager() {
                     </label>
                     <select
                       value={formData.interestPeriod}
-                      onChange={(e) => setFormData({ ...formData, interestPeriod: e.target.value as any })}
+                      onChange={(e) => setFormData({ ...formData, interestPeriod: e.target.value as "day" | "month" })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                     >
                       <option value="day">Theo ngày (% / Ngày)</option>

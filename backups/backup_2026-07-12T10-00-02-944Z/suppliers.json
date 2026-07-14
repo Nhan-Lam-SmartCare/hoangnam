@@ -1,0 +1,58 @@
+[
+  {
+    "id": "5c6f41d2-6d1c-4fac-bd12-b80ff43658dc",
+    "name": "nhạn",
+    "phone": null,
+    "address": null,
+    "created_at": "2026-04-03T13:34:29.465+00:00"
+  },
+  {
+    "id": "679cabce-3931-4189-8c65-43347090f3d3",
+    "name": "Phụ Tùng Xe Máy Đức Anh",
+    "phone": "0359663199",
+    "address": "Hà Nội",
+    "created_at": "2026-04-04T03:41:12.637+00:00"
+  },
+  {
+    "id": "06cfd114-c964-475f-acde-6b6a48974798",
+    "name": "Phụ Tùng Hà Nội",
+    "phone": "0886585114",
+    "address": null,
+    "created_at": "2026-04-04T03:58:32.382+00:00"
+  },
+  {
+    "id": "4281aa5f-8aec-4b8f-b4e1-d2076b23e576",
+    "name": "Sơn Nam CL",
+    "phone": "0868111101",
+    "address": null,
+    "created_at": "2026-04-11T02:21:07.929+00:00"
+  },
+  {
+    "id": "88978cfa-8b29-4b9e-8a90-14c7458cc82a",
+    "name": "Xe Điện Nam Long ( Trần Văn An)",
+    "phone": "0988113460",
+    "address": "Q.12_ TPHCM",
+    "created_at": "2026-04-18T07:33:06.749+00:00"
+  },
+  {
+    "id": "2a758b6f-5327-4ae2-91dd-7b9e0c18d1c3",
+    "name": "CTY Cố Phần Winsky",
+    "phone": "0979245500",
+    "address": "Hà Nội",
+    "created_at": "2026-04-18T07:37:48.283+00:00"
+  },
+  {
+    "id": "82ae1cb9-0e84-4357-85e1-9aee13eb3b84",
+    "name": "Acquy Hoàng Minh",
+    "phone": "0909838065",
+    "address": "Ninh Kiều- Cần Thơ",
+    "created_at": "2026-04-18T07:38:47.507+00:00"
+  },
+  {
+    "id": "13e99d2c-75af-42f6-acdd-05b1f6c09b50",
+    "name": "Sơn Nam",
+    "phone": "0868111101",
+    "address": "Chi Lăng, An Giang",
+    "created_at": "2026-06-14T12:34:43.755+00:00"
+  }
+]

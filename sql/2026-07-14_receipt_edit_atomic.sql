@@ -24,7 +24,6 @@ DECLARE
   v_import_price numeric;
   v_selling_price numeric;
   v_wholesale_price numeric;
-  v_labor_cost numeric;
   v_part_name text;
   v_tx_id     text;
 BEGIN
@@ -44,7 +43,6 @@ BEGIN
       v_import_price := COALESCE((v_item->>'importPrice')::numeric, 0);
       v_selling_price := COALESCE((v_item->>'sellingPrice')::numeric, 0);
       v_wholesale_price := COALESCE((v_item->>'wholesalePrice')::numeric, 0);
-      v_labor_cost := COALESCE((v_item->>'laborCost')::numeric, 0);
 
       IF v_part_id IS NULL OR v_qty <= 0 THEN
         CONTINUE;
@@ -53,33 +51,31 @@ BEGIN
       -- Khóa hàng để cập nhật an toàn
       PERFORM 1 FROM public.parts WHERE id = v_part_id FOR UPDATE;
 
-      -- Cập nhật tồn kho và giá cả của hàng
+      -- Cập nhật tồn kho và giá cả của hàng.
+      -- LƯU Ý QUAN TRỌNG:
+      --  * Cột giá trên bảng parts đặt theo camelCase ("retailPrice",
+      --    "wholesalePrice") nên trong SQL thô PHẢI nháy kép, nếu không Postgres
+      --    fold về chữ thường (retailprice) và không khớp cột thật.
+      --  * KHÔNG đụng costPrice / laborCost: hai cột này không có trong schema
+      --    parts hiện tại (xem partsRepository.createPart) — tham chiếu sẽ làm
+      --    UPDATE lỗi cứng "column does not exist". Chỉ mirror đúng các cột mà
+      --    createPart ghi: stock, "retailPrice", "wholesalePrice".
       UPDATE public.parts
-      SET 
+      SET
         stock = jsonb_set(
           COALESCE(stock, '{}'::jsonb),
           ARRAY[p_branch_id],
           to_jsonb(COALESCE((stock->>p_branch_id)::numeric, 0) + v_qty)
         ),
-        costPrice = jsonb_set(
-          COALESCE(costPrice, '{}'::jsonb),
-          ARRAY[p_branch_id],
-          to_jsonb(v_import_price)
-        ),
-        retailPrice = jsonb_set(
-          COALESCE(retailPrice, '{}'::jsonb),
+        "retailPrice" = jsonb_set(
+          COALESCE("retailPrice", '{}'::jsonb),
           ARRAY[p_branch_id],
           to_jsonb(v_selling_price)
         ),
-        wholesalePrice = jsonb_set(
-          COALESCE(wholesalePrice, '{}'::jsonb),
+        "wholesalePrice" = jsonb_set(
+          COALESCE("wholesalePrice", '{}'::jsonb),
           ARRAY[p_branch_id],
           to_jsonb(v_wholesale_price)
-        ),
-        laborCost = jsonb_set(
-          COALESCE(laborCost, '{}'::jsonb),
-          ARRAY[p_branch_id],
-          to_jsonb(v_labor_cost)
         )
       WHERE id = v_part_id;
 

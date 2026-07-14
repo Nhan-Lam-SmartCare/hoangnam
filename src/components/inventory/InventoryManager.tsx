@@ -1027,12 +1027,16 @@ const InventoryManagerNew: React.FC = () => {
     ]
   );
 
-  // Handle select all
+  // Handle select all — chỉ tác động trên các sản phẩm ĐANG HIỂN THỊ (trang hiện
+  // tại), tránh vô tình chọn cả sản phẩm ở trang khác khi đang lọc client-side.
   const handleSelectAll = (checked: boolean) => {
+    const pageIds = displayedParts.map((p) => p.id);
     if (checked) {
-      setSelectedItems(filteredParts.map((p) => p.id));
+      // Gộp id trang hiện tại vào lựa chọn sẵn có (không xóa lựa chọn ở trang khác).
+      setSelectedItems((prev) => Array.from(new Set([...prev, ...pageIds])));
     } else {
-      setSelectedItems([]);
+      // Bỏ chọn các id thuộc trang hiện tại, giữ nguyên lựa chọn ở trang khác.
+      setSelectedItems((prev) => prev.filter((id) => !pageIds.includes(id)));
     }
   };
 
@@ -2117,8 +2121,10 @@ const InventoryManagerNew: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={
-                            selectedItems.length === filteredParts.length &&
-                            filteredParts.length > 0
+                            displayedParts.length > 0 &&
+                            displayedParts.every((p) =>
+                              selectedItems.includes(p.id)
+                            )
                           }
                           onChange={(e) => handleSelectAll(e.target.checked)}
                           className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500"
