@@ -105,41 +105,6 @@ import {
 
 // Local types removed - now imported from ./types/service.types
 
-const iconMap: Record<string, React.ComponentType<any>> = {
-  Wrench: Wrench,
-  Settings: Settings,
-  Check: Check,
-  HandCoins: HandCoins,
-};
-
-const _serviceTemplates = [
-  {
-    name: "Cài đặt Windows",
-    description: "Cài đặt Windows 11, cập nhật driver, phần mềm cơ bản",
-    laborCost: 150000,
-    duration: 60,
-    parts: [],
-  },
-  {
-    name: "Thay màn hình điện thoại",
-    description: "Thay màn hình zin/linh kiện, kiểm tra cảm ứng",
-    laborCost: 100000,
-    duration: 45,
-    parts: [
-      { name: "Màn hình iPhone 13 Pro Max", quantity: 1, price: 8500000 },
-    ],
-  },
-  {
-    name: "Vệ sinh & Bảo dưỡng Laptop",
-    description: "Vệ sinh máy, thay keo tản nhiệt, kiểm tra quạt",
-    laborCost: 200000,
-    duration: 90,
-    parts: [
-      { name: "Keo tản nhiệt Arctic MX-4", quantity: 1, price: 50000 },
-    ],
-  },
-];
-
 export default function ServiceManager() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -492,11 +457,25 @@ export default function ServiceManager() {
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(
     null
   );
-  const invoicePreviewRef = useRef<HTMLDivElement>(null);
-  const [_isSharing, setIsSharing] = useState(false);
-  const printableIssueDescription = sanitizeIssueDescriptionForPrint(
-    printOrder?.issueDescription
-  );
+
+  // Fetch store settings for branch
+  useEffect(() => {
+    let active = true;
+    async function loadSettings() {
+      try {
+        const settings = await fetchStoreSettingsForBranch(currentBranchId);
+        if (active) {
+          setStoreSettings(settings);
+        }
+      } catch (err) {
+        console.error("Error fetching store settings:", err);
+      }
+    }
+    loadSettings();
+    return () => {
+      active = false;
+    };
+  }, [currentBranchId]);
 
   // State for refund modal
   const [refundingOrder, setRefundingOrder] = useState<WorkOrder | null>(null);
@@ -537,42 +516,6 @@ export default function ServiceManager() {
       canDeleteWorkOrder && (canManageAllWorkOrders || isOwnWorkOrder(order)),
     [canDeleteWorkOrder, canManageAllWorkOrders, isOwnWorkOrder]
   );
-
-  // Share invoice as image function
-  const _handleShareInvoice = async () => {
-    if (!invoicePreviewRef.current || !printOrder) return;
-
-    setIsSharing(true);
-    try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(invoicePreviewRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-      });
-
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((b) => resolve(b!), "image/png", 1.0);
-      });
-
-      const fileName = `phieu-sua-chua-${formatWorkOrderId(printOrder.id)}.png`;
-      const title = `Phiếu sửa chữa ${formatWorkOrderId(printOrder.id)}`;
-
-      if (await shareBlobNative(blob, fileName, title)) {
-        showToast.success("Đã mở chia sẻ phiếu thành công!");
-      } else {
-        downloadImage(blob, fileName);
-      }
-    } catch (error) {
-      if ((error as Error).name !== "AbortError") {
-        console.error("Error sharing invoice:", error);
-        showToast.error("Không thể chia sẻ phiếu");
-      }
-    } finally {
-      setIsSharing(false);
-    }
-  };
 
   // downloadImage moved to ./utils/service.utils.ts
 
@@ -792,34 +735,7 @@ export default function ServiceManager() {
     setShowModal(true);
   };
 
-  const _handleApplyTemplate = (template: (typeof _serviceTemplates)[0]) => {
-    const newOrder: Partial<WorkOrder> = {
-      id: "",
-      customerName: "",
-      customerPhone: "",
-      vehicleModel: "",
-      licensePlate: "",
-      issueDescription: template.description,
-      laborCost: template.laborCost,
-      partsUsed: template.parts.map((p, idx) => ({
-        partId: `TEMPLATE-${idx}`,
-        partName: p.name,
-        sku: "",
-        quantity: p.quantity,
-        price: p.price,
-      })),
-      status: "Tiếp nhận",
-      paymentStatus: "unpaid",
-      discount: 0,
-      total: 0,
-      creationDate: new Date().toISOString(),
-      branchId: currentBranchId,
-      technicianName: "",
-    };
-    setEditingOrder(newOrder as WorkOrder);
-    setShowTemplateModal(false);
-    setShowModal(true);
-  };
+
 
   // Handle print work order - show preview modal with permission check
   const handlePrintOrderWithPermission = useCallback((order: WorkOrder) => {
@@ -1410,7 +1326,7 @@ export default function ServiceManager() {
               finalOrderData.laborTotal || finalOrderData.laborCost;
           } else {
             showToast.warning(
-              "Da luu phieu nhung chua dong bo duoc cong sua: " +
+              "Đã lưu phiếu nhưng chưa đồng bộ được công sửa: " +
               (laborSyncResult as { error: any }).error.message
             );
           }
@@ -1654,11 +1570,6 @@ export default function ServiceManager() {
       showToast.error("Lỗi khi hủy đơn sửa chữa");
     }
   };
-
-  // handleCallCustomer moved to ./utils/service.utils.ts
-  const _handleCallCustomerWrapper = (phone: string) => callCustomer(phone);
-
-  // formatMaskedPhone moved to ./utils/service.utils.ts
 
   const clearFilters = () => {
     setSearchQuery("");

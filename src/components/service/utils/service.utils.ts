@@ -220,9 +220,14 @@ export const generateWorkOrderTextReceipt = (
     const laborLine = `Tien cong:${" ".repeat(Math.max(1, 32 - 10 - laborStr.length))}${laborStr}`;
     const totalLine = `Tong cong:${" ".repeat(Math.max(1, 32 - 10 - grandTotalStr.length))}${grandTotalStr}`;
 
+    const storeName = (settings?.store_name || "MOTOCARE PRO").toUpperCase();
+    const padTotal = 32 - storeName.length;
+    const padLeft = padTotal > 0 ? Math.floor(padTotal / 2) : 0;
+    const centeredStoreName = " ".repeat(padLeft) + storeName;
+
     return `
 ================================
-         MOTOCARE PRO
+${centeredStoreName}
 ================================
 PHIEU DICH VU SUA CHUA
 Ngay: ${now}
