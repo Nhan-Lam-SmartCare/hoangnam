@@ -81,7 +81,13 @@ import { PODetailView } from "../purchase-orders/PODetailView";
 import { ExternalDataImport } from "../inventory/ExternalDataImport";
 import type { PurchaseOrder } from "../../types";
 import EditReceiptModal from "./modals/EditReceiptModal";
-import { fetchReceiptTransactions, rollbackReceiptStock, deleteReceiptRecords } from "../../lib/repository/goodsReceiptRepository";
+import {
+  fetchReceiptTransactions,
+  rollbackReceiptStock,
+  deleteReceiptRecords,
+  deleteReceiptAtomic,
+  editReceiptAtomic,
+} from "../../lib/repository/goodsReceiptRepository";
 // Extracted modals
 import GoodsReceiptMobileWrapper from "./modals/GoodsReceiptMobileWrapper";
 import GoodsReceiptModal from "./modals/GoodsReceiptModal";
@@ -1208,19 +1214,7 @@ const InventoryManagerNew: React.FC = () => {
     const { receiptCode } = editingReceipt;
 
     try {
-      // 1. Get original transactions to rollback stock
-      const origTxRes = await fetchReceiptTransactions(receiptCode);
-      const originalTxs = origTxRes.ok ? origTxRes.data : [];
-
-      if (originalTxs && originalTxs.length > 0) {
-        // Rollback stock cho các item gốc (đúng chi nhánh của từng giao dịch).
-        await rollbackReceiptStock(originalTxs, currentBranchId);
-      }
-
-      // 2. Delete original database records (inventory_transactions + supplier_debts + cash_transactions)
-      await deleteReceiptRecords(receiptCode);
-
-      // 3. Resolve supplier ID or create new one
+      // 1. Resolve supplier ID or create new one
       const supplierName = updatedData.supplier;
       const supplierRes = await resolveOrCreateSupplier(
         supplierName,
@@ -1231,7 +1225,7 @@ const InventoryManagerNew: React.FC = () => {
         throw new Error(supplierRes.ok ? "Không thể định danh nhà cung cấp" : supplierRes.error?.message || "Lỗi định danh nhà cung cấp");
       }
 
-      // 4. Resolve part IDs for items (some might be new or existing)
+      // 2. Resolve part IDs for items (some might be new or existing)
       const processedItems = await Promise.all(
         updatedData.items.map(async (item) => {
           let partId = item.partId || item.id;
@@ -1270,14 +1264,19 @@ const InventoryManagerNew: React.FC = () => {
         })
       );
 
-      // 5. Create new receipt items atomically via RPC (triggers stock updates)
-      await createReceiptAtomicMutation.mutateAsync({
-        items: processedItems,
+      // 3. Cập nhật phiếu nhập kho và hoàn/cộng tồn kho atomically via editReceiptAtomic
+      const editNotes = `${receiptCode} | NV:${profile?.name || profile?.full_name || "Nhân viên"} NCC:${supplierName} | Đã chỉnh sửa`;
+      const editRes = await editReceiptAtomic(
+        receiptCode,
+        processedItems,
         supplierId,
-        branchId: currentBranchId,
-        userId: profile?.id || "unknown",
-        notes: `${receiptCode} | NV:${profile?.name || profile?.full_name || "Nhân viên"} NCC:${supplierName} | Đã chỉnh sửa`,
-      });
+        currentBranchId,
+        profile?.id || "unknown",
+        editNotes
+      );
+      if (!editRes.ok) {
+        throw editRes.error.cause || new Error(editRes.error.message);
+      }
 
       // 6. Calculate total amount
       const totalAmount = processedItems.reduce((sum, item) => sum + item.quantity * item.importPrice, 0);
@@ -1347,20 +1346,8 @@ const InventoryManagerNew: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      // 1. Get transaction details to rollback stock
-      const txRes = await fetchReceiptTransactions(receiptCode);
-      const transactions = txRes.ok ? txRes.data : [];
-
-      if (!transactions || transactions.length === 0) {
-        showToast.error("Không tìm thấy phiếu nhập");
-        return;
-      }
-
-      // 2. Rollback stock for each part BEFORE deleting transactions.
-      await rollbackReceiptStock(transactions, currentBranchId);
-
-      // 3-5. Delete inventory_transactions + supplier_debts + cash_transactions
-      const delRes = await deleteReceiptRecords(receiptCode);
+      // Call atomic delete RPC via repository
+      const delRes = await deleteReceiptAtomic(receiptCode, currentBranchId);
       if (!delRes.ok) throw delRes.error.cause || new Error(delRes.error.message);
 
       showToast.success(`Đã xóa phiếu nhập ${receiptCode} và hoàn trả tồn kho`);

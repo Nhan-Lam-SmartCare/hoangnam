@@ -1,5 +1,6 @@
 import { supabase } from "../../supabaseClient";
 import { RepoResult, success, failure } from "./types";
+import { createReceiptAtomic } from "./inventoryTransactionsRepository";
 
 const PARTS_TABLE = "parts";
 const INVENTORY_TX_TABLE = "inventory_transactions";
@@ -133,6 +134,164 @@ export async function deleteReceiptRecords(
     return failure({
       code: "network",
       message: "Lỗi kết nối khi xóa bản ghi phiếu nhập",
+      cause: e,
+    });
+  }
+}
+
+/**
+ * Xóa phiếu nhập kho bằng RPC atomic, tự động fallback nếu RPC chưa deploy.
+ */
+export async function deleteReceiptAtomic(
+  receiptCode: string,
+  branchId: string
+): Promise<RepoResult<any>> {
+  try {
+    const isMissingReceiptRpc = (err: any) => {
+      const code = String(err?.code || "").toUpperCase();
+      const message = String(err?.message || "").toLowerCase();
+      const details = String(err?.details || "").toLowerCase();
+      return (
+        code === "PGRST202" &&
+        (message.includes("receipt_delete_atomic") ||
+          details.includes("receipt_delete_atomic"))
+      );
+    };
+
+    const runFallbackDelete = async () => {
+      // 1. Lấy danh sách giao dịch
+      const origTxRes = await fetchReceiptTransactions(receiptCode);
+      if (!origTxRes.ok) return failure(origTxRes.error);
+      const originalTxs = origTxRes.data || [];
+
+      if (originalTxs.length > 0) {
+        // 2. Hoàn trả tồn kho
+        const rollbackRes = await rollbackReceiptStock(originalTxs, branchId);
+        if (!rollbackRes.ok) return failure(rollbackRes.error);
+      }
+
+      // 3. Xóa các bản ghi liên quan
+      const delRes = await deleteReceiptRecords(receiptCode);
+      if (!delRes.ok) return failure(delRes.error);
+
+      return success({
+        success: true,
+        message: "Đã xóa phiếu bằng fallback (không dùng RPC)",
+        mode: "fallback",
+      });
+    };
+
+    const { data, error } = await supabase.rpc("receipt_delete_atomic", {
+      p_receipt_code: receiptCode,
+      p_branch_id: branchId,
+    });
+
+    if (error) {
+      if (isMissingReceiptRpc(error)) {
+        return await runFallbackDelete();
+      }
+      return failure({
+        code: "supabase",
+        message: error.message,
+        cause: error,
+      });
+    }
+
+    if (data && !data.success) {
+      return failure({
+        code: "validation",
+        message: data.message,
+      });
+    }
+
+    return success(data);
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi xóa phiếu nhập",
+      cause: e,
+    });
+  }
+}
+
+/**
+ * Cập nhật phiếu nhập kho bằng RPC atomic (hủy phiếu cũ + tạo phiếu mới trong 1 transaction),
+ * tự động fallback nếu RPC chưa deploy.
+ */
+export async function editReceiptAtomic(
+  oldReceiptCode: string,
+  newItems: any[],
+  supplierId: string,
+  branchId: string,
+  userId: string,
+  newNotes: string
+): Promise<RepoResult<any>> {
+  try {
+    const isMissingReceiptRpc = (err: any) => {
+      const code = String(err?.code || "").toUpperCase();
+      const message = String(err?.message || "").toLowerCase();
+      const details = String(err?.details || "").toLowerCase();
+      return (
+        code === "PGRST202" &&
+        (message.includes("receipt_edit_atomic") ||
+          details.includes("receipt_edit_atomic"))
+      );
+    };
+
+    const runFallbackEdit = async () => {
+      // 1. Hủy và hoàn kho phiếu cũ
+      const delRes = await deleteReceiptAtomic(oldReceiptCode, branchId);
+      if (!delRes.ok) return failure(delRes.error);
+
+      // 2. Tạo mới các giao dịch và cộng kho phiếu mới
+      const createRes = await createReceiptAtomic(
+        newItems,
+        supplierId,
+        branchId,
+        userId,
+        newNotes
+      );
+      if (!createRes.ok) return failure(createRes.error);
+
+      return success({
+        success: true,
+        message: "Đã sửa phiếu bằng fallback (không dùng RPC edit)",
+        mode: "fallback",
+      });
+    };
+
+    const { data, error } = await supabase.rpc("receipt_edit_atomic", {
+      p_old_receipt_code: oldReceiptCode,
+      p_new_items: newItems,
+      p_supplier_id: supplierId,
+      p_branch_id: branchId,
+      p_user_id: userId,
+      p_new_notes: newNotes,
+    });
+
+    if (error) {
+      if (isMissingReceiptRpc(error)) {
+        return await runFallbackEdit();
+      }
+      return failure({
+        code: "supabase",
+        message: error.message,
+        cause: error,
+      });
+    }
+
+    if (data && !data.success) {
+      return failure({
+        code: "validation",
+        message: data.message,
+      });
+    }
+
+    return success(data);
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi cập nhật phiếu nhập",
       cause: e,
     });
   }
