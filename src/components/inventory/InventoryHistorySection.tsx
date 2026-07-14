@@ -160,7 +160,7 @@ const InventoryHistorySection: React.FC<{
         // Extract receipt code from notes if exists (format: "NH-20251119-XXX | NCC: ...")
         let receiptCode = "";
         if (firstItem.notes) {
-          const match = firstItem.notes.match(/NH-\d{8}-\d{3}/);
+          const match = firstItem.notes.match(/NH-\d{8}-[A-Z0-9]{3,4}/);
           if (match) {
             receiptCode = match[0];
           }
@@ -194,7 +194,7 @@ const InventoryHistorySection: React.FC<{
 
   const receiptDebtMap = useMemo(() => {
     const map = new Map<string, any>();
-    const receiptCodeRegex = /NH-\d{8}-\d{3}/i;
+    const receiptCodeRegex = /NH-\d{8}-[A-Z0-9]{3,4}/i;
 
     for (const debt of supplierDebts || []) {
       const description = String((debt as any)?.description || "");
@@ -208,7 +208,7 @@ const InventoryHistorySection: React.FC<{
 
   const receiptPaidFromCashMap = useMemo(() => {
     const map = new Map<string, number>();
-    const receiptCodeRegex = /NH-\d{8}-\d{3}/gi;
+    const receiptCodeRegex = /NH-\d{8}-[A-Z0-9]{3,4}/gi;
 
     for (const tx of cashTransactions || []) {
       const text = `${(tx as any)?.notes || ""} ${(tx as any)?.description || ""}`;

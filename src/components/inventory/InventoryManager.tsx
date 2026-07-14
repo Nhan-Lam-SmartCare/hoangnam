@@ -237,7 +237,6 @@ const InventoryManagerNew: React.FC = () => {
 
   const repoParts = useMemo(() => pagedResult?.data ?? [], [pagedResult?.data]);
   const totalParts = pagedResult?.meta?.total || 0;
-  const totalPages = Math.max(1, Math.ceil(totalParts / pageSize));
 
   // Fetch ALL parts for accurate totals calculation (stock, costPrice, retailPrice)
   // NOTE: This query does NOT depend on search - only category filter
@@ -273,7 +272,7 @@ const InventoryManagerNew: React.FC = () => {
     allPartsData.forEach((part) => {
       const stock = part.stock?.[branchKey] || 0;
       const reserved = part.reservedStock?.[branchKey] || 0;
-      const available = stock - reserved; // ✅ Calculate available stock
+      const available = Math.max(0, stock - reserved); // ✅ Calculate available stock
 
       if (available > 0) summary.inStock += 1;
       if (available === 0) summary.outOfStock += 1;
@@ -414,7 +413,7 @@ const InventoryManagerNew: React.FC = () => {
       filtered = baseList.filter((part: any) => {
         const stock = part.stock?.[branchKey] || 0;
         const reserved = part.reservedStock?.[branchKey] || 0;
-        const available = stock - reserved; // ✅ Calculate available stock
+        const available = Math.max(0, stock - reserved); // ✅ Calculate available stock
 
         if (stockFilter === "in-stock") return available > 0;
         if (stockFilter === "low-stock")
@@ -495,6 +494,26 @@ const InventoryManagerNew: React.FC = () => {
     sortDirection,
   ]);
 
+  const isClientFiltering = stockFilter !== "all" || showDuplicatesOnly;
+
+  const totalPages = useMemo(() => {
+    if (isClientFiltering) {
+      return Math.max(1, Math.ceil(filteredParts.length / pageSize));
+    }
+    return Math.max(1, Math.ceil(totalParts / pageSize));
+  }, [isClientFiltering, filteredParts.length, totalParts, pageSize]);
+
+  const displayedParts = useMemo(() => {
+    if (isClientFiltering) {
+      return filteredParts.slice((page - 1) * pageSize, page * pageSize);
+    }
+    return filteredParts;
+  }, [isClientFiltering, filteredParts, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [stockFilter, showDuplicatesOnly]);
+
   // Auto-disable duplicate filter when no duplicates remain
   useEffect(() => {
     if (showDuplicatesOnly && duplicateSkus.size === 0) {
@@ -507,7 +526,7 @@ const InventoryManagerNew: React.FC = () => {
     return allPartsData.reduce((sum, part: any) => {
       const stock = part.stock?.[currentBranchId] || 0;
       const reserved = part.reservedStock?.[currentBranchId] || 0;
-      return sum + (stock - reserved); // ✅ Use available stock
+      return sum + Math.max(0, stock - reserved); // ✅ Use available stock
     }, 0);
   }, [allPartsData, currentBranchId]);
 
@@ -516,7 +535,7 @@ const InventoryManagerNew: React.FC = () => {
     return allPartsData.reduce((sum, part: any) => {
       const stock = part.stock?.[currentBranchId] || 0;
       const reserved = part.reservedStock?.[currentBranchId] || 0;
-      const available = stock - reserved; // ✅ Calculate available
+      const available = Math.max(0, stock - reserved); // ✅ Calculate available
       // Prefer costPrice if present; otherwise fallback to retailPrice for demo datasets
       // where import/cost price hasn't been filled.
       const unitValue =
@@ -546,7 +565,7 @@ const InventoryManagerNew: React.FC = () => {
       return invTx;
     }
 
-    const receiptCodeRegex = /NH-\d{8}-\d{3}/i;
+    const receiptCodeRegex = /NH-\d{8}-[A-Z0-9]{3,4}/i;
     return (supplierDebts || [])
       .filter((debt: any) => {
         if (currentBranchId && debt?.branchId && debt.branchId !== currentBranchId) {
@@ -638,12 +657,11 @@ const InventoryManagerNew: React.FC = () => {
         discount: number;
       }
     ) => {
-      // Generate receipt code: NH-YYYYMMDD-XXX
+      // Generate receipt code: NH-YYYYMMDD-XXXX (using base36 timestamp suffix for uniqueness)
       const today = new Date();
       const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
-      const receiptCode = `NH-${dateStr}-${Math.floor(Math.random() * 1000)
-        .toString()
-        .padStart(3, "0")}`;
+      const timeSuffix = Date.now().toString(36).slice(-4).toUpperCase();
+      const receiptCode = `NH-${dateStr}-${timeSuffix}`;
 
 
       // Get supplier name
@@ -1149,43 +1167,29 @@ const InventoryManagerNew: React.FC = () => {
     let errorCount = 0;
     const totalCount = selectedItems.length;
 
-    // Delete all selected items
-    selectedItems.forEach((id) => {
-      deletePartMutation.mutate(
-        { id },
-        {
-          onSuccess: async () => {
-            successCount++;
-            // Show toast only after last item
-            if (successCount + errorCount === totalCount) {
-              // Force refetch to update duplicate detection immediately
-              await refetchAllParts();
-              if (errorCount === 0) {
-                showToast.success(`Đã xóa ${successCount} phụ tùng`);
-              } else {
-                showToast.warning(
-                  `Đã xóa ${successCount}/${totalCount} phụ tùng (${errorCount} lỗi)`
-                );
-              }
-            }
-          },
-          onError: (error) => {
-            console.error(`Delete error for item ${id}:`, error);
-            errorCount++;
-            // Show toast only after last item
-            if (successCount + errorCount === totalCount) {
-              if (successCount === 0) {
-                showToast.error(`Không thể xóa ${totalCount} phụ tùng`);
-              } else {
-                showToast.warning(
-                  `Đã xóa ${successCount}/${totalCount} phụ tùng (${errorCount} lỗi)`
-                );
-              }
-            }
-          },
-        }
+    // Delete all selected items sequentially
+    for (const id of selectedItems) {
+      try {
+        await deletePartMutation.mutateAsync({ id });
+        successCount++;
+      } catch (error) {
+        console.error(`Delete error for item ${id}:`, error);
+        errorCount++;
+      }
+    }
+
+    // Force refetch to update duplicate detection immediately
+    await refetchAllParts();
+
+    if (errorCount === 0) {
+      showToast.success(`Đã xóa ${successCount} phụ tùng`);
+    } else if (successCount === 0) {
+      showToast.error(`Không thể xóa ${totalCount} phụ tùng`);
+    } else {
+      showToast.warning(
+        `Đã xóa ${successCount}/${totalCount} phụ tùng (${errorCount} lỗi)`
       );
-    });
+    }
 
     setSelectedItems([]);
   };
@@ -1976,7 +1980,7 @@ const InventoryManagerNew: React.FC = () => {
               {/* Mobile: stacked cards (visible on small screens) */}
               <div className="block sm:hidden">
                 <div className="space-y-3 p-3">
-                    {filteredParts.map((part, index) => {
+                    {displayedParts.map((part, index) => {
                     const hasPartActions = canUpdatePart || canDeletePart;
                     const stock = part.stock[currentBranchId] || 0;
                     const retailPrice = part.retailPrice[currentBranchId] || 0;
@@ -2233,11 +2237,11 @@ const InventoryManagerNew: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredParts.map((part) => {
+                      displayedParts.map((part) => {
                         const branchKey = currentBranchId || "";
                         const stock = part.stock?.[branchKey] || 0;
                         const reserved = part.reservedStock?.[branchKey] || 0;
-                        const available = stock - reserved; // ✅ Calculate available stock
+                        const available = Math.max(0, stock - reserved); // ✅ Calculate available stock
                         const retailPrice = part.retailPrice?.[branchKey] || 0;
                         const hasLaborCost = Object.prototype.hasOwnProperty.call(part, "laborCost");
                         const laborCost = hasLaborCost
@@ -2499,7 +2503,7 @@ const InventoryManagerNew: React.FC = () => {
                     Trang {page}/{totalPages}
                   </span>
                   <span className="mx-1">•</span>
-                  <span>{totalParts} phụ tùng</span>
+                  <span>{isClientFiltering ? filteredParts.length : totalParts} phụ tùng</span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
