@@ -199,21 +199,30 @@ export function useFinanceActions(
       // Danh sách nguồn để ghi sổ quỹ + cập nhật số dư (1 hoặc nhiều nguồn).
       let payments: { source: string; amount: number }[] = [];
       if (rawPayments.length > 0) {
-        let remainingToAllocate = actualPaidAmount;
-        // Ưu tiên bank trước để nếu dư thì giảm trừ vào cash (trả lại tiền thừa)
-        const sortedRaw = [...rawPayments].sort((a, b) => {
+        // Phân bổ ƯU TIÊN bank trước: chuyển khoản là số chính xác khách đã
+        // chuyển, nên nếu tổng vượt total thì phần dư trừ vào cash (trả lại
+        // tiền thừa bằng tiền mặt). Nhưng mảng kết quả GIỮ THỨ TỰ NHẬP gốc
+        // (cash trước bank như UI) để ổn định contract với RPC/sổ quỹ/test.
+        const indexed = rawPayments.map((p, idx) => ({ ...p, idx }));
+        const bankFirst = [...indexed].sort((a, b) => {
           if (a.source === "bank" && b.source === "cash") return -1;
           if (a.source === "cash" && b.source === "bank") return 1;
           return 0;
         });
 
-        for (const p of sortedRaw) {
+        const allocations = new Array<number>(rawPayments.length).fill(0);
+        let remainingToAllocate = actualPaidAmount;
+        for (const p of bankFirst) {
           if (p.amount > 0 && remainingToAllocate > 0) {
             const allocated = Math.min(p.amount, remainingToAllocate);
-            payments.push({ source: p.source, amount: allocated });
+            allocations[p.idx] = allocated;
             remainingToAllocate -= allocated;
           }
         }
+
+        payments = indexed
+          .filter((p) => allocations[p.idx] > 0)
+          .map((p) => ({ source: p.source, amount: allocations[p.idx] }));
       } else if (actualPaidAmount > 0) {
         payments = [{ source: data.paymentMethod, amount: actualPaidAmount }];
       }

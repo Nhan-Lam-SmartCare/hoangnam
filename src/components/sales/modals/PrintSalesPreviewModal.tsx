@@ -74,8 +74,6 @@ const PrintSalesPreviewModal: React.FC<PrintSalesPreviewModalProps> = ({
   storeSettings,
   onPrint,
 }) => {
-  if (!isOpen || !printPayload) return null;
-
   const [selectedPaperSizeKey, setSelectedPaperSizeKey] = useState<string>(
     storeSettings?.print_paper_size_sales || "A5"
   );
@@ -85,6 +83,10 @@ const PrintSalesPreviewModal: React.FC<PrintSalesPreviewModalProps> = ({
       setSelectedPaperSizeKey(storeSettings.print_paper_size_sales);
     }
   }, [storeSettings?.print_paper_size_sales, isOpen]);
+
+  // Guard đặt SAU hooks: React yêu cầu hooks chạy cùng thứ tự ở mọi render
+  // (rules-of-hooks) — early-return trước hooks có thể crash khi modal mở/đóng.
+  if (!isOpen || !printPayload) return null;
 
   const paperSize = resolvePaperSize(selectedPaperSizeKey, "A5");
 
