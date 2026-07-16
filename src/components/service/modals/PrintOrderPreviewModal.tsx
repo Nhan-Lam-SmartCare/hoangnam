@@ -67,6 +67,18 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
   storeSettings,
   onPrint,
 }) => {
+  const [selectedPaperSizeKey, setSelectedPaperSizeKey] = useState<string>(
+    storeSettings?.print_paper_size_receipt || "80mm"
+  );
+
+  useEffect(() => {
+    if (storeSettings?.print_paper_size_receipt && isOpen) {
+      setSelectedPaperSizeKey(storeSettings.print_paper_size_receipt);
+    }
+  }, [storeSettings?.print_paper_size_receipt, isOpen]);
+
+  // Guard đặt SAU hooks: React yêu cầu hooks chạy cùng thứ tự ở mọi render
+  // (rules-of-hooks) — early-return trước hooks có thể crash khi modal mở/đóng.
   if (!isOpen || !printOrder) return null;
 
   const printableIssueDescription = sanitizeIssueDescriptionForPrint(
@@ -85,16 +97,6 @@ const PrintOrderPreviewModal: React.FC<PrintOrderPreviewModalProps> = ({
     window.matchMedia?.("(pointer: coarse)").matches;
 
   const isNative = Capacitor.isNativePlatform();
-
-  const [selectedPaperSizeKey, setSelectedPaperSizeKey] = useState<string>(
-    storeSettings?.print_paper_size_receipt || "80mm"
-  );
-
-  useEffect(() => {
-    if (storeSettings?.print_paper_size_receipt && isOpen) {
-      setSelectedPaperSizeKey(storeSettings.print_paper_size_receipt);
-    }
-  }, [storeSettings?.print_paper_size_receipt, isOpen]);
 
   const paperSize = resolvePaperSize(selectedPaperSizeKey, "80mm");
 

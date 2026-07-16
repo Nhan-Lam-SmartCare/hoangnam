@@ -48,8 +48,6 @@ const PrintPawnPreviewModal: React.FC<PrintPawnPreviewModalProps> = ({
   onPrint,
   children,
 }) => {
-  if (!isOpen || !printRecord) return null;
-
   const [selectedPaperSizeKey, setSelectedPaperSizeKey] = useState<string>(
     storeSettings?.print_paper_size_pawn || "A5"
   );
@@ -59,6 +57,10 @@ const PrintPawnPreviewModal: React.FC<PrintPawnPreviewModalProps> = ({
       setSelectedPaperSizeKey(storeSettings.print_paper_size_pawn);
     }
   }, [storeSettings?.print_paper_size_pawn, isOpen]);
+
+  // Guard đặt SAU hooks: React yêu cầu hooks chạy cùng thứ tự ở mọi render
+  // (rules-of-hooks) — early-return trước hooks có thể crash khi modal mở/đóng.
+  if (!isOpen || !printRecord) return null;
 
   const paperSize = resolvePaperSize(selectedPaperSizeKey, "A5");
 
