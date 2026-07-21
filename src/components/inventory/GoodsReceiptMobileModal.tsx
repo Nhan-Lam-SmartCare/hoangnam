@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { 
   X, 
   Search, 
@@ -121,15 +121,32 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
 
 
 
-  const filteredParts =
-    parts?.filter((part) => {
-      if (!searchTerm || searchTerm.trim() === "") return true; // Show all if no search
-      const term = searchTerm.toLowerCase().trim();
-      return (
-        part.name?.toLowerCase().includes(term) ||
-        part.sku?.toLowerCase().includes(term)
-      );
-    }) || [];
+  const filteredParts = useMemo(() => {
+    if (!parts) return [];
+    
+    const branchParts = parts.filter((part) => {
+      const isServiceCategory = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
+      if (isServiceCategory) return true;
+
+      const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+      if (pBranchId) {
+        return pBranchId === currentBranchId;
+      }
+
+      const hasStock = part.stock && part.stock[currentBranchId] !== undefined;
+      const hasRetail = part.retailPrice && part.retailPrice[currentBranchId] !== undefined;
+      const hasCost = part.costPrice && part.costPrice[currentBranchId] !== undefined;
+
+      return hasStock || hasRetail || hasCost;
+    });
+
+    if (!searchTerm || searchTerm.trim() === "") return branchParts;
+    const term = searchTerm.toLowerCase().trim();
+    return branchParts.filter((part) => 
+      part.name?.toLowerCase().includes(term) ||
+      part.sku?.toLowerCase().includes(term)
+    );
+  }, [parts, searchTerm, currentBranchId]);
 
 
   const addToReceipt = (part: Part) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Package, Coins, Camera, Plus } from 'lucide-react';
+import { Check, Package, Coins, Camera } from 'lucide-react';
 import { showToast } from '../../../utils/toast';
 import { validatePriceAndQty } from '../../../utils/validation';
 import FormattedNumberInput from '../../common/FormattedNumberInput';
@@ -91,7 +91,7 @@ const AddProductModal: React.FC<{
         open={isOpen}
         title="Thêm sản phẩm mới"
         onClose={onClose}
-        className="max-w-4xl"
+        className="max-w-3xl"
       >
         <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 custom-scrollbar">
           <div className="space-y-4">
@@ -102,9 +102,9 @@ const AddProductModal: React.FC<{
                 <span>Thông tin sản phẩm</span>
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Tên sản phẩm */}
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Tên sản phẩm <span className="text-red-500">*</span>
                   </label>
@@ -119,7 +119,7 @@ const AddProductModal: React.FC<{
 
                 {/* Danh mục */}
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Danh mục sản phẩm
                   </label>
                   <div className="flex gap-2">
@@ -234,13 +234,13 @@ const AddProductModal: React.FC<{
             <div className="bg-white dark:bg-[#1e1e2d] rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
               <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 pl-0.5">
                 <Coins className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Thông tin nhập kho</span>
+                <span>Thông tin nhập kho & Giá</span>
               </h3>
 
-              <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {/* Số lượng */}
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Số lượng
                   </label>
                   <FormattedNumberInput
@@ -256,8 +256,8 @@ const AddProductModal: React.FC<{
                 </div>
 
                 {/* Giá nhập */}
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Giá nhập (đ)
                   </label>
                   <FormattedNumberInput
@@ -278,8 +278,8 @@ const AddProductModal: React.FC<{
                 </div>
 
                 {/* Giá bán lẻ */}
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Giá bán lẻ (đ)
                   </label>
                   <FormattedNumberInput
@@ -293,8 +293,8 @@ const AddProductModal: React.FC<{
                 </div>
 
                 {/* Tiền công */}
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Tiền công (đ)
                   </label>
                   <FormattedNumberInput
@@ -305,15 +305,15 @@ const AddProductModal: React.FC<{
                 </div>
 
                 {/* Bảo hành */}
-                <div className="col-span-2 md:col-span-4">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
                     Bảo hành
                   </label>
                   <div className="flex gap-2">
                     <FormattedNumberInput
                       value={warranty}
                       onValue={(v) => setWarranty(Math.max(0, Math.floor(v)))}
-                      className="w-16 px-2 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center font-bold outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
+                      className="w-24 px-2 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center font-bold outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
                     />
                     <select
                       value={warrantyUnit}

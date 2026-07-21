@@ -6,6 +6,8 @@ import { useAppContext } from "../../../contexts/AppContext";
 import { useCreateCashTransaction } from "../../../hooks/useSupabase";
 import { showToast } from "../../../utils/toast";
 import type { PayrollRecord } from "../../../types";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "../../../supabaseClient";
 
 interface PayrollReportProps {
   salaryReportProps: any;
@@ -40,6 +42,7 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
   const {
     staffSalaryRows,
     loadingSalaryRows,
+    employees: salaryEmployees, // employees fetched from DB inside the hook (has branch_id)
     selectedSalaryWorker,
     setSelectedSalaryWorker,
     salaryDetailRows,
@@ -53,6 +56,33 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
 
   const { upsertPayrollRecord, setPayrollRecords, payrollRecords = [] } = useAppContext();
   const createCashTx = useCreateCashTransaction();
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ["allBranchesForPayroll"],
+    queryFn: async () => {
+      const { data } = await supabase.from("branches").select("id, name");
+      return data || [];
+    },
+    staleTime: 300000,
+  });
+
+  const branchMap = useMemo(() => {
+    return new Map(branches.map((b: any) => [b.id, b.name]));
+  }, [branches]);
+
+  const employeeBranchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    // Use salaryEmployees (fetched directly from Supabase in hook) — has branch_id (snake_case)
+    const sourceList = (salaryEmployees && salaryEmployees.length > 0) ? salaryEmployees : (employees || []);
+    for (const emp of sourceList) {
+      const bId = emp.branch_id || emp.branchId || "";
+      const bName = branchMap.get(bId) || "";
+      if (bName) {
+        map.set(emp.id, bName);
+      }
+    }
+    return map;
+  }, [salaryEmployees, employees, branchMap]);
 
   const [payingWorker, setPayingWorker] = useState<any | null>(null);
   const [payMethod, setPayMethod] = useState<"cash" | "bank">("cash");
@@ -282,13 +312,20 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
                 combinedSalaryRows.map((row: any) => (
                   <tr key={row.workerId} className="border-b border-slate-100 dark:border-white/5">
                     <td className="py-3 px-3 text-sm text-slate-800 dark:text-white">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenSalaryDetails(row)}
-                        className="text-left text-blue-600 dark:text-cyan-300 hover:text-blue-500 dark:hover:text-cyan-200 underline-offset-2 hover:underline"
-                      >
-                        {row.workerName}
-                      </button>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSalaryDetails(row)}
+                          className="text-left text-blue-600 dark:text-cyan-300 hover:text-blue-500 dark:hover:text-cyan-200 underline-offset-2 hover:underline font-medium"
+                        >
+                          {row.workerName}
+                        </button>
+                        {employeeBranchMap.get(row.workerId) && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                            {employeeBranchMap.get(row.workerId)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-3 text-sm text-right text-slate-600 dark:text-slate-300">
                       {row.totalServiceCount}
@@ -372,13 +409,20 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
                 className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/40 p-3"
               >
                 <div className="flex justify-between items-start">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenSalaryDetails(row)}
-                    className="text-sm font-semibold text-blue-600 dark:text-cyan-300 hover:text-blue-500 dark:hover:text-cyan-200"
-                  >
-                    {row.workerName}
-                  </button>
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSalaryDetails(row)}
+                      className="text-sm font-semibold text-blue-600 dark:text-cyan-300 hover:text-blue-500 dark:hover:text-cyan-200 text-left"
+                    >
+                      {row.workerName}
+                    </button>
+                    {employeeBranchMap.get(row.workerId) && (
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                        {employeeBranchMap.get(row.workerId)}
+                      </span>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setEditingBonusPenalty({ workerId: row.workerId, workerName: row.workerName, bonus: Number(row.bonus || 0), penalty: Number(row.penalty || 0) })}
@@ -487,8 +531,15 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
             <tbody>
               {employeeSalesSummary.map((row: any) => (
                 <tr key={row.employeeId} className="border-b border-slate-100 dark:border-white/5">
-                  <td className="py-3 px-3 text-sm text-slate-800 dark:text-white font-medium">
-                    {row.employeeName}
+                  <td className="py-3 px-3 text-sm text-slate-800 dark:text-white">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{row.employeeName}</span>
+                      {employeeBranchMap.get(row.employeeId) && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                          {employeeBranchMap.get(row.employeeId)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-3 text-sm text-right text-slate-600 dark:text-slate-300">
                     {row.totalSalesCount}
@@ -538,8 +589,15 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
               key={row.employeeId}
               className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/40 p-3"
             >
-              <div className="text-sm font-semibold text-slate-800 dark:text-white">
-                {row.employeeName}
+              <div className="flex flex-col">
+                <div className="text-sm font-semibold text-slate-800 dark:text-white">
+                  {row.employeeName}
+                </div>
+                {employeeBranchMap.get(row.employeeId) && (
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                    {employeeBranchMap.get(row.employeeId)}
+                  </span>
+                )}
               </div>
               <div className="mt-2 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                 <div className="flex justify-between gap-2">

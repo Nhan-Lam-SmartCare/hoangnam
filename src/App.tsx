@@ -213,7 +213,7 @@ const MainLayout: React.FC = () => {
 
 
   return (
-    <div className="app-shell min-h-screen transition-colors pb-20 md:pb-0 relative overflow-hidden">
+    <div className="app-shell min-h-screen transition-colors pb-20 md:pb-0 relative">
       {!isShopPage && <Nav />}
       <main
         className={

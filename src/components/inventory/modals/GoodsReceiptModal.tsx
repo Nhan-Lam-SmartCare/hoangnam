@@ -191,23 +191,37 @@ const GoodsReceiptModal: React.FC<{
   };
 
   const filteredParts = useMemo(() => {
-
-
     if (!parts || parts.length === 0) {
       return [];
     }
 
+    const branchParts = parts.filter((part) => {
+      const isServiceCategory = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
+      if (isServiceCategory) return true;
+
+      const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+      if (pBranchId) {
+        return pBranchId === currentBranchId;
+      }
+
+      const hasStock = part.stock && part.stock[currentBranchId] !== undefined;
+      const hasRetail = part.retailPrice && part.retailPrice[currentBranchId] !== undefined;
+      const hasCost = part.costPrice && part.costPrice[currentBranchId] !== undefined;
+
+      return hasStock || hasRetail || hasCost;
+    });
+
     if (!searchTerm || searchTerm.trim() === "") {
-      return parts;
+      return branchParts;
     }
 
     const q = searchTerm.toLowerCase().trim();
-    const filtered = parts.filter(
+    const filtered = branchParts.filter(
       (p) =>
         p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q)
     );
     return filtered;
-  }, [parts, searchTerm]);
+  }, [parts, searchTerm, currentBranchId]);
 
   const addToReceipt = (part: Part) => {
     const existing = receiptItems.find((item) => item.partId === part.id);
