@@ -205,7 +205,23 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
 
   // Filter parts
   const filteredParts = useMemo(() => {
-    return parts.filter((p) => {
+    const branchParts = parts.filter((part) => {
+      const isServiceCategory = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
+      if (isServiceCategory) return true;
+
+      const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+      if (pBranchId) {
+        return pBranchId === currentBranchId;
+      }
+
+      const hasStock = part.stock && part.stock[currentBranchId] !== undefined;
+      const hasRetail = part.retailPrice && part.retailPrice[currentBranchId] !== undefined;
+      const hasCost = part.costPrice && part.costPrice[currentBranchId] !== undefined;
+
+      return hasStock || hasRetail || hasCost;
+    });
+
+    return branchParts.filter((p) => {
       const matchSearch =
         !searchTerm ||
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -217,7 +233,7 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
 
       return matchSearch && matchCategory;
     });
-  }, [parts, searchTerm, filterCategory]);
+  }, [parts, searchTerm, filterCategory, currentBranchId]);
 
   // Get stock for a part
   const getStock = (part: Part) => part.stock[currentBranchId] || 0;

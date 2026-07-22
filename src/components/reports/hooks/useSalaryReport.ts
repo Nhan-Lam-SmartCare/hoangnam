@@ -30,7 +30,7 @@ export const useSalaryReport = (
       if (activeTab !== "payroll") return;
       try {
         let usersToMap: any[] = [];
-        const { data: employeesData } = await supabase.from("employees").select("*");
+        const { data: employeesData } = await supabase.from("employees").select("id, name, email, base_salary, branch_id");
         
         if (employeesData && employeesData.length > 0) {
            usersToMap = employeesData;
@@ -256,6 +256,7 @@ export const useSalaryReport = (
   return {
     staffSalaryRows,
     loadingSalaryRows,
+    employees, // expose internal employees (with branch_id from DB)
     selectedSalaryWorker,
     setSelectedSalaryWorker,
     salaryDetailRows,

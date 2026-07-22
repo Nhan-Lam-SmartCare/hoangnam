@@ -39,13 +39,29 @@ const AddProductToReceiptModal: React.FC<{
     const filteredParts = useMemo(() => {
         if (!searchTerm) return [];
         const q = searchTerm.toLowerCase();
-        return allParts.filter(
+        const branchParts = allParts.filter((part) => {
+            const isServiceCategory = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
+            if (isServiceCategory) return true;
+
+            const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+            if (pBranchId) {
+                return pBranchId === currentBranchId;
+            }
+
+            const hasStock = part.stock && part.stock[currentBranchId] !== undefined;
+            const hasRetail = part.retailPrice && part.retailPrice[currentBranchId] !== undefined;
+            const hasCost = part.costPrice && part.costPrice[currentBranchId] !== undefined;
+
+            return hasStock || hasRetail || hasCost;
+        });
+
+        return branchParts.filter(
             (p) =>
                 p.name.toLowerCase().includes(q) ||
                 p.sku?.toLowerCase().includes(q) ||
                 p.description?.toLowerCase().includes(q)
         );
-    }, [allParts, searchTerm]);
+    }, [allParts, searchTerm, currentBranchId]);
 
     const handleSelectProduct = (part: Part) => {
         setSelectedProduct(part);

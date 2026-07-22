@@ -156,7 +156,7 @@ BEGIN
       NULLIF(p_sale#>>'{customer,phone}', ''),
       'Mua hàng (Hóa đơn #' || v_sale_id || ')',
       v_total, v_paid, v_remaining,
-      to_char(now(), 'YYYY-MM-DD'),
+      now(),
       p_branch_id, v_sale_id
     )
     ON CONFLICT (id) DO UPDATE
@@ -165,18 +165,10 @@ BEGIN
           remaining_amount = EXCLUDED.remaining_amount;
   END IF;
 
-  -- 6) Cộng thống kê khách hàng nguyên tử (#8) + phân hạng segment (khớp client).
+  -- 6) Cộng thống kê khách hàng.
   IF v_customer_id IS NOT NULL THEN
     UPDATE public.customers
-    SET totalspent = COALESCE(totalspent, 0) + v_total,
-        visitcount = COALESCE(visitcount, 0) + 1,
-        lastvisit = now(),
-        segment = CASE
-          WHEN COALESCE(totalspent, 0) + v_total > 10000000 THEN 'VIP'
-          WHEN COALESCE(totalspent, 0) + v_total > 3000000 THEN 'Loyal'
-          WHEN COALESCE(visitcount, 0) + 1 > 1 THEN 'Potential'
-          ELSE 'New'
-        END
+    SET "totalSpent" = COALESCE("totalSpent", 0) + v_total
     WHERE id = v_customer_id;
   END IF;
 

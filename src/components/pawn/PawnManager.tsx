@@ -493,7 +493,6 @@ export default function PawnManager() {
                       value={formData.customerName}
                       onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="Nguyễn Văn A"
                       required
                     />
                   </div>
@@ -506,7 +505,6 @@ export default function PawnManager() {
                       value={formData.customerPhone}
                       onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="0901234567"
                     />
                   </div>
                   <div>
@@ -518,7 +516,6 @@ export default function PawnManager() {
                       value={formData.customerCccd}
                       onChange={(e) => setFormData({ ...formData, customerCccd: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="091090123456"
                     />
                   </div>
                   <div>
@@ -530,7 +527,6 @@ export default function PawnManager() {
                       value={formData.customerAddress}
                       onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="Vĩnh Lập, An Cư, An Giang"
                     />
                   </div>
                 </div>
@@ -549,7 +545,6 @@ export default function PawnManager() {
                       value={formData.assetType}
                       onChange={(e) => setFormData({ ...formData, assetType: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="Điện thoại, Xe máy, Máy tính..."
                       required
                     />
                   </div>
@@ -562,7 +557,6 @@ export default function PawnManager() {
                       value={formData.assetModel}
                       onChange={(e) => setFormData({ ...formData, assetModel: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="iPhone 15 Pro Max, Honda SH..."
                     />
                   </div>
                   <div>
@@ -574,7 +568,6 @@ export default function PawnManager() {
                       value={formData.assetSerial}
                       onChange={(e) => setFormData({ ...formData, assetSerial: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="356988..."
                     />
                   </div>
                   <div>
@@ -586,7 +579,6 @@ export default function PawnManager() {
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       rows={2}
                       className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
-                      placeholder="Bị trầy xước nhẹ ở viền, không kèm cáp sạc..."
                     />
                   </div>
                 </div>
@@ -608,7 +600,6 @@ export default function PawnManager() {
                       value={formData.loanAmount || ""}
                       onChange={(e) => setFormData({ ...formData, loanAmount: Number(e.target.value) })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
-                      placeholder="5,000,000"
                       min="0"
                       required
                     />
@@ -622,7 +613,6 @@ export default function PawnManager() {
                       value={formData.interestRate || ""}
                       onChange={(e) => setFormData({ ...formData, interestRate: Number(e.target.value) })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="0.2"
                       step="0.01"
                       min="0"
                     />
@@ -674,7 +664,6 @@ export default function PawnManager() {
                       value={formData.minInterest || ""}
                       onChange={(e) => setFormData({ ...formData, minInterest: Number(e.target.value) })}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                      placeholder="50,000"
                       min="0"
                     />
                   </div>
