@@ -26,16 +26,11 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppContext } from "../../contexts/AppContext";
 import { canDo } from "../../utils/permissions";
-import type {
-  WorkOrder,
-  WorkOrderPart,
-  Customer,
-} from "../../types";
+import type { WorkOrder } from "../../types";
 import {
   formatCurrency,
   formatDate,
   formatWorkOrderId,
-  generateWorkOrderId,
 } from "../../utils/format";
 import {
   useDeleteWorkOrderRepo,
@@ -59,10 +54,6 @@ import PrintOrderPreviewModal from "../service/modals/PrintOrderPreviewModal";
 import StatusBadge from "../service/components/StatusBadge";
 import { getQuickStatusFilters } from "../service/components/quickStatusFiltersData";
 import { getStatusSnapshotCards } from "../service/components/statusSnapshotCardsData";
-import {
-  detectMaintenancesFromWorkOrder,
-  updateVehicleMaintenances,
-} from "../../utils/maintenanceReminder";
 import { RepairTemplatesModal } from "../service/components/RepairTemplatesModal";
 import { ServiceInsights } from "../service/components/ServiceInsights";
 import { ServiceActionBar } from "../service/components/ServiceActionBar";
@@ -1053,23 +1044,6 @@ export default function ServiceManager() {
           />
         )
       }
-
-      {/* Mobile Work Order Modal - DISABLED */}
-      {/*
-      <WorkOrderMobileModal
-        isOpen={showMobileModal}
-        onClose={() => {
-          setShowMobileModal(false);
-          setEditingOrder(undefined);
-        }}
-        onSave={handleMobileSave}
-        workOrder={editingOrder}
-        customers={displayCustomers}
-        parts={fetchedParts || []}
-        employees={displayEmployees || []}
-        currentBranchId={currentBranchId}
-      />
-      */}
 
       <PrintOrderPreviewModal
         isOpen={showPrintPreview}

@@ -285,7 +285,7 @@ export function useWorkOrderMobileSubmit(params: UseWorkOrderMobileSubmitParams)
       existingOrder: editingOrder || null,
       formData: {
         customerName: customer.name,
-        customerPhone: customer.phone,
+        customerPhone: customer.phone || "",
         vehicleModel: vehicle?.model,
         licensePlate: vehicle?.licensePlate,
         vehicleId: vehicle?.id,
