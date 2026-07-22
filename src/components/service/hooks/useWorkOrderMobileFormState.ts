@@ -13,6 +13,7 @@ import {
   getAdditionalPaymentToApply,
   calculateRemainingAmount,
 } from "../../../lib/services/workOrderCalculations";
+import { getBlockedDeepEditMessage as getBlockedDeepEditMessageService } from "../../../lib/services/workOrderDeepEditPolicy";
 import { validateWorkOrderDraft } from "../../../lib/services/workOrderValidation";
 import { compressImage } from "../../../utils/imageCompressor";
 import { uploadDevicePhoto, deleteDevicePhoto } from "../../../lib/storage/devicePhotosStorage";
@@ -1153,146 +1154,41 @@ export function useWorkOrderMobileFormState({
       };
     });
 
+    // Phase 8: ma trận quyền deep-edit dùng chung với desktop
+    // (lib/services/workOrderDeepEditPolicy.ts — có unit test).
     if (workOrder?.id) {
-      const normalizeNumber = (value: unknown): number => Number(value || 0);
-
-      const normalizePartsForCompare = (items: any[] = []) =>
-        items
-          .map((item) => ({
-            partId: String(item.partId || ""),
-            partName: String(item.partName || ""),
-            quantity: normalizeNumber(item.quantity),
-            price: normalizeNumber(item.price ?? item.sellingPrice),
-            costPrice: normalizeNumber(item.costPrice),
-          }))
-          .sort((a, b) =>
-            `${a.partId}|${a.partName}`.localeCompare(`${b.partId}|${b.partName}`)
-          );
-
-      const normalizeServicesForCompare = (items: any[] = []) =>
-        items
-          .map((item) => ({
-            description: String(item.description || item.name || ""),
-            quantity: normalizeNumber(item.quantity),
-            price: normalizeNumber(item.price ?? item.sellingPrice),
-            costPrice: normalizeNumber(item.costPrice),
-          }))
-          .sort((a, b) => a.description.localeCompare(b.description));
-
-      const normalizeRepairServicesForCompare = (items: any[] = []) =>
-        items
-          .map((item) => ({
-            serviceId: String(item.service_id || item.serviceId || ""),
-            serviceName: String(item.service_name || item.serviceName || ""),
-            laborAmount: normalizeNumber(item.labor_amount || item.laborAmount),
-            relatedItemIds: (item.related_items || item.relatedItems || [])
-              .map((related: any) => String(related.part_id || related.partId || ""))
-              .sort(),
-          }))
-          .sort((a, b) =>
-            `${a.serviceId}|${a.serviceName}`.localeCompare(
-              `${b.serviceId}|${b.serviceName}`
-            )
-          );
-
-      const statusChanged = status !== workOrder.status;
-
-      const previousDeposit = normalizeNumber(workOrder.depositAmount);
-      const previousAdditionalPayment = normalizeNumber(workOrder.additionalPayment);
-      const previousPaymentMethod = String(workOrder.paymentMethod || "");
-      const currentPaymentMethod = String(paymentMethod || "");
-      const paymentChanged =
-        previousDeposit !== totalDeposit ||
-        previousAdditionalPayment !== additionalPayment ||
-        previousPaymentMethod !== currentPaymentMethod;
-
-      const existingPartsSignature = JSON.stringify(
-        normalizePartsForCompare(workOrder.partsUsed as any[])
+      const blockedMessage = getBlockedDeepEditMessageService(
+        workOrder,
+        {
+          status,
+          paymentMethod,
+          customerName: selectedCustomer?.name,
+          customerPhone: selectedCustomer?.phone,
+          vehicleId: selectedVehicle?.id,
+          vehicleModel: selectedVehicle?.model,
+          licensePlate: selectedVehicle?.licensePlate,
+          totalDeposit,
+          nextAdditionalPayment: additionalPayment,
+          effectiveLaborCost,
+          discount: discountAmount,
+          selectedParts: transformedParts,
+          additionalServices: transformedServices,
+          repairServices: transformedRepairServices,
+        },
+        {
+          canUpdateWorkOrderStatus,
+          canUpdateWorkOrderPayment,
+          canUpdateWorkOrderParts,
+          canUpdateWorkOrderLabor,
+          canUpdateWorkOrderDiscount,
+          canUpdateWorkOrderCustomer,
+          canUpdateWorkOrderVehicle,
+          canUpdateWorkOrderOutsourceService,
+        },
+        { compareCurrentKm: false } // mobile không so sánh km (giữ hành vi cũ)
       );
-      const currentPartsSignature = JSON.stringify(
-        normalizePartsForCompare(transformedParts)
-      );
-
-      const existingServicesSignature = JSON.stringify(
-        normalizeServicesForCompare(workOrder.additionalServices as any[])
-      );
-      const currentServicesSignature = JSON.stringify(
-        normalizeServicesForCompare(transformedServices)
-      );
-
-      const existingRepairServicesSignature = JSON.stringify(
-        normalizeRepairServicesForCompare(workOrder.repairServices as any[])
-      );
-      const currentRepairServicesSignature = JSON.stringify(
-        normalizeRepairServicesForCompare(transformedRepairServices)
-      );
-
-      const customerChanged =
-        String(workOrder.customerName || "") !== String(selectedCustomer?.name || "") ||
-        String(workOrder.customerPhone || "") !== String(selectedCustomer?.phone || "");
-
-      const vehicleChanged =
-        String(workOrder.vehicleId || "") !== String(selectedVehicle?.id || "") ||
-        String(workOrder.vehicleModel || "") !== String(selectedVehicle?.model || "") ||
-        String(workOrder.licensePlate || "") !== String(selectedVehicle?.licensePlate || "");
-
-      const partsChanged =
-        existingPartsSignature !== currentPartsSignature ||
-        existingRepairServicesSignature !== currentRepairServicesSignature;
-
-      const outsourceServicesChanged =
-        existingServicesSignature !== currentServicesSignature;
-
-      const laborChanged =
-        normalizeNumber(workOrder.laborCost) !== normalizeNumber(effectiveLaborCost);
-
-      const discountChanged =
-        normalizeNumber(workOrder.discount) !== normalizeNumber(discountAmount);
-
-      if (statusChanged && !canUpdateWorkOrderStatus) {
-        showToast.error("Bạn không có quyền đổi trạng thái phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (paymentChanged && !canUpdateWorkOrderPayment) {
-        showToast.error("Bạn không có quyền cập nhật thanh toán phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (partsChanged && !canUpdateWorkOrderParts) {
-        showToast.error("Bạn không có quyền sửa phụ tùng trong phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (laborChanged && !canUpdateWorkOrderLabor) {
-        showToast.error("Bạn không có quyền sửa tiền công (labor) phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (discountChanged && !canUpdateWorkOrderDiscount) {
-        showToast.error("Bạn không có quyền sửa giảm giá phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (customerChanged && !canUpdateWorkOrderCustomer) {
-        showToast.error("Bạn không có quyền sửa thông tin khách hàng trong phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (vehicleChanged && !canUpdateWorkOrderVehicle) {
-        showToast.error("Bạn không có quyền sửa thông tin thiết bị trong phiếu sửa chữa");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (outsourceServicesChanged && !canUpdateWorkOrderOutsourceService) {
-        showToast.error("Bạn không có quyền tạo/sửa dịch vụ gia công ngoài");
+      if (blockedMessage) {
+        showToast.error(blockedMessage);
         setIsSubmitting(false);
         return;
       }

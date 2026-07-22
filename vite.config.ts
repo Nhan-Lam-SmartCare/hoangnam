@@ -1,4 +1,4 @@
-﻿import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import createStaffHandler from "./api/staff/create.js";
@@ -47,6 +47,8 @@ export default defineConfig(({ mode }) => {
     server: { port: 4310, host: "0.0.0.0" },
     plugins: [react(), localApiPlugin()],
     test: {
+      environment: "jsdom",
+      globals: true,
       exclude: ["e2e/**", "node_modules/**"],
     },
     resolve: { alias: { "@": path.resolve(process.cwd(), "src") } },

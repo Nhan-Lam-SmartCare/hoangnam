@@ -38,6 +38,17 @@ const AddProductModal: React.FC<{
   const [warrantyUnit, setWarrantyUnit] = useState("tháng");
   const [retailOverridden, setRetailOverridden] = useState<boolean>(false);
   const { data: categories = [] } = useCategories();
+  const sortedCategories = React.useMemo(() => {
+    const map = new Map<string, any>();
+    for (const c of categories) {
+      if (!c.name) continue;
+      const key = c.name.trim().toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { ...c, name: c.name.trim() });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  }, [categories]);
   const createCategory = useCreateCategory();
   const [showInlineCat, setShowInlineCat] = useState(false);
   const [inlineCatName, setInlineCatName] = useState("");
@@ -129,7 +140,7 @@ const AddProductModal: React.FC<{
                       className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
                     >
                       <option value="">-- Chọn danh mục --</option>
-                      {categories.map((c: any) => (
+                      {sortedCategories.map((c: any) => (
                         <option key={c.id} value={c.name}>
                           {c.name}
                         </option>

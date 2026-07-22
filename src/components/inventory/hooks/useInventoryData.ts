@@ -169,23 +169,13 @@ export function useInventoryData({
       baseList = baseList.filter((part: any) => {
         const pBranchId = part.branch_id || part.branchId || "";
 
-        // If the part is explicitly assigned to a branch, only show in that branch
         if (pBranchId) {
           return pBranchId === currentBranchId;
         }
 
         // If the part has no specific branch assigned (e.g. legacy or global product),
-        // we show it ONLY if it has any stock activity, price configuration, or if it is completely new (0 activity).
-        // Since createPart initializes stock as { [currentBranchId]: 0 },
-        // we can check if currentBranchId is in the stock keys to know if it belongs here.
-        const stockKeys = Object.keys(part.stock || {});
-        const retailKeys = Object.keys(part.retailPrice || {});
-
-        // If it was explicitly initialized or imported in this branch, it will have the branch key in stock or retailPrice.
-        // If it has NO keys at all, it's a completely malformed/empty product, we might as well show it.
-        if (stockKeys.length === 0 && retailKeys.length === 0) return true;
-
-        return stockKeys.includes(currentBranchId) || retailKeys.includes(currentBranchId);
+        // we show it in all branches so that any branch can see and use global products.
+        return true;
       });
     }
 

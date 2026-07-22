@@ -14,6 +14,7 @@ import {
 import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { useAppContext } from "../../contexts/AppContext";
 import { formatCurrency } from "../../utils/format";
+import { useBranchesRepo } from "../../hooks/useBranchesRepository";
 import {
   Boxes,
   Wrench,
@@ -31,6 +32,8 @@ import {
   AlertCircle,
   Edit2,
   Trash2,
+  Building2,
+  Filter,
 } from "lucide-react";
 import {
   getAllCategoryPricingRules,
@@ -42,6 +45,14 @@ import { UiCard } from "../ui";
 const CategoriesManager: React.FC = () => {
   const navigate = useNavigate();
   const { currentBranchId } = useAppContext();
+  const { data: branches = [] } = useBranchesRepo();
+  // Selected branch filter: "all" or specific branch ID
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(
+    currentBranchId || "all"
+  );
+  // Toggle: Only show categories that have products in the selected branch
+  const [onlyBranchWithProducts, setOnlyBranchWithProducts] = useState<boolean>(false);
+
   // Live parts from Supabase
   const { data: parts = [] } = useParts();
   const {
@@ -65,23 +76,63 @@ const CategoriesManager: React.FC = () => {
   // Confirm dialog hook
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
-  // Extract unique categories from parts with enhanced stats
-  const categories = useMemo(() => {
-    const branchKey = currentBranchId || "";
+  // Helper check if a part is associated with or has stock/pricing in a branch
+  const isPartInBranch = (p: any, branchId: string) => {
+    if (branchId === "all") return true;
+    const pBranch = p.branch_id || p.branchId || "";
+    if (pBranch) return pBranch === branchId;
+    const hasStock = p.stock && p.stock[branchId] !== undefined;
+    const hasRetail = p.retailPrice && p.retailPrice[branchId] !== undefined;
+    const hasCost = p.costPrice && p.costPrice[branchId] !== undefined;
+    return hasStock || hasRetail || hasCost;
+  };
 
-    return categoriesData.map((c) => {
-      const categoryParts = parts.filter((p) => p.category === c.name);
-      const totalStock = categoryParts.reduce(
-        (sum, p) => sum + (p.stock?.[branchKey] || 0),
-        0
-      );
+  // Branch-scoped parts list
+  const branchScopedParts = useMemo(() => {
+    return parts.filter((p) => isPartInBranch(p, selectedBranchId));
+  }, [parts, selectedBranchId]);
+
+  // Extract categories with enhanced branch-scoped stats
+  const categories = useMemo(() => {
+    const activeBranch = selectedBranchId;
+
+    const mapped = categoriesData.map((c) => {
+      const categoryParts = branchScopedParts.filter((p) => p.category === c.name);
+
+      const totalStock = categoryParts.reduce((sum, p) => {
+        if (activeBranch === "all") {
+          const allStockSum = Object.values(p.stock || {}).reduce(
+            (s: number, v: any) => s + Math.max(0, Number(v || 0)),
+            0
+          );
+          return sum + allStockSum;
+        }
+        return sum + Math.max(0, Number(p.stock?.[activeBranch] || 0));
+      }, 0);
+
       const totalValue = categoryParts.reduce((sum, p) => {
-        const stock = p.stock?.[branchKey] || 0;
-        const costPrice = p.costPrice?.[branchKey] || 0;
+        if (activeBranch === "all") {
+          const allValueSum = Object.keys(p.stock || {}).reduce((s, bKey) => {
+            const st = Math.max(0, Number(p.stock?.[bKey] || 0));
+            const cost = Math.max(0, Number(p.costPrice?.[bKey] || 0));
+            return s + st * cost;
+          }, 0);
+          return sum + allValueSum;
+        }
+        const stock = Math.max(0, Number(p.stock?.[activeBranch] || 0));
+        const costPrice = Math.max(0, Number(p.costPrice?.[activeBranch] || 0));
         return sum + stock * costPrice;
       }, 0);
+
       const lowStockParts = categoryParts.filter((p) => {
-        const stock = p.stock?.[branchKey] || 0;
+        if (activeBranch === "all") {
+          const totalSt = Object.values(p.stock || {}).reduce(
+            (s: number, v: any) => s + Math.max(0, Number(v || 0)),
+            0
+          );
+          return totalSt > 0 && totalSt <= 2;
+        }
+        const stock = Math.max(0, Number(p.stock?.[activeBranch] || 0));
         return stock > 0 && stock <= 2;
       });
 
@@ -101,12 +152,21 @@ const CategoriesManager: React.FC = () => {
         lowStockParts: lowStockParts.map((p) => ({
           name: p.name,
           sku: p.sku,
-          stock: p.stock?.[branchKey] || 0,
+          stock:
+            activeBranch === "all"
+              ? Object.values(p.stock || {}).reduce((s: number, v: any) => s + Math.max(0, Number(v || 0)), 0)
+              : Math.max(0, Number(p.stock?.[activeBranch] || 0)),
         })),
         lowStockCount: lowStockParts.length,
       };
     });
-  }, [categoriesData, parts, currentBranchId, pricingRules]);
+
+    if (onlyBranchWithProducts) {
+      return mapped.filter((cat) => cat.count > 0 || cat.totalStock > 0);
+    }
+
+    return mapped;
+  }, [categoriesData, branchScopedParts, selectedBranchId, pricingRules, onlyBranchWithProducts]);
 
   const handleUpdateCategoryRule = async (
     categoryName: string,
@@ -256,22 +316,61 @@ const CategoriesManager: React.FC = () => {
     <div className="categories-screen h-full flex flex-col bg-slate-50 dark:bg-[#0f172a]">
       {/* Header */}
       <UiCard className="rounded-none border-x-0 border-t-0 px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Boxes className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               Danh mục sản phẩm
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Quản lý các danh mục phân loại sản phẩm
+              Quản lý các danh mục phân loại sản phẩm theo chi nhánh
             </p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-          >
-            <PlusIcon className="w-5 h-5" />
-            Thêm danh mục
-          </button>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Branch Selector */}
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 shadow-sm">
+              <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 hidden sm:inline">
+                Chi nhánh:
+              </span>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+              >
+                <option value="all">Tất cả chi nhánh</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.id}) {b.id === currentBranchId ? "★ Hiện tại" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Toggle Only Active Categories in Branch */}
+            <button
+              type="button"
+              onClick={() => setOnlyBranchWithProducts((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                onlyBranchWithProducts
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+              }`}
+              title="Lọc chỉ những danh mục đang có sản phẩm/tồn kho ở chi nhánh được chọn"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>Chỉ mục có sản phẩm</span>
+            </button>
+
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Thêm danh mục
+            </button>
+          </div>
         </div>
       </UiCard>
 
@@ -294,27 +393,42 @@ const CategoriesManager: React.FC = () => {
       <UiCard className="rounded-none border-x-0 px-4 py-3">
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-lg border border-blue-200 dark:border-blue-700">
-            <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-              Tổng danh mục
+            <div className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 flex items-center justify-between">
+              <span>Tổng danh mục</span>
+              <span className="text-[10px] bg-blue-200/60 dark:bg-blue-800/50 px-1.5 py-0.5 rounded font-mono">
+                {selectedBranchId === "all"
+                  ? "Tất cả CN"
+                  : branches.find((b) => b.id === selectedBranchId)?.name || selectedBranchId}
+              </span>
             </div>
             <div className="text-xl font-bold text-blue-900 dark:text-blue-100 mt-1">
               {categories.length}
             </div>
           </div>
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 p-3 rounded-lg border border-emerald-200 dark:border-emerald-700">
-            <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-              Tổng sản phẩm
+            <div className="text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+              <span>Sản phẩm ở CN</span>
+              <span className="text-[10px] bg-emerald-200/60 dark:bg-emerald-800/50 px-1.5 py-0.5 rounded font-mono">
+                {selectedBranchId === "all"
+                  ? "Tất cả CN"
+                  : selectedBranchId}
+              </span>
             </div>
             <div className="text-xl font-bold text-emerald-900 dark:text-emerald-100 mt-1">
-              {parts.length}
+              {branchScopedParts.length}
             </div>
           </div>
           <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 p-3 rounded-lg border border-amber-200 dark:border-amber-700">
-            <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
-              Chưa phân loại
+            <div className="text-xs sm:text-sm font-medium text-amber-600 dark:text-amber-400 flex items-center justify-between">
+              <span>Chưa phân loại</span>
+              <span className="text-[10px] bg-amber-200/60 dark:bg-amber-800/50 px-1.5 py-0.5 rounded font-mono">
+                {selectedBranchId === "all"
+                  ? "Tất cả CN"
+                  : selectedBranchId}
+              </span>
             </div>
             <div className="text-xl font-bold text-amber-900 dark:text-amber-100 mt-1">
-              {parts.filter((p) => !p.category).length}
+              {branchScopedParts.filter((p) => !p.category).length}
             </div>
           </div>
         </div>

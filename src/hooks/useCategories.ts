@@ -30,7 +30,24 @@ export const useCategories = () => {
         });
       }
 
-      return res.data;
+      // Khử trùng lặp danh mục không phân biệt hoa/thường (Case-insensitive deduplication)
+      const seen = new Set<string>();
+      const uniqueCategories: typeof fetchedCategories = [];
+      if (Array.isArray(fetchedCategories)) {
+        for (const cat of fetchedCategories) {
+          if (!cat.name || !cat.name.trim()) continue;
+          const key = cat.name.trim().toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueCategories.push({
+              ...cat,
+              name: cat.name.trim(),
+            });
+          }
+        }
+      }
+
+      return uniqueCategories;
     },
   });
 };

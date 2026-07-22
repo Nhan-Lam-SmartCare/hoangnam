@@ -48,7 +48,7 @@ export function computeStockHealth(
   lowStockThreshold: number
 ): StockHealth {
   const summary: StockHealth = {
-    totalProducts: parts?.length || 0,
+    totalProducts: 0,
     inStock: 0,
     lowStock: 0,
     outOfStock: 0,
@@ -56,6 +56,11 @@ export function computeStockHealth(
   if (!parts) return summary;
 
   for (const part of parts) {
+    const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+    if (pBranchId && pBranchId !== branchId) {
+      continue;
+    }
+    summary.totalProducts += 1;
     const available = getAvailable(part, branchId);
     if (available > 0) summary.inStock += 1;
     if (available === 0) summary.outOfStock += 1;
@@ -77,6 +82,10 @@ export function computeTotals(
 
   const branchKey = branchId || "";
   for (const part of parts) {
+    const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+    if (pBranchId && pBranchId !== branchId) {
+      continue;
+    }
     const available = getAvailable(part, branchId);
     totals.totalQuantity += available;
     const unitValue =
