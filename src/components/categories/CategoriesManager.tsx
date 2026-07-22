@@ -15,6 +15,7 @@ import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { useAppContext } from "../../contexts/AppContext";
 import { formatCurrency } from "../../utils/format";
 import { useBranchesRepo } from "../../hooks/useBranchesRepository";
+import { isPartInBranch } from "../../utils/inventoryCalc";
 import {
   Boxes,
   Wrench,
@@ -75,8 +76,6 @@ const CategoriesManager: React.FC = () => {
 
   // Confirm dialog hook
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
-
-import { isPartInBranch } from "../../utils/inventoryCalc";
 
   // Branch-scoped parts list
   const branchScopedParts = useMemo(() => {
