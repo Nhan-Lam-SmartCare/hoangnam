@@ -440,10 +440,10 @@ export const WorkOrderPaymentSection: React.FC<WorkOrderPaymentSectionProps> = (
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+        <div className="flex flex-col gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 order-3">
           <button
             onClick={handleSaveOnly}
-            className="w-full px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-medium"
+            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors"
           >
             Lưu Phiếu
           </button>
@@ -451,7 +451,7 @@ export const WorkOrderPaymentSection: React.FC<WorkOrderPaymentSectionProps> = (
           {formData.status !== "Trả máy" && showDepositInput && (
             <button
               onClick={() => handleSave()}
-              className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+              className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shadow-sm transition-colors"
             >
               Đặt cọc
             </button>
@@ -460,7 +460,7 @@ export const WorkOrderPaymentSection: React.FC<WorkOrderPaymentSectionProps> = (
           {formData.status === "Trả máy" && (
             <button
               onClick={handlePayFull}
-              className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
+              className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-sm transition-colors"
             >
               Thanh toán
             </button>
@@ -468,7 +468,7 @@ export const WorkOrderPaymentSection: React.FC<WorkOrderPaymentSectionProps> = (
 
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg"
+            className="w-full px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-medium transition-colors"
           >
             Hủy
           </button>
