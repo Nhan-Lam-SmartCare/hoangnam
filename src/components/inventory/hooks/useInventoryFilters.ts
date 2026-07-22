@@ -64,8 +64,8 @@ export function useInventoryFilters() {
     setShowAdvancedFilters(false);
   };
 
-  // Đang lọc client-side (tồn kho / trùng SKU) -> phân trang cắt trên mảng đã lọc.
-  const isClientFiltering = stockFilter !== "all" || showDuplicatesOnly;
+  // Đang lọc client-side (tồn kho / trùng SKU / chi nhánh) -> phân trang cắt trên mảng đã lọc.
+  const isClientFiltering = stockFilter !== "all" || showDuplicatesOnly || filterBranchOnly;
 
   const advancedFiltersActive = useMemo(
     () =>

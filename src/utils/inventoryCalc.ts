@@ -37,6 +37,37 @@ export function getAvailable(part: StockLike, branchId: string): number {
 }
 
 /**
+ * Kiểm tra xem một phụ tùng có thuộc về hoặc có tồn kho/giá tại một chi nhánh hay không.
+ */
+export function isPartInBranch(part: StockLike, branchId: string): boolean {
+  if (!branchId || branchId === "all") return true;
+
+  const pBranchId = (part as any).branch_id || (part as any).branchId || "";
+  if (pBranchId) {
+    return pBranchId === branchId;
+  }
+
+  const stock = part.stock || {};
+  const costPrice = part.costPrice || {};
+  const retailPrice = part.retailPrice || {};
+
+  const stockKeys = Object.keys(stock);
+  const costKeys = Object.keys(costPrice);
+  const retailKeys = Object.keys(retailPrice);
+
+  // Nếu sản phẩm hoàn toàn chưa có key ở bất kỳ chi nhánh nào, coi như chưa phân bổ (hiện ở tất cả)
+  if (stockKeys.length === 0 && costKeys.length === 0 && retailKeys.length === 0) {
+    return true;
+  }
+
+  return (
+    Object.prototype.hasOwnProperty.call(stock, branchId) ||
+    Object.prototype.hasOwnProperty.call(costPrice, branchId) ||
+    Object.prototype.hasOwnProperty.call(retailPrice, branchId)
+  );
+}
+
+/**
  * Thống kê tình trạng kho theo tồn khả dụng:
  *  - inStock: available > 0
  *  - outOfStock: available === 0
@@ -56,15 +87,19 @@ export function computeStockHealth(
   if (!parts) return summary;
 
   for (const part of parts) {
-    const pBranchId = (part as any).branch_id || (part as any).branchId || "";
-    if (pBranchId && pBranchId !== branchId) {
+    if (!isPartInBranch(part, branchId)) {
       continue;
     }
     summary.totalProducts += 1;
     const available = getAvailable(part, branchId);
-    if (available > 0) summary.inStock += 1;
-    if (available === 0) summary.outOfStock += 1;
-    if (available > 0 && available <= lowStockThreshold) summary.lowStock += 1;
+    if (available > 0) {
+      summary.inStock += 1;
+      if (available <= lowStockThreshold) {
+        summary.lowStock += 1;
+      }
+    } else {
+      summary.outOfStock += 1;
+    }
   }
   return summary;
 }
@@ -82,8 +117,7 @@ export function computeTotals(
 
   const branchKey = branchId || "";
   for (const part of parts) {
-    const pBranchId = (part as any).branch_id || (part as any).branchId || "";
-    if (pBranchId && pBranchId !== branchId) {
+    if (!isPartInBranch(part, branchId)) {
       continue;
     }
     const available = getAvailable(part, branchId);

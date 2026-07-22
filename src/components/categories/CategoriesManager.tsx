@@ -76,16 +76,7 @@ const CategoriesManager: React.FC = () => {
   // Confirm dialog hook
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
 
-  // Helper check if a part is associated with or has stock/pricing in a branch
-  const isPartInBranch = (p: any, branchId: string) => {
-    if (branchId === "all") return true;
-    const pBranch = p.branch_id || p.branchId || "";
-    if (pBranch) return pBranch === branchId;
-    const hasStock = p.stock && p.stock[branchId] !== undefined;
-    const hasRetail = p.retailPrice && p.retailPrice[branchId] !== undefined;
-    const hasCost = p.costPrice && p.costPrice[branchId] !== undefined;
-    return hasStock || hasRetail || hasCost;
-  };
+import { isPartInBranch } from "../../utils/inventoryCalc";
 
   // Branch-scoped parts list
   const branchScopedParts = useMemo(() => {

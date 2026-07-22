@@ -13,6 +13,7 @@ import {
   computeStockHealth,
   computeTotals,
   detectDuplicateSkus,
+  isPartInBranch,
 } from "../../../utils/inventoryCalc";
 import { LOW_STOCK_THRESHOLD } from "../constants";
 import type { InventoryTransaction } from "../../../types";
@@ -166,17 +167,7 @@ export function useInventoryData({
     }
 
     if (filterBranchOnly) {
-      baseList = baseList.filter((part: any) => {
-        const pBranchId = part.branch_id || part.branchId || "";
-
-        if (pBranchId) {
-          return pBranchId === currentBranchId;
-        }
-
-        // If the part has no specific branch assigned (e.g. legacy or global product),
-        // we show it in all branches so that any branch can see and use global products.
-        return true;
-      });
+      baseList = baseList.filter((part: any) => isPartInBranch(part, currentBranchId));
     }
 
     // Client-side multi-keyword search refinement
