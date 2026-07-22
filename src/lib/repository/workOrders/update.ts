@@ -100,6 +100,9 @@ export async function updateWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       additionalservices: additionalServicesToSave,
       additional_services: additionalServicesToSave,
 
+      // Ảnh thiết bị: undefined sẽ bị strip bên dưới → không ghi đè khi caller không gửi
+      device_photos: input.devicePhotos,
+
       notes: notesWithAdditionalServices, // Mapped to 'notes'
       total: input.total,
       "branchId": input.branchId, // Might not allow changing branch?

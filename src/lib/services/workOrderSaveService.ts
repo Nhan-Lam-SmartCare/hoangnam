@@ -62,6 +62,8 @@ export interface WorkOrderSaveRequest {
   /** Pre-built repair service payloads for syncRepairOrderServices (component builds from draft state) */
   repairServicePayloads?: any[];
   devicePassword?: string;
+  /** URL ảnh thiết bị đã upload (devicePhotosStorage). */
+  devicePhotos?: string[];
   currentBranchId: string;
   storePrefix?: string;
   options?: {
@@ -162,6 +164,8 @@ function buildWorkOrderPayload(req: WorkOrderSaveRequest, orderId: string, resol
     remainingamount: req.remainingAmount,
     creationDate: resolvedCreationDate,
     creationdate: resolvedCreationDate,
+    device_photos:
+      req.devicePhotos && req.devicePhotos.length > 0 ? req.devicePhotos : undefined,
   };
   return p;
 }
@@ -295,6 +299,8 @@ export async function saveWorkOrder(
       totalPaid: req.totalPaid > 0 ? req.totalPaid : undefined,
       remainingAmount: req.remainingAmount,
       creationDate: resolvedCreationDate,
+      devicePhotos:
+        req.devicePhotos && req.devicePhotos.length > 0 ? req.devicePhotos : undefined,
     };
     const res = isCreate
       ? await deps.createWorkOrderAtomic(input)

@@ -149,6 +149,12 @@ export async function createWorkOrderAtomic(input: Partial<WorkOrder>): Promise<
       additionalservices: additionalServices,
       additional_services: additionalServices,
 
+      // Ảnh thiết bị: chỉ ghi khi có (schema fallback tự bỏ nếu cột chưa tồn tại)
+      device_photos:
+        input.devicePhotos && input.devicePhotos.length > 0
+          ? input.devicePhotos
+          : undefined,
+
       notes: notesWithAdditionalServices, // Mapped to 'notes'
       total: input.total || 0,
       "branchId": branchId,

@@ -192,6 +192,39 @@ describe("saveWorkOrder — atomic create", () => {
     expect(deps.createWorkOrderAtomic).not.toHaveBeenCalled();
   });
 
+  it("[bug fix] devicePhotos flows into atomic input (create + update)", async () => {
+    const photos = ["https://storage/p1.jpg", "https://storage/p2.jpg"];
+    const deps = makeDeps();
+    await saveWorkOrder(makeCreateRequest({ devicePhotos: photos }), deps);
+    expect((deps.createWorkOrderAtomic as any).mock.calls[0][0].devicePhotos).toEqual(photos);
+
+    const deps2 = makeDeps();
+    await saveWorkOrder(
+      makeCreateRequest({ existingOrder: { id: "WO-EXIST-001" } as any, devicePhotos: photos }),
+      deps2
+    );
+    expect((deps2.updateWorkOrderAtomic as any).mock.calls[0][0].devicePhotos).toEqual(photos);
+  });
+
+  it("[bug fix] devicePhotos flows into legacy payload as device_photos", async () => {
+    const photos = ["https://storage/p1.jpg"];
+    const deps = makeDeps();
+    await saveWorkOrder(
+      makeCreateRequest({ devicePhotos: photos, options: { atomic: false } }),
+      deps
+    );
+    const payload = (deps.insertWorkOrderLegacy as any).mock.calls[0][0];
+    expect(payload.device_photos).toEqual(photos);
+  });
+
+  it("empty devicePhotos array is not written (no pointless column churn)", async () => {
+    const deps = makeDeps();
+    await saveWorkOrder(makeCreateRequest({ devicePhotos: [] }), deps);
+    expect(
+      (deps.createWorkOrderAtomic as any).mock.calls[0][0].devicePhotos
+    ).toBeUndefined();
+  });
+
   it("should propagate atomic error", async () => {
     const deps = makeDeps({
       createWorkOrderAtomic: vi.fn().mockResolvedValue({

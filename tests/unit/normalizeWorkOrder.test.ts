@@ -214,6 +214,14 @@ describe("normalizeWorkOrder", () => {
     expect(undefResult.id).toBeUndefined();
   });
 
+  it("[bug fix] should map device_photos from all casing variants", () => {
+    const photos = ["https://storage/p1.jpg", "https://storage/p2.jpg"];
+    expect(normalizeWorkOrder({ ...baseRow, device_photos: photos }).devicePhotos).toEqual(photos);
+    expect(normalizeWorkOrder({ ...baseRow, devicephotos: photos }).devicePhotos).toEqual(photos);
+    expect(normalizeWorkOrder({ ...baseRow, devicePhotos: photos }).devicePhotos).toEqual(photos);
+    expect(normalizeWorkOrder({ ...baseRow }).devicePhotos).toBeUndefined();
+  });
+
   it("should handle inventory_deducted and inventoryDeducted", () => {
     const withDeducted = normalizeWorkOrder({ ...baseRow, inventory_deducted: true, inventoryDeducted: true });
     expect(withDeducted.inventoryDeducted).toBe(true);

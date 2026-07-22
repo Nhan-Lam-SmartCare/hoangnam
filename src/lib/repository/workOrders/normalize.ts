@@ -54,6 +54,8 @@ export function normalizeWorkOrder(row: any): WorkOrder {
     currentKm: row.currentkm || row.currentKm,
     issueDescription:
       row.issuedescription || row.issueDescription || notesDecoded.cleanNotes || "",
+    devicePhotos:
+      row.device_photos || row.devicephotos || row.devicePhotos || undefined,
     technicianName: row.technicianname || row.technicianName,
     status: row.status,
     laborCost: row.laborcost || row.laborCost || 0,

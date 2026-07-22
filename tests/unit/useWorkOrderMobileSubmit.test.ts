@@ -175,6 +175,13 @@ describe("useWorkOrderMobileSubmit — Phase 7", () => {
     expect(mockSaveWorkOrderAsync.mock.calls[0][0].paymentStatus).toBe("partial");
   });
 
+  it("[bug fix] devicePhotos được truyền vào save request (trước đây bị bỏ rơi)", async () => {
+    const { submit } = renderSubmit();
+    const photos = ["https://storage/photo-1.jpg", "https://storage/photo-2.jpg"];
+    await submit(makeData({ devicePhotos: photos }));
+    expect(mockSaveWorkOrderAsync.mock.calls[0][0].devicePhotos).toEqual(photos);
+  });
+
   it("records cash ledger and mutates context when payment collected", async () => {
     mockRecordTx.mockResolvedValue([{ id: "TX-1", amount: 80000 }]);
     const { submit } = renderSubmit();
