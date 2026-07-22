@@ -47,6 +47,7 @@ import { usePrinter } from "../../hooks/usePrinter";
 import { fetchStoreSettingsForBranch, getDynamicQrUrl } from "../service/utils/service.utils";
 import { useEmployeesDirectoryRepo } from "../../hooks/useEmployeesRepository";
 import { getSelectableEmployees } from "../../utils/employees";
+import { isPartInBranch } from "../../utils/inventoryCalc";
 
 const getBranchStock = (part: Part, branchId: string): number => {
   const stock = Math.max(0, Number(part.stock?.[branchId] || 0));
@@ -101,6 +102,7 @@ interface HeldOrder {
   customerName: string;
   customerPhone: string;
   selectedCustomerId: string | null;
+  selectedEmployeeId?: string | null;
   items: CartItem[];
   discount: number;
   discountType: "vnd" | "percent";
@@ -184,7 +186,8 @@ const SalesManager: React.FC = () => {
   }, [profile, selectableEmployees, selectedEmployeeId]);
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<"vnd" | "percent">("vnd");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank" | "card" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank" | "card" | null>("cash");
+  const [cashGiven, setCashGiven] = useState<number | "">(0);
   const [note, setNote] = useState("");
   const [paidAmount, setPaidAmount] = useState<number | "full">("full");
   // Thanh toán tách: khách trả một phần tiền mặt + một phần chuyển khoản.
@@ -244,6 +247,49 @@ const SalesManager: React.FC = () => {
       setShowNoteInput(true);
     }
   }, [note]);
+
+  // Phím tắt bàn phím chuẩn POS (F2: Tìm SP, F4: Chọn khách, F8: Giữ đơn, F9/Ctrl+Enter: Thanh toán, ESC: Xóa tìm kiếm)
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const customerInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || "").toUpperCase();
+      const isInput = ["INPUT", "TEXTAREA", "SELECT"].includes(activeTag);
+
+      if (e.key === "F2") {
+        e.preventDefault();
+        setActiveTab("products");
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        setActiveTab("cart");
+        setTimeout(() => customerInputRef.current?.focus(), 50);
+      } else if (e.key === "F8") {
+        e.preventDefault();
+        if (cartItems.length > 0) {
+          holdCurrentOrder();
+        } else {
+          showToast.info("F8: Giỏ hàng trống, không có đơn để giữ.");
+        }
+      } else if (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) {
+        e.preventDefault();
+        if (cartItems.length > 0) {
+          void submitSale();
+        } else {
+          showToast.info("Giỏ hàng đang trống, không thể thanh toán.");
+        }
+      } else if (e.key === "Escape") {
+        if (search) {
+          e.preventDefault();
+          setSearch("");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [cartItems, search]);
     const enablePartsPaging =
     (import.meta.env.VITE_SALES_PARTS_PAGED || "false").toLowerCase() === "true";
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -278,6 +324,7 @@ const SalesManager: React.FC = () => {
   const filteredParts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     const base = inventoryParts.filter((part) => {
+      if (!isPartInBranch(part, currentBranchId)) return false;
       const hasStock = getBranchStock(part, currentBranchId) > 0;
       const isServiceCategory = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
       return hasStock || isServiceCategory;
@@ -775,22 +822,38 @@ Cam on quy khach da tin tuong!
     const keyword = search.trim().toLowerCase();
     if (!keyword) return;
 
-    const exactMatch = inventoryParts.find((p) => {
+    // 1. Ưu tiên tìm chính xác theo mã SKU hoặc Mã vạch
+    const matchByCode = inventoryParts.find((p) => {
       const sku = (p.sku || "").toLowerCase();
       const barcode = (p.barcode || "").toLowerCase();
-      return (
-        (sku === keyword || barcode === keyword) &&
-        getBranchStock(p, currentBranchId) > 0
-      );
+      return sku === keyword || barcode === keyword;
     });
 
-    const target =
-      exactMatch || (filteredParts.length === 1 ? filteredParts[0] : null);
-
-    if (target) {
+    if (matchByCode) {
       e.preventDefault();
-      addPartToCart(target);
+      const stock = getBranchStock(matchByCode, currentBranchId);
+      const isService = ["dịch vụ", "công thợ"].includes((matchByCode.category || "").trim().toLowerCase());
+      if (stock > 0 || isService) {
+        addPartToCart(matchByCode);
+        setSearch("");
+      } else {
+        showToast.error(`Sản phẩm "${matchByCode.name}" (SKU: ${matchByCode.sku}) hiện đã HẾT HÀNG trong kho!`);
+        setSearch("");
+      }
+      return;
+    }
+
+    // 2. Nếu không khớp mã vạch/SKU, kiểm tra danh sách kết quả tìm kiếm duy nhất
+    if (filteredParts.length === 1) {
+      e.preventDefault();
+      addPartToCart(filteredParts[0]);
       setSearch("");
+      return;
+    }
+
+    if (filteredParts.length === 0) {
+      e.preventDefault();
+      showToast.warning("Không tìm thấy sản phẩm khớp với từ khóa vừa nhập.");
     }
   };
 
@@ -798,14 +861,21 @@ Cam on quy khach da tin tuong!
   const handleScannedBarcode = (code: string) => {
     const keyword = String(code || "").trim().toLowerCase();
     if (!keyword) return;
-    const match = (enablePartsPaging ? parts : inventoryParts).find((p) => {
+    const stockSourceParts = enablePartsPaging ? parts : inventoryParts;
+    const match = stockSourceParts.find((p) => {
       const sku = (p.sku || "").toLowerCase();
       const barcode = (p.barcode || "").toLowerCase();
       return sku === keyword || barcode === keyword;
     });
     if (match) {
-      addPartToCart(match);
-      showToast.success(`Đã thêm: ${match.name}`);
+      const stock = getBranchStock(match, currentBranchId);
+      const isService = ["dịch vụ", "công thợ"].includes((match.category || "").trim().toLowerCase());
+      if (stock > 0 || isService) {
+        addPartToCart(match);
+        showToast.success(`Đã thêm: ${match.name}`);
+      } else {
+        showToast.error(`Sản phẩm "${match.name}" (SKU: ${match.sku}) hiện đã HẾT HÀNG trong kho!`);
+      }
     } else {
       setSearch(code);
       showToast.warning("Không tìm thấy sản phẩm khớp mã vừa quét.");
@@ -842,7 +912,7 @@ Cam on quy khach da tin tuong!
     setCartItems([]);
     setDiscount(0);
     setDiscountType("vnd");
-    setPaymentMethod(null);
+    setPaymentMethod("cash");
     setPaidAmount("full");
     setNote("");
     setCustomerName("Khách lẻ");
@@ -877,6 +947,7 @@ Cam on quy khach da tin tuong!
       customerName: customerName.trim() || "Khách lẻ",
       customerPhone: customerPhone.trim(),
       selectedCustomerId,
+      selectedEmployeeId,
       items: cartItems,
       discount,
       discountType,
@@ -919,6 +990,9 @@ Cam on quy khach da tin tuong!
     setCustomerSearch(held.customerName);
     setCustomerPhone(held.customerPhone);
     setSelectedCustomerId(held.selectedCustomerId);
+    if (held.selectedEmployeeId !== undefined) {
+      setSelectedEmployeeId(held.selectedEmployeeId);
+    }
     setPaidAmount("full");
     
     setTransactionType(held.transactionType || "full");
@@ -1130,6 +1204,7 @@ Cam on quy khach da tin tuong!
       if (result.ok) {
         setDiscount(0);
         setDiscountType("vnd");
+        setPaymentMethod("cash");
         setPaidAmount("full");
         setSplitPayment(false);
         setSplitCash(0);
@@ -1357,11 +1432,12 @@ Cam on quy khach da tin tuong!
                   <div className="relative flex-1">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      ref={searchInputRef}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onKeyDown={handleSearchKeyDown}
-                      aria-label="Tìm sản phẩm theo tên, SKU hoặc mã vạch"
-                      placeholder="Tìm tên, SKU, mã vạch (Enter)..."
+                      aria-label="Tìm sản phẩm theo tên, SKU hoặc mã vạch (F2)"
+                      placeholder="Tìm tên, SKU, mã vạch (Enter, F2)..."
                       className="w-full pl-9 pr-3 h-11 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm outline-none transition focus:border-emerald-400 dark:focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15"
                     />
                   </div>
@@ -1925,6 +2001,7 @@ Cam on quy khach da tin tuong!
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 z-10" />
                 <input
+                  ref={customerInputRef}
                   value={customerSearch}
                   onFocus={() => setShowCustomerSuggestions(true)}
                   onBlur={() => {
@@ -1937,7 +2014,7 @@ Cam on quy khach da tin tuong!
                     setSelectedCustomerId(null); // Clear ID when typing
                     setShowCustomerSuggestions(true);
                   }}
-                  placeholder="Tìm khách hàng (tên, SĐT, Serial/IMEI)"
+                  placeholder="Tìm khách hàng (F4: Tên, SĐT, Serial/IMEI)"
                   className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                 />
                 {showCustomerSuggestions && customerSuggestions.length > 0 && (
@@ -2123,6 +2200,55 @@ Cam on quy khach da tin tuong!
                   <span className="text-[10px] font-bold tracking-wide uppercase">Quẹt thẻ</span>
                 </button>
               </div>
+
+              {/* Bộ tính tiền thừa trả khách (Tiền mặt) */}
+              {paymentMethod === "cash" && !splitPayment && (
+                <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <span>💵 Tiền khách đưa:</span>
+                    <span className="text-[11px] text-slate-400 font-normal">Tính tiền thừa</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={cashGiven || ""}
+                      onChange={(e) => setCashGiven(e.target.value ? Number(e.target.value) : "")}
+                      aria-label="Nhập số tiền khách đưa"
+                      className="flex-1 px-3 h-10 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-right font-bold text-sm text-slate-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCashGiven(total)}
+                      className="px-3 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shrink-0"
+                    >
+                      Đủ tiền
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {[100000, 200000, 500000].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setCashGiven(preset)}
+                        className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:border-emerald-500 transition-colors"
+                      >
+                        {formatCurrency(preset)}
+                      </button>
+                    ))}
+                  </div>
+                  {Number(cashGiven) > total && (
+                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">Tiền thừa trả khách:</span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(Number(cashGiven) - total)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-pointer select-none">
                 <input
