@@ -30,6 +30,7 @@ interface UseServiceFiltersReturn {
     // State values
     filters: ServiceFiltersState;
     debouncedSearchQuery: string;
+    visibleCount: number;
 
     // Filtered results
     filteredOrders: WorkOrder[];
@@ -78,38 +79,50 @@ export function useServiceFilters({
 
     // Filter work orders based on all criteria
     const filteredOrders = useMemo(() => {
-        let filtered = workOrders.filter((o) => !o.refunded);
+        let filtered = workOrders.filter((o) => !o.refunded && o.status !== "Đã hủy");
 
-        // Tab filter
-        if (activeTab === "delivered") {
-            filtered = filtered.filter((o) => o.status === "Trả máy");
-        } else {
-            filtered = filtered.filter((o) => o.status !== "Trả máy");
+        const normalizedQuery = debouncedSearchQuery.toLowerCase().trim();
+        const normalizedPhoneQuery = normalizedQuery.replace(/\D/g, "");
 
-            if (activeTab === "pending")
-                filtered = filtered.filter((o) => o.status === "Tiếp nhận");
-            else if (activeTab === "inProgress")
-                filtered = filtered.filter((o) => o.status === "Đang sửa");
-            else if (activeTab === "done")
-                filtered = filtered.filter((o) => o.status === "Đã sửa xong");
+        // Apply status filter based on active tab ONLY if not searching
+        if (!debouncedSearchQuery) {
+            if (activeTab === "delivered") {
+                filtered = filtered.filter((o) => o.status === "Trả máy");
+            } else {
+                filtered = filtered.filter((o) => o.status !== "Trả máy");
+
+                if (activeTab === "pending")
+                    filtered = filtered.filter((o) => o.status === "Tiếp nhận");
+                else if (activeTab === "inProgress")
+                    filtered = filtered.filter((o) => o.status === "Đang sửa");
+                else if (activeTab === "done")
+                    filtered = filtered.filter((o) => o.status === "Đã sửa xong");
+            }
         }
 
         // Search filter (using debounced value)
         if (debouncedSearchQuery) {
             filtered = filtered.filter(
                 (o) =>
-                    o.customerName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-                    o.vehicleModel?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-                    o.licensePlate?.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+                    o.customerName.toLowerCase().includes(normalizedQuery) ||
+                    o.vehicleModel?.toLowerCase().includes(normalizedQuery) ||
+                    o.licensePlate?.toLowerCase().includes(normalizedQuery) ||
+                    o.id?.toLowerCase().includes(normalizedQuery) ||
+                    (!!normalizedPhoneQuery &&
+                        (o.customerPhone || "").replace(/\D/g, "").includes(normalizedPhoneQuery))
             );
         }
 
-        // Date filter
-        if (dateFilter !== "all") {
+        // Date filter - Only apply for "Trả máy" orders
+        if (dateFilter !== "all" && !debouncedSearchQuery) {
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
             filtered = filtered.filter((o) => {
+                if (o.status !== "Trả máy") {
+                    return true;
+                }
+
                 const orderDate = new Date(o.creationDate || (o as any).creationdate);
 
                 if (dateFilter === "today") {
@@ -175,7 +188,7 @@ export function useServiceFilters({
                 label: "Tất cả",
                 color: "slate",
                 count: dateFilteredOrders.filter(
-                    (o) => o.status !== "Trả máy" && !o.refunded
+                    (o) => o.status !== "Trả máy" && o.status !== "Đã hủy" && !o.refunded
                 ).length,
             },
             {
@@ -251,6 +264,7 @@ export function useServiceFilters({
             paymentFilter,
         },
         debouncedSearchQuery,
+        visibleCount,
         filteredOrders,
         paginatedOrders,
         hasMoreOrders,

@@ -1,66 +1,45 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
 import type {
   Employee,
-  RepairOrderService,
-  ServiceConfig,
   WorkOrder,
   Part,
   WorkOrderPart,
 } from "../../../types";
 import {
-  formatWorkOrderId,
-  generateWorkOrderId,
   normalizeSearchText,
-  formatCurrency,
 } from "../../../utils/format";
-import {
-  useCreateWorkOrderAtomicRepo,
-  useUpdateWorkOrderAtomicRepo,
-} from "../../../hooks/useWorkOrdersRepository";
-import { useCreateCustomerDebtRepo } from "../../../hooks/useDebtsRepository";
-import { completeWorkOrderPayment } from "../../../lib/repository/workOrdersRepository";
-
+import { useWorkOrderSave } from "../../../hooks/useWorkOrderSave";
+import { searchCustomers } from "../../../lib/repository/customersRepository";
 import { showToast } from "../../../utils/toast";
-import { supabase } from "../../../supabaseClient";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { useWarrantyCards } from "../../../hooks/useWarrantyRepository";
 import { useServiceConfigs } from "../../../hooks/useRepairLabor";
-import { syncRepairOrderServices } from "../../../lib/repository/repairLaborRepository";
 import {
   buildDefaultWorkerSplit,
   calculateLabor,
   splitWorkerAmount,
 } from "../../../lib/services/repairLaborService";
+import {
+  calculateWorkOrderTotals,
+  getAdditionalPaymentToApply,
+  calculateRemainingAmount,
+  derivePaymentStatus,
+} from "../../../lib/services/workOrderCalculations";
 import { compressImage } from "../../../utils/imageCompressor";
 import { uploadDevicePhoto, deleteDevicePhoto } from "../../../lib/storage/devicePhotosStorage";
 import { getSelectableEmployees } from "../../../utils/employees";
 
 import {
-  RepairServiceDraftWorker,
   RepairServiceDraft,
   createEmptyRepairServiceDraft,
   mapRepairServiceToDraft,
-  getWarrantyText,
   getPartLaborBase as sharedGetPartLaborBase,
   getPartWarranty as sharedGetPartWarranty,
   getIntegratedLaborByQuantity as sharedGetIntegratedLaborByQuantity,
 } from "./useWorkOrderSharedLogic";
 
-export interface StoreSettings {
-  store_name?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  logo_url?: string;
-  bank_qr_url?: string;
-  bank_name?: string;
-  bank_account_number?: string;
-  bank_account_holder?: string;
-  bank_branch?: string;
-  work_order_prefix?: string;
-}
+import type { StoreSettings } from "../types/service.types";
 
 export interface UseWorkOrderFormStateProps {
   order: WorkOrder;
@@ -107,12 +86,12 @@ export function useWorkOrderFormState({
   canUpdateWorkOrderOutsourceService = true,
   invalidateWorkOrders,
 }: UseWorkOrderFormStateProps) {
-  const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { mutateAsync: createWorkOrderAtomicAsync } = useCreateWorkOrderAtomicRepo();
-  const { mutateAsync: updateWorkOrderAtomicAsync } = useUpdateWorkOrderAtomicRepo();
   const { data: warrantyCards } = useWarrantyCards(currentBranchId);
   const { data: serviceConfigs = [] } = useServiceConfigs();
+  const { mutateAsync: saveWorkOrderAsync } = useWorkOrderSave(
+    upsertCustomer as (customer: any) => Promise<any>
+  );
 
   const employeeOptions = getSelectableEmployees(employees as Employee[], currentBranchId);
   
@@ -338,16 +317,12 @@ export function useWorkOrderFormState({
 
     setIsSearchingCustomer(true);
     try {
+      const res = await searchCustomers(searchTerm, page, CUSTOMER_PAGE_SIZE);
+      if (!res.ok) throw res.error;
+      const { data, count } = res.data;
       const from = page * CUSTOMER_PAGE_SIZE;
-      const to = from + CUSTOMER_PAGE_SIZE - 1;
 
-      const { data, error, count } = await supabase
-        .from("customers")
-        .select("*", { count: "exact", head: false })
-        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
-        .range(from, to);
-
-      if (!error && data) {
+      if (data) {
         if (isLoadMore) {
           setServerCustomers((prev: any[]) => {
             const newIds = new Set(data.map((c: any) => c.id));
@@ -644,287 +619,52 @@ export function useWorkOrderFormState({
     return [...repairPayloads, ...outsourcePayloads];
   };
 
-  const syncRepairServicesForOrder = async (repairOrderId: string) => {
-    const payloads = buildRepairServicePayloads().filter(
-      (service: any) => service.service_name.trim().length > 0
-    );
-
-    const result = await syncRepairOrderServices(repairOrderId, payloads);
-    if ("ok" in result && !result.ok) {
-      throw (result as { error: any }).error;
-    }
-
-    return result.data;
-  };
-
   const getPartLaborBase = (partId: string) => sharedGetPartLaborBase(partId, parts, currentBranchId);
   const getPartWarranty = (partId: string) => sharedGetPartWarranty(partId, parts);
   const getIntegratedLaborByQuantity = (laborBase: number, quantity: number) => sharedGetIntegratedLaborByQuantity(laborBase, quantity);
 
-  const partsTotal = selectedParts.reduce(
-    (sum: number, p: any) => sum + (p.price || 0) * (p.quantity || 0),
-    0
-  );
-  
   const repairLaborTotal = repairServices.reduce(
     (sum: number, service: RepairServiceDraft) => sum + (service.isBillable ? getRepairServiceLaborAmount(service) : 0),
     0
   );
-  
-  const servicesTotal = additionalServices.reduce(
-    (sum: number, s: any) => sum + ((s.price || 0) + (s.laborPrice || 0)) * (s.quantity || 0),
-    0
-  );
-  
-  const partsLaborInfoTotal = selectedParts.reduce((sum: number, item: any) => {
+
+  const partsLaborInfoTotal = selectedParts.reduce((sum: number, item: WorkOrderPart) => {
     const laborBase = getPartLaborBase(item.partId);
     return sum + getIntegratedLaborByQuantity(laborBase, Number(item.quantity || 0));
   }, 0);
-  
-  const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
-  const subtotal = partsTotal + servicesTotal + effectiveLaborCost + repairLaborTotal;
+
   const discount = formData.discount || 0;
-  const total = Math.max(0, subtotal - discount);
+  const { partsTotal, servicesTotal, effectiveLaborCost, subtotal, total } =
+    calculateWorkOrderTotals({
+      parts: selectedParts.map((p) => ({
+        quantity: p.quantity || 0,
+        unitPrice: p.price || 0,
+      })),
+      services: additionalServices.map((s) => ({
+        quantity: s.quantity || 0,
+        unitPrice: s.price || 0,
+        unitLaborPrice: s.laborPrice || 0,
+      })),
+      repairLaborTotal,
+      integratedLaborTotal: partsLaborInfoTotal,
+      includeIntegratedLabor,
+      discount,
+      discountType: "amount", // desktop chỉ hỗ trợ giảm giá theo số tiền
+    });
 
   const totalDeposit = depositAmount || order.depositAmount || 0;
-  
-  const totalAdditionalPayment =
-    formData.status === "Trả máy" && showPartialPayment ? partialPayment : 0;
+
+  const totalAdditionalPayment = getAdditionalPaymentToApply({
+    status: formData.status,
+    forceFullPayment: false,
+    showPartialPayment,
+    partialPayment,
+    total,
+    totalDeposit,
+    clampToRemaining: false, // preview hiển thị không clamp (giữ hành vi cũ)
+  });
   const totalPaid = totalDeposit + totalAdditionalPayment;
-  const remainingAmount = Math.max(0, total - totalPaid);
-
-  const createCustomerDebt = useCreateCustomerDebtRepo();
-  const createCustomerDebtIfNeeded = async (
-    workOrder: WorkOrder,
-    remainingAmount: number,
-    totalAmount: number,
-    paidAmount: number
-  ) => {
-    if (remainingAmount <= 0) return;
-
-    try {
-      const safeCustomerId =
-        workOrder.customerPhone || workOrder.id || `CUST-ANON-${Date.now()}`;
-      const safeCustomerName =
-        workOrder.customerName?.trim() ||
-        workOrder.customerPhone ||
-        "Khách vãng lai";
-
-      const workOrderNumber = formatWorkOrderId(
-        workOrder.id,
-        storeSettings?.work_order_prefix
-      );
-
-      let description = `${workOrder.vehicleModel || "Thiết bị"} (Phiếu sửa chữa #${workOrderNumber})`;
-
-      if (workOrder.issueDescription) {
-        description += `\nVấn đề: ${workOrder.issueDescription}`;
-      }
-
-      if (workOrder.partsUsed && workOrder.partsUsed.length > 0) {
-        description += "\n\nPhụ tùng đã thay:";
-        workOrder.partsUsed.forEach((part: any) => {
-          description += `\n  - ${part.quantity} x ${part.partName} - ${formatCurrency(part.price * part.quantity)}`;
-        });
-      }
-
-      if (workOrder.additionalServices && workOrder.additionalServices.length > 0) {
-        description += "\n\nDịch vụ:";
-        workOrder.additionalServices.forEach((service: any) => {
-          description += `\n  - ${service.quantity} x ${service.description} - ${formatCurrency(service.price * service.quantity)}`;
-        });
-      }
-
-      if (workOrder.laborCost && workOrder.laborCost > 0) {
-        description += `\n\nCông lao động: ${formatCurrency(workOrder.laborCost)}`;
-      }
-
-      if (workOrder.discount && workOrder.discount > 0) {
-        description += `\nGiảm giá: -${formatCurrency(workOrder.discount)}`;
-      }
-
-      const createdByDisplay = profile?.name || profile?.full_name || "N/A";
-      description += `\n\nNV: ${createdByDisplay}`;
-
-      if (workOrder.technicianName) {
-        description += `\nNVKỹ thuật: ${workOrder.technicianName}`;
-      }
-
-      const payload = {
-        customerId: safeCustomerId,
-        customerName: safeCustomerName,
-        phone: workOrder.customerPhone || null,
-        licensePlate: workOrder.licensePlate || null,
-        description: description,
-        totalAmount: totalAmount,
-        paidAmount: paidAmount,
-        remainingAmount: remainingAmount,
-        createdDate: new Date().toISOString().split("T")[0],
-        branchId: currentBranchId,
-        workOrderId: workOrder.id,
-      };
-
-      const result = await createCustomerDebt.mutateAsync(payload as any);
-      showToast.success(
-        `Đã tạo/cập nhật công nợ ${remainingAmount.toLocaleString()}đ (Mã: ${result?.id || "N/A"})`
-      );
-    } catch (error) {
-      console.error("Error creating/updating customer debt:", error);
-      showToast.error("Không thể tạo/cập nhật công nợ tự động");
-    }
-  };
-
-  const parseMissingWorkOrderColumn = (error: any): string | null => {
-    if (!error || String(error.code || "").toUpperCase() !== "PGRST204") {
-      return null;
-    }
-    const message = String(error.message || "");
-    const match = message.match(/'([^']+)'\s+column\s+of\s+'work_orders'/i);
-    return match?.[1] || null;
-  };
-
-  const normalizeColumnKey = (key: string): string =>
-    String(key || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[_\s-]/g, "");
-
-  const removeMissingColumnFromPayload = (
-    payload: Record<string, any>,
-    missingColumn: string
-  ): { nextPayload: Record<string, any>; removedCount: number } => {
-    const nextPayload = { ...payload };
-
-    if (Object.prototype.hasOwnProperty.call(nextPayload, missingColumn)) {
-      delete nextPayload[missingColumn];
-      return { nextPayload, removedCount: 1 };
-    }
-
-    const target = normalizeColumnKey(missingColumn);
-    const keyToDelete = Object.keys(nextPayload).find(
-      (key) => normalizeColumnKey(key) === target
-    );
-
-    if (keyToDelete) {
-      delete nextPayload[keyToDelete];
-      return { nextPayload, removedCount: 1 };
-    }
-
-    return { nextPayload, removedCount: 0 };
-  };
-
-  const parseNotNullColumn = (error: any): string | null => {
-    if (!error || String(error.code || "") !== "23502") {
-      return null;
-    }
-    const message = String(error.message || "");
-    const match = message.match(/null\s+value\s+in\s+column\s+"([^"]+)"/i);
-    return match?.[1] || null;
-  };
-
-  const insertWorkOrderWithSchemaFallback = async (payload: Record<string, any>) => {
-    let attemptPayload: Record<string, any> = { ...payload };
-    let lastError: any = null;
-
-    for (let i = 0; i < 20; i++) {
-      const { data, error } = await supabase
-        .from("work_orders")
-        .insert(attemptPayload)
-        .select();
-
-      if (!error) {
-        return { data, error: null, payload: attemptPayload };
-      }
-
-      lastError = error;
-
-      const notNullColumn = parseNotNullColumn(error);
-      if (notNullColumn && normalizeColumnKey(notNullColumn) === normalizeColumnKey("creationDate")) {
-        attemptPayload = {
-          ...attemptPayload,
-          creationDate:
-            attemptPayload.creationDate ||
-            attemptPayload.creationdate ||
-            new Date().toISOString(),
-        };
-        if (!Object.prototype.hasOwnProperty.call(attemptPayload, "creationdate")) {
-          attemptPayload.creationdate = attemptPayload.creationDate;
-        }
-        continue;
-      }
-
-      const missingColumn = parseMissingWorkOrderColumn(error);
-      if (!missingColumn) {
-        break;
-      }
-
-      const { nextPayload, removedCount } = removeMissingColumnFromPayload(
-        attemptPayload,
-        missingColumn
-      );
-      if (removedCount === 0) {
-        break;
-      }
-
-      attemptPayload = nextPayload;
-    }
-
-    return { data: null, error: lastError, payload: attemptPayload };
-  };
-
-  const updateWorkOrderWithSchemaFallback = async (
-    orderId: string,
-    payload: Record<string, any>
-  ) => {
-    let attemptPayload: Record<string, any> = { ...payload };
-    let lastError: any = null;
-
-    for (let i = 0; i < 20; i++) {
-      const { data, error } = await supabase
-        .from("work_orders")
-        .update(attemptPayload)
-        .eq("id", orderId)
-        .select();
-
-      if (!error) {
-        return { data, error: null, payload: attemptPayload };
-      }
-
-      lastError = error;
-
-      const notNullColumn = parseNotNullColumn(error);
-      if (notNullColumn && normalizeColumnKey(notNullColumn) === normalizeColumnKey("creationDate")) {
-        attemptPayload = {
-          ...attemptPayload,
-          creationDate:
-            attemptPayload.creationDate ||
-            attemptPayload.creationdate ||
-            new Date().toISOString(),
-        };
-        if (!Object.prototype.hasOwnProperty.call(attemptPayload, "creationdate")) {
-          attemptPayload.creationdate = attemptPayload.creationDate;
-        }
-        continue;
-      }
-
-      const missingColumn = parseMissingWorkOrderColumn(error);
-      if (!missingColumn) {
-        break;
-      }
-
-      const { nextPayload, removedCount } = removeMissingColumnFromPayload(
-        attemptPayload,
-        missingColumn
-      );
-      if (removedCount === 0) {
-        break;
-      }
-
-      attemptPayload = nextPayload;
-    }
-
-    return { data: null, error: lastError, payload: attemptPayload };
-  };
+  const remainingAmount = calculateRemainingAmount(total, totalPaid);
 
   const getBlockedDeepEditMessage = (nextAdditionalPayment: number): string | null => {
     if (!order?.id) return null;
@@ -1061,523 +801,136 @@ export function useWorkOrderFormState({
   };
 
   const handleSaveOnly = async () => {
-    if (!formData.customerName?.trim()) {
-      showToast.error("Vui lòng nhập tên khách hàng");
-      return;
-    }
-    if (!formData.customerPhone?.trim()) {
-      showToast.error("Vui lòng nhập số điện thoại");
-      return;
-    }
-
-    const phoneRegex = /^[0-9]{10,11}$/;
-    if (!phoneRegex.test(formData.customerPhone.trim())) {
-      showToast.error("Số điện thoại không hợp lệ! (cần 10-11 chữ số)");
-      return;
-    }
-
-    // Validate workers' share percent total does not exceed 100%
-    for (const service of repairServices || []) {
-      const workers = service.workers || [];
-      const totalShare = workers.reduce((sum: number, w: any) => sum + Number(w.share_percent || w.sharePercent || 0), 0);
-      if (totalShare > 100) {
-        showToast.error(`Tổng phần trăm chia thợ cho dịch vụ "${service.serviceName}" vượt quá 100% (${totalShare}%)`);
-        return;
-      }
-    }
-
     const blockedMessageEarly = getBlockedDeepEditMessage(Number(order?.additionalPayment || 0));
-    if (blockedMessageEarly) {
-      showToast.error(blockedMessageEarly);
-      return;
-    }
+    if (blockedMessageEarly) { showToast.error(blockedMessageEarly); return; }
 
-    if (formData.customerName && formData.customerPhone) {
-      const existingCustomer = customers.find((c) => c.phone === formData.customerPhone);
-
-      if (!existingCustomer) {
-        const vehicleId = `VEH-${Date.now()}`;
-        const vehicles = [];
-        if (formData.vehicleModel || formData.licensePlate) {
-          vehicles.push({
-            id: vehicleId,
-            model: formData.vehicleModel || "",
-            licensePlate: formData.licensePlate || "",
-            isPrimary: true,
-          });
-        }
-
-        await upsertCustomer({
-          id: `CUST-${Date.now()}`,
-          name: formData.customerName,
-          phone: formData.customerPhone,
-          vehicles: vehicles.length > 0 ? vehicles : undefined,
-          vehicleModel: formData.vehicleModel,
-          licensePlate: formData.licensePlate,
-          created_at: new Date().toISOString(),
-        });
-      } else {
-        if (formData.vehicleModel && existingCustomer.vehicleModel !== formData.vehicleModel) {
-          await upsertCustomer({
-            ...existingCustomer,
-            vehicleModel: formData.vehicleModel,
-            licensePlate: formData.licensePlate,
-          });
-        }
-      }
-    }
-
-    let paymentStatus: "unpaid" | "paid" | "partial" = "unpaid";
     const existingPaid = (order?.depositAmount || 0) + (order?.additionalPayment || 0);
-    if (existingPaid >= total) {
-      paymentStatus = "paid";
-    } else if (existingPaid > 0) {
-      paymentStatus = "partial";
-    }
+    const paymentStatus = derivePaymentStatus({ total, totalPaid: existingPaid });
+
+    const payloads = buildRepairServicePayloads().filter((s: any) => s.service_name.trim().length > 0);
 
     try {
-      const orderId = order?.id || generateWorkOrderId(storeSettings?.work_order_prefix);
-      const resolvedCreationDate = order?.creationDate || new Date().toISOString();
-
-      let finalIssueDescription = formData.issueDescription || "";
-      finalIssueDescription = finalIssueDescription.replace(/\[MK: .+?\]\s*/g, "").trim();
-      if (devicePassword && devicePassword.trim()) {
-        finalIssueDescription = `[MK: ${devicePassword.trim()}] ${finalIssueDescription}`;
-      }
-
-      const workOrderData = {
-        id: orderId,
-        customerName: formData.customerName || "",
-        customername: formData.customerName || "",
-        customerPhone: formData.customerPhone || "",
-        customerphone: formData.customerPhone || "",
-        vehicleId: formData.vehicleId,
-        vehicleid: formData.vehicleId,
-        vehicleModel: formData.vehicleModel || "",
-        vehiclemodel: formData.vehicleModel || "",
-        licensePlate: formData.licensePlate || "",
-        licenseplate: formData.licensePlate || "",
-        currentKm: formData.currentKm,
-        currentkm: formData.currentKm,
-        issueDescription: finalIssueDescription,
-        issuedescription: finalIssueDescription,
-        technicianName: resolvedTechnicianName,
-        technicianname: resolvedTechnicianName,
-        status: formData.status || "Tiếp nhận",
+      const result = await saveWorkOrderAsync({
+        existingOrder: order || null,
+        formData: {
+          customerName: formData.customerName || "",
+          customerPhone: formData.customerPhone || "",
+          vehicleModel: formData.vehicleModel,
+          licensePlate: formData.licensePlate,
+          vehicleId: formData.vehicleId,
+          currentKm: formData.currentKm,
+          issueDescription: formData.issueDescription,
+          technicianName: resolvedTechnicianName,
+          status: formData.status || "Tiếp nhận",
+          paymentMethod: formData.paymentMethod,
+        },
         laborCost: effectiveLaborCost,
-        laborcost: effectiveLaborCost,
-        discount: discount,
-        partsUsed: selectedParts,
-        partsused: selectedParts,
-        additionalServices: additionalServices.length > 0 ? additionalServices : undefined,
-        additionalservices: additionalServices.length > 0 ? additionalServices : undefined,
-        total: total,
-        branchId: currentBranchId,
-        branchid: currentBranchId,
-        paymentStatus: paymentStatus,
-        paymentstatus: paymentStatus,
-        paymentMethod: formData.paymentMethod || null,
-        paymentmethod: formData.paymentMethod || null,
-        depositAmount: order?.depositAmount || null,
-        depositamount: order?.depositAmount || null,
-        totalPaid: existingPaid > 0 ? existingPaid : null,
-        totalpaid: existingPaid > 0 ? existingPaid : null,
+        discount,
+        total,
+        depositAmount: depositAmount || 0,
+        additionalPayment: 0,
+        totalDeposit: (order?.depositAmount || 0),
+        totalPaid: existingPaid,
         remainingAmount: total - existingPaid,
-        remainingamount: total - existingPaid,
-        creationDate: resolvedCreationDate,
-        creationdate: resolvedCreationDate,
-      };
+        paymentStatus,
+        selectedParts,
+        additionalServices,
+        repairServicePayloads: payloads,
+        devicePassword,
+        currentBranchId,
+        storePrefix: storeSettings?.work_order_prefix,
+        options: { atomic: false },
+      });
 
-      if (order?.id) {
-        const { error } = await updateWorkOrderWithSchemaFallback(order.id, workOrderData);
-        if (error) {
-          console.error("[UPDATE ERROR]", error);
-          throw error;
-        }
-
-        if (formData.currentKm && formData.vehicleId && formData.customerPhone) {
-          const customer = customers.find((c) => c.phone === formData.customerPhone);
-          if (customer) {
-            const existingVehicles = customer.vehicles || [];
-            const vehicleExists = existingVehicles.some((v: any) => v.id === formData.vehicleId);
-
-            if (vehicleExists) {
-              const updatedVehicles = existingVehicles.map((v: any) =>
-                v.id === formData.vehicleId
-                  ? { ...v, currentKm: formData.currentKm }
-                  : v
-              );
-
-              const { error: updateError } = await supabase
-                .from("customers")
-                .update({ vehicles: updatedVehicles })
-                .eq("id", customer.id);
-
-              if (updateError) {
-                console.error(`[WorkOrderFormState UPDATE] Failed to update km in DB:`, updateError);
-              } else {
-                upsertCustomer({
-                  ...customer,
-                  vehicles: updatedVehicles,
-                });
-              }
-            }
-          }
-        }
-      } else {
-        const { error } = await insertWorkOrderWithSchemaFallback(workOrderData);
-        if (error) {
-          console.error("[INSERT ERROR]", error);
-          throw error;
-        }
-
-        if (formData.currentKm && formData.vehicleId && formData.customerPhone) {
-          const customer = customers.find((c) => c.phone === formData.customerPhone);
-          if (customer) {
-            const existingVehicles = customer.vehicles || [];
-            const vehicleExists = existingVehicles.some((v: any) => v.id === formData.vehicleId);
-
-            let updatedVehicles;
-            if (vehicleExists) {
-              updatedVehicles = existingVehicles.map((v: any) =>
-                v.id === formData.vehicleId
-                  ? { ...v, currentKm: formData.currentKm }
-                  : v
-              );
-            } else {
-              const newVehicleObj = {
-                id: formData.vehicleId,
-                licensePlate: formData.licensePlate,
-                model: formData.vehicleModel,
-                currentKm: formData.currentKm,
-              };
-              updatedVehicles = [...existingVehicles, newVehicleObj];
-            }
-
-            const { error: updateError } = await supabase
-              .from("customers")
-              .update({ vehicles: updatedVehicles })
-              .eq("id", customer.id);
-
-            if (updateError) {
-              console.error(`[WorkOrderFormState CREATE] Failed to update km in DB:`, updateError);
-            } else {
-              upsertCustomer({
-                ...customer,
-                vehicles: updatedVehicles,
-              });
-            }
-          }
-        }
-      }
-
-      const syncedRepairServices = await syncRepairServicesForOrder(orderId);
-      (workOrderData as any).repairServices = syncedRepairServices;
-      (workOrderData as any).laborTotal = syncedRepairServices.reduce(
-        (sum: number, service: any) => sum + Number(service.laborAmount || 0),
-        0
-      );
-      (workOrderData as any).workerTotal = syncedRepairServices.reduce(
-        (sum: number, service: any) =>
-          sum +
-          (service.workers && service.workers.length > 0
-            ? service.workers.reduce(
-                (workerSum: number, worker: any) => workerSum + Number(worker.workerAmount || 0),
-                0
-              )
-            : Number(service.workerAmount || 0)),
-        0
-      );
-
-      if (invalidateWorkOrders) {
-        invalidateWorkOrders();
-      }
-
-      if (workOrderData.status === "Trả máy" && workOrderData.remainingAmount > 0) {
-        await createCustomerDebtIfNeeded(
-          workOrderData as unknown as WorkOrder,
-          workOrderData.remainingAmount,
-          workOrderData.total,
-          existingPaid
-        );
-      }
-
-      onSave(workOrderData as unknown as WorkOrder);
+      if (invalidateWorkOrders) invalidateWorkOrders();
+      onSave(result.order);
       showToast.success(order?.id ? "Đã cập nhật phiếu" : "Đã lưu phiếu thành công");
       onClose();
     } catch (error: any) {
-      console.error("Error saving work order:", error);
-      showToast.error("Lỗi khi lưu phiếu: " + (error.message || error.hint || "Không xác định"));
+      console.error("handleSaveOnly error:", error);
     }
   };
 
   const handleSave = async (forceFullPayment = false) => {
-    if (submittingRef.current || isSubmitting) {
-      return;
-    }
+    if (submittingRef.current || isSubmitting) return;
     submittingRef.current = true;
     setIsSubmitting(true);
 
+    const maxAdditionalPayment = Math.max(0, total - totalDeposit);
+    const additionalPaymentPreview =
+      formData.status === "Trả máy"
+        ? forceFullPayment ? maxAdditionalPayment : showPartialPayment ? partialPayment : 0
+        : 0;
+
+    const blockedMessageEarly = getBlockedDeepEditMessage(additionalPaymentPreview);
+    if (blockedMessageEarly) {
+      showToast.error(blockedMessageEarly);
+      setIsSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
+
+    const additionalPaymentToApply = getAdditionalPaymentToApply({
+      status: formData.status,
+      forceFullPayment,
+      showPartialPayment,
+      partialPayment,
+      total,
+      totalDeposit,
+      clampToRemaining: true, // đường lưu clamp theo số còn lại (giữ hành vi cũ)
+    });
+    const totalPaidToApply = totalDeposit + additionalPaymentToApply;
+    const remainingAmountToApply = calculateRemainingAmount(total, totalPaidToApply);
+    const paymentStatus = derivePaymentStatus({ total, totalPaid: totalPaidToApply });
+
+    const payloads = buildRepairServicePayloads().filter((s: any) => s.service_name.trim().length > 0);
+
     try {
-      if (!formData.customerName?.trim()) {
-        showToast.error("Vui lòng nhập tên khách hàng");
-        return;
-      }
-      if (!formData.customerPhone?.trim()) {
-        showToast.error("Vui lòng nhập số điện thoại");
-        return;
-      }
+      const result = await saveWorkOrderAsync({
+        existingOrder: order || null,
+        formData: {
+          customerName: formData.customerName || "",
+          customerPhone: formData.customerPhone || "",
+          vehicleModel: formData.vehicleModel,
+          licensePlate: formData.licensePlate,
+          vehicleId: formData.vehicleId,
+          currentKm: formData.currentKm,
+          issueDescription: formData.issueDescription,
+          technicianName: resolvedTechnicianName,
+          status: formData.status || "Tiếp nhận",
+          paymentMethod: formData.paymentMethod,
+        },
+        laborCost: effectiveLaborCost,
+        discount,
+        total,
+        depositAmount: totalDeposit,
+        additionalPayment: additionalPaymentToApply,
+        totalDeposit,
+        totalPaid: totalPaidToApply,
+        remainingAmount: remainingAmountToApply,
+        paymentStatus,
+        selectedParts,
+        additionalServices,
+        repairServicePayloads: payloads,
+        devicePassword,
+        currentBranchId,
+        storePrefix: storeSettings?.work_order_prefix,
+        options: { atomic: true },
+      });
 
-      const phoneRegex = /^[0-9]{10,11}$/;
-      if (!phoneRegex.test(formData.customerPhone.trim())) {
-        showToast.error("Số điện thoại không hợp lệ! (cần 10-11 chữ số)");
-        return;
-      }
+      if (invalidateWorkOrders) invalidateWorkOrders();
 
-      // Validate workers' share percent total does not exceed 100%
-      for (const service of repairServices || []) {
-        const workers = service.workers || [];
-        const totalShare = workers.reduce((sum: number, w: any) => sum + Number(w.share_percent || w.sharePercent || 0), 0);
-        if (totalShare > 100) {
-          showToast.error(`Tổng phần trăm chia thợ cho dịch vụ "${service.serviceName}" vượt quá 100% (${totalShare}%)`);
-          return;
-        }
-      }
-
-      const additionalPaymentPreview =
-        formData.status === "Trả máy"
-          ? forceFullPayment
-            ? Math.max(0, total - totalDeposit)
-            : showPartialPayment
-              ? partialPayment
-              : 0
-          : 0;
-
-      const blockedMessageEarly = getBlockedDeepEditMessage(additionalPaymentPreview);
-      if (blockedMessageEarly) {
-        showToast.error(blockedMessageEarly);
-        return;
-      }
-
-      if (total <= 0 && formData.status === "Trả máy") {
-        showToast.error("Tổng tiền phải lớn hơn 0 khi trả máy");
-        return;
+      if (result.usedFallback) {
+        showToast.warning(
+          "Đã lưu phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
+        );
       }
 
-      if (formData.customerName && formData.customerPhone) {
-        const existingCustomer = customers.find((c) => c.phone === formData.customerPhone);
-
-        if (!existingCustomer) {
-          const vehicleId = `VEH-${Date.now()}`;
-          const vehicles = [];
-          if (formData.vehicleModel || formData.licensePlate) {
-            vehicles.push({
-              id: vehicleId,
-              model: formData.vehicleModel || "",
-              licensePlate: formData.licensePlate || "",
-              isPrimary: true,
-            });
-          }
-
-          await upsertCustomer({
-            id: `CUST-${Date.now()}`,
-            name: formData.customerName,
-            phone: formData.customerPhone,
-            vehicles: vehicles.length > 0 ? vehicles : undefined,
-            vehicleModel: formData.vehicleModel,
-            licensePlate: formData.licensePlate,
-            created_at: new Date().toISOString(),
-          });
-        } else {
-          if (formData.vehicleModel && existingCustomer.vehicleModel !== formData.vehicleModel) {
-            await upsertCustomer({
-              ...existingCustomer,
-              vehicleModel: formData.vehicleModel,
-              licensePlate: formData.licensePlate,
-            });
-          }
-        }
-      }
-
-      const maxAdditionalPayment = Math.max(0, total - totalDeposit);
-      const additionalPaymentToApply =
-        formData.status === "Trả máy"
-          ? forceFullPayment
-            ? maxAdditionalPayment
-            : showPartialPayment
-              ? Math.min(partialPayment, maxAdditionalPayment)
-              : 0
-          : 0;
-
-      const totalPaidToApply = totalDeposit + additionalPaymentToApply;
-      const remainingAmountToApply = Math.max(0, total - totalPaidToApply);
-
-      let paymentStatus: "unpaid" | "paid" | "partial" = "unpaid";
-      if (totalPaidToApply >= total) {
-        paymentStatus = "paid";
-      } else if (totalPaidToApply > 0) {
-        paymentStatus = "partial";
-      }
-
-      let finalIssueDescription = formData.issueDescription || "";
-      finalIssueDescription = finalIssueDescription.replace(/\[MK: .+?\]\s*/g, "").trim();
-      if (devicePassword && devicePassword.trim()) {
-        finalIssueDescription = `[MK: ${devicePassword.trim()}] ${finalIssueDescription}`;
-      }
-
-      if (!order?.id) {
-        try {
-          const orderId = generateWorkOrderId(storeSettings?.work_order_prefix);
-
-          const responseData = await createWorkOrderAtomicAsync({
-            id: orderId,
-            customerName: formData.customerName || "",
-            customerPhone: formData.customerPhone || "",
-            vehicleModel: formData.vehicleModel || "",
-            licensePlate: formData.licensePlate || "",
-            currentKm: formData.currentKm,
-            issueDescription: finalIssueDescription,
-            technicianName: resolvedTechnicianName,
-            status: formData.status || "Tiếp nhận",
-            laborCost: effectiveLaborCost,
-            discount: discount,
-            partsUsed: selectedParts,
-            additionalServices: additionalServices.length > 0 ? additionalServices : undefined,
-            total: total,
-            branchId: currentBranchId,
-            paymentStatus: paymentStatus,
-            paymentMethod: formData.paymentMethod,
-            depositAmount: depositAmount > 0 ? depositAmount : undefined,
-            additionalPayment: additionalPaymentToApply > 0 ? additionalPaymentToApply : undefined,
-            totalPaid: totalPaidToApply > 0 ? totalPaidToApply : undefined,
-            remainingAmount: remainingAmountToApply,
-            creationDate: new Date().toISOString(),
-          } as any);
-
-          const syncedRepairServices = await syncRepairServicesForOrder(orderId);
-          const finalOrder = {
-            ...(responseData as any),
-            repairServices: syncedRepairServices,
-          };
-
-          // 🔹 FIX Desktop: completeWorkOrderPayment to deduct stock
-          if (
-            (paymentStatus === "paid" || (formData.status || "Tiếp nhận") === "Trả máy") &&
-            selectedParts.length > 0 &&
-            !(responseData as any)?.inventoryDeducted
-          ) {
-            try {
-              const deductResult = await completeWorkOrderPayment(
-                orderId,
-                formData.paymentMethod || "cash",
-                0
-              );
-              if (deductResult.ok && deductResult.data.usedFallback) {
-                showToast.warning(
-                  "Đã lưu phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
-                );
-              }
-            } catch (err) {
-              console.error("[handleSave] Error in completeWorkOrderPayment:", err);
-            }
-          }
-
-          if (invalidateWorkOrders) {
-            invalidateWorkOrders();
-          }
-
-          if (finalOrder.status === "Trả máy" && remainingAmountToApply > 0) {
-            await createCustomerDebtIfNeeded(
-              finalOrder,
-              remainingAmountToApply,
-              total,
-              totalPaidToApply
-            );
-          }
-
-          onSave(finalOrder);
-          onClose();
-        } catch (error: any) {
-          console.error("Error creating work order (atomic):", error);
-        }
-        return;
-      }
-
-      if (order?.id) {
-        try {
-          const responseData = await updateWorkOrderAtomicAsync({
-            id: order.id,
-            customerName: formData.customerName || "",
-            customerPhone: formData.customerPhone || "",
-            vehicleModel: formData.vehicleModel || "",
-            licensePlate: formData.licensePlate || "",
-            issueDescription: finalIssueDescription,
-            technicianName: resolvedTechnicianName,
-            status: formData.status || "Tiếp nhận",
-            laborCost: effectiveLaborCost,
-            discount: discount,
-            partsUsed: selectedParts,
-            additionalServices: additionalServices.length > 0 ? additionalServices : undefined,
-            total: total,
-            branchId: currentBranchId,
-            paymentStatus: paymentStatus,
-            paymentMethod: formData.paymentMethod,
-            depositAmount: depositAmount > 0 ? depositAmount : undefined,
-            additionalPayment: additionalPaymentToApply > 0 ? additionalPaymentToApply : undefined,
-            totalPaid: totalPaidToApply > 0 ? totalPaidToApply : undefined,
-            remainingAmount: remainingAmountToApply,
-          } as any);
-
-          const syncedRepairServices = await syncRepairServicesForOrder(order.id);
-          const finalOrder = {
-            ...((responseData as any)?.workOrder || responseData as any),
-            repairServices: syncedRepairServices,
-          };
-
-          // 🔹 FIX Desktop: completeWorkOrderPayment to deduct stock if paid or completed
-          const wasUnpaidOrPartial = order.paymentStatus !== "paid";
-          const wasNotInventoryDeducted = !order.inventoryDeducted;
-          if (
-            (paymentStatus === "paid" || (formData.status || "Tiếp nhận") === "Trả máy") &&
-            (wasUnpaidOrPartial || wasNotInventoryDeducted) &&
-            selectedParts.length > 0
-          ) {
-            try {
-              const deductResult = await completeWorkOrderPayment(
-                order.id,
-                formData.paymentMethod || "cash",
-                0
-              );
-              if (deductResult.ok && deductResult.data.usedFallback) {
-                showToast.warning(
-                  "Đã cập nhật phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
-                );
-              }
-            } catch (err: any) {
-              console.error("[handleSave] Error in completeWorkOrderPayment (update):", err);
-            }
-          }
-
-          if (invalidateWorkOrders) {
-            invalidateWorkOrders();
-          }
-
-          if (finalOrder.status === "Trả máy" && remainingAmountToApply > 0) {
-            await createCustomerDebtIfNeeded(
-              finalOrder,
-              remainingAmountToApply,
-              total,
-              totalPaidToApply
-            );
-          }
-
-          onSave(finalOrder);
-          onClose();
-        } catch (error: any) {
-          console.error("[handleSave] Error updating work order (atomic):", error);
-        }
-        return;
-      }
+      onSave(result.order);
+      showToast.success(order?.id ? "Đã cập nhật phiếu" : "Đã tạo phiếu mới");
+      onClose();
+    } catch (error: any) {
+      console.error("handleSave error:", error);
     } finally {
       setIsSubmitting(false);
       submittingRef.current = false;

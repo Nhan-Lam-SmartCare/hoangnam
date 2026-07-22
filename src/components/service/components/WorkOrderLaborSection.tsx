@@ -3,7 +3,6 @@ import type { Employee, ServiceConfig, WorkOrder, WorkOrderPart } from "../../..
 import { formatCurrency } from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";
 import { showToast } from "../../../utils/toast";
-import { supabase } from "../../../supabaseClient";
 import { getSelectableEmployees } from "../../../utils/employees";
 import {
   buildDefaultWorkerSplit,

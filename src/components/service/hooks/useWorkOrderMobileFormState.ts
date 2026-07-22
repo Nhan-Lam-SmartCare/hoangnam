@@ -8,9 +8,15 @@ import {
   calculateLabor,
   splitWorkerAmount,
 } from "../../../lib/services/repairLaborService";
+import {
+  calculateWorkOrderTotals,
+  getAdditionalPaymentToApply,
+  calculateRemainingAmount,
+} from "../../../lib/services/workOrderCalculations";
+import { validateWorkOrderDraft } from "../../../lib/services/workOrderValidation";
 import { compressImage } from "../../../utils/imageCompressor";
 import { uploadDevicePhoto, deleteDevicePhoto } from "../../../lib/storage/devicePhotosStorage";
-import { supabase } from "../../../supabaseClient";
+import { searchCustomers } from "../../../lib/repository/customersRepository";
 import { formatCurrency, formatWorkOrderId, normalizeSearchText } from "../../../utils/format";
 import {
   checkVehicleMaintenance,
@@ -37,17 +43,22 @@ import {
   getPartWarranty as sharedGetPartWarranty,
   getIntegratedLaborByQuantity as sharedGetIntegratedLaborByQuantity,
 } from "./useWorkOrderSharedLogic";
+import { useWorkOrderMobileSubmit } from "./useWorkOrderMobileSubmit";
+import type { StoreSettings } from "../types/service.types";
 
 export interface UseWorkOrderMobileFormStateProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (workOrderData: any) => Promise<void> | void;
   workOrder?: WorkOrder | null;
   customers: Customer[];
   parts: Part[];
   employees: Employee[];
   currentBranchId: string;
   upsertCustomer?: (customer: any) => void;
+  /** Phase 7: store settings for work-order prefix (ledger/description). */
+  storeSettings?: StoreSettings | null;
+  /** Phase 7: ownership guard (ServiceManager.canModifyOrder). Omit = allow. */
+  canModifyWorkOrder?: (order: WorkOrder) => boolean;
   canUpdateWorkOrderStatus?: boolean;
   canUpdateWorkOrderPayment?: boolean;
   canUpdateWorkOrderParts?: boolean;
@@ -61,13 +72,14 @@ export interface UseWorkOrderMobileFormStateProps {
 export function useWorkOrderMobileFormState({
   isOpen,
   onClose,
-  onSave,
   workOrder,
   customers,
   parts,
   employees,
   currentBranchId,
   upsertCustomer,
+  storeSettings,
+  canModifyWorkOrder,
   canUpdateWorkOrderStatus = true,
   canUpdateWorkOrderPayment = true,
   canUpdateWorkOrderParts = true,
@@ -80,6 +92,18 @@ export function useWorkOrderMobileFormState({
   const { profile } = useAuth();
   const { data: serviceConfigs = [] } = useServiceConfigs();
   const showLegacyRepairSection = import.meta.env.VITE_ENABLE_MOBILE_REPAIR_SECTION === "1";
+
+  // Phase 7: mobile saves through the same pipeline as desktop —
+  // useWorkOrderMobileSubmit → useWorkOrderSave → saveWorkOrder.
+  const { submit: submitWorkOrder } = useWorkOrderMobileSubmit({
+    currentBranchId,
+    customers,
+    employees,
+    editingOrder: workOrder,
+    storeSettings,
+    upsertCustomer,
+    canModifyWorkOrder,
+  });
 
   const [isPatternMode, setIsPatternMode] = useState(false);
 
@@ -587,16 +611,12 @@ export function useWorkOrderMobileFormState({
 
     setIsSearchingCustomer(true);
     try {
+      const res = await searchCustomers(searchTerm, page, CUSTOMER_PAGE_SIZE);
+      if (!res.ok) throw res.error;
+      const { data, count } = res.data;
       const from = page * CUSTOMER_PAGE_SIZE;
-      const to = from + CUSTOMER_PAGE_SIZE - 1;
 
-      const { data, error, count } = await supabase
-        .from("customers")
-        .select("*", { count: "exact", head: false })
-        .or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
-        .range(from, to);
-
-      if (!error && data) {
+      if (data) {
         if (isLoadMore) {
           setServerCustomers((prev) => {
             const newIds = new Set(data.map(c => c.id));
@@ -707,17 +727,6 @@ export function useWorkOrderMobileFormState({
     }
   }, [customerVehicles, selectedVehicle]);
 
-  const partsTotal = useMemo(() => {
-    return selectedParts.reduce(
-      (sum, p) => sum + p.quantity * p.sellingPrice,
-      0
-    );
-  }, [selectedParts]);
-
-  const servicesTotal = useMemo(() => {
-    return additionalServices.reduce((sum, s) => sum + s.sellingPrice * s.quantity, 0);
-  }, [additionalServices]);
-
   const partsLaborInfoTotal = useMemo(() => {
     return selectedParts.reduce((sum, item) => {
       const laborBase = getPartLaborBase(item.partId);
@@ -725,23 +734,54 @@ export function useWorkOrderMobileFormState({
     }, 0);
   }, [selectedParts, getPartLaborBase, getIntegratedLaborByQuantity]);
 
-  const effectiveLaborCost = includeIntegratedLabor ? partsLaborInfoTotal : 0;
+  const {
+    partsTotal,
+    servicesTotal,
+    effectiveLaborCost,
+    subtotal,
+    discountAmount,
+    total,
+  } = useMemo(
+    () =>
+      calculateWorkOrderTotals({
+        parts: selectedParts.map((p) => ({
+          quantity: p.quantity,
+          unitPrice: p.sellingPrice,
+        })),
+        // mobile: dịch vụ không có laborPrice riêng (khác desktop — giữ nguyên)
+        services: additionalServices.map((s) => ({
+          quantity: s.quantity,
+          unitPrice: s.sellingPrice,
+        })),
+        repairLaborTotal: _repairLaborTotal,
+        integratedLaborTotal: partsLaborInfoTotal,
+        includeIntegratedLabor,
+        discount,
+        discountType,
+      }),
+    [
+      selectedParts,
+      additionalServices,
+      _repairLaborTotal,
+      partsLaborInfoTotal,
+      includeIntegratedLabor,
+      discount,
+      discountType,
+    ]
+  );
 
-  const subtotal = partsTotal + servicesTotal + effectiveLaborCost + _repairLaborTotal;
-
-  const discountAmount = useMemo(() => {
-    if (discountType === "percent") {
-      return (subtotal * discount) / 100;
-    }
-    return discount;
-  }, [subtotal, discount, discountType]);
-
-  const total = Math.max(0, subtotal - discountAmount);
-  const additionalPaymentPreview =
-    status === "Trả máy" && showPaymentInput ? partialAmount : 0;
-  const remainingPreview = Math.max(
-    0,
-    total - (isDeposit ? depositAmount : 0) - additionalPaymentPreview
+  const additionalPaymentPreview = getAdditionalPaymentToApply({
+    status,
+    forceFullPayment: false,
+    showPartialPayment: showPaymentInput,
+    partialPayment: partialAmount,
+    total,
+    totalDeposit: isDeposit ? depositAmount : 0,
+    clampToRemaining: false, // preview không clamp (giữ hành vi cũ)
+  });
+  const remainingPreview = calculateRemainingAmount(
+    total,
+    (isDeposit ? depositAmount : 0) + additionalPaymentPreview
   );
 
   useEffect(() => {
@@ -1013,20 +1053,26 @@ export function useWorkOrderMobileFormState({
   const handleSave = async (forceFullPayment = false) => {
     if (isSubmitting) return;
 
-    if (!selectedCustomer || !selectedVehicle) {
-      alert("Vui lòng chọn khách hàng và thiết bị");
+    const validationErrors = validateWorkOrderDraft({
+      repairServices,
+      checks: {
+        requireSelectedCustomerVehicle: true,
+        hasSelectedCustomer: !!selectedCustomer,
+        hasSelectedVehicle: !!selectedVehicle,
+      },
+    });
+    const customerVehicleError = validationErrors.find((e) => e.field === "customerVehicle");
+    if (customerVehicleError) {
+      alert(customerVehicleError.message); // giữ alert như hành vi cũ của mobile
       return;
     }
-
-    // Validate workers' share percent total does not exceed 100%
-    for (const service of repairServices || []) {
-      const workers = service.workers || [];
-      const totalShare = workers.reduce((sum: number, w: any) => sum + Number(w.share_percent || w.sharePercent || 0), 0);
-      if (totalShare > 100) {
-        showToast.error(`Tổng phần trăm chia thợ cho dịch vụ "${service.serviceName}" vượt quá 100% (${totalShare}%)`);
-        return;
-      }
+    const workerShareError = validationErrors.find((e) => e.field === "repairServiceWorkers");
+    if (workerShareError) {
+      showToast.error(workerShareError.message);
+      return;
     }
+    // Type narrowing — validated non-null above via requireSelectedCustomerVehicle
+    if (!selectedCustomer || !selectedVehicle) return;
 
     setIsSubmitting(true);
     const failSafeUnlockTimer = window.setTimeout(() => {
@@ -1034,17 +1080,17 @@ export function useWorkOrderMobileFormState({
     }, 20000);
 
     const totalDeposit = isDeposit ? depositAmount : 0;
-    const maxAdditionalPayment = Math.max(0, total - totalDeposit);
-    const additionalPayment =
-      status === "Trả máy"
-        ? forceFullPayment
-          ? maxAdditionalPayment
-          : showPaymentInput
-            ? Math.min(partialAmount, maxAdditionalPayment)
-            : 0
-        : 0;
+    const additionalPayment = getAdditionalPaymentToApply({
+      status,
+      forceFullPayment,
+      showPartialPayment: showPaymentInput,
+      partialPayment: partialAmount,
+      total,
+      totalDeposit,
+      clampToRemaining: true, // đường lưu clamp theo số còn lại (giữ hành vi cũ)
+    });
     const totalPaid = totalDeposit + additionalPayment;
-    const remainingAmount = Math.max(0, total - totalPaid);
+    const remainingAmount = calculateRemainingAmount(total, totalPaid);
 
     const transformedParts = selectedParts.map((p) => ({
       partId: p.partId.startsWith("manual-") ? undefined : p.partId,
@@ -1275,7 +1321,13 @@ export function useWorkOrderMobileFormState({
     };
 
     try {
-      await onSave(workOrderData);
+      // Phase 7: save directly via the unified pipeline (no more onSave
+      // delegation up to ServiceManager).
+      const submitResult = await submitWorkOrder(workOrderData);
+      if (submitResult.saved) {
+        onClose(); // legacy behavior: ServiceManager closed the modal on success
+      }
+      // saved: false → validation toast already shown, keep the modal open
     } catch (error: any) {
       console.error("Error saving work order:", error);
 

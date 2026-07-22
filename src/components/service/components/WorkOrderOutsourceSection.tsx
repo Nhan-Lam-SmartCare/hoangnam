@@ -3,7 +3,7 @@ import type { WorkOrder } from "../../../types";
 import { formatCurrency } from "../../../utils/format";
 import { NumberInput } from "../../common/NumberInput";
 import { showToast } from "../../../utils/toast";
-import { supabase } from "../../../supabaseClient";
+import { clearWorkOrderAdditionalServices } from "../../../lib/repository/workOrdersRepository";
 import { getServiceLineTotal } from "../utils/service.utils";
 
 interface WorkOrderOutsourceSectionProps {
@@ -183,17 +183,15 @@ export const WorkOrderOutsourceSection: React.FC<WorkOrderOutsourceSectionProps>
                       setAdditionalServices(newServices);
 
                       if (newServices.length === 0 && order?.id) {
-                        try {
-                          await supabase
-                            .from("work_orders")
-                            .update({ additionalservices: null })
-                            .eq("id", order.id);
+                        const res = await clearWorkOrderAdditionalServices(order.id);
+                        if (res.ok) {
                           showToast.success("Đã xóa phần gia công/đặt hàng");
-                        } catch (error) {
+                        } else {
                           console.error(
                             "[WorkOrderOutsourceSection] Error clearing additionalServices:",
-                            error
+                            res.error
                           );
+                          showToast.error("Không thể xóa phần gia công/đặt hàng ngoài");
                         }
                       }
                     }}

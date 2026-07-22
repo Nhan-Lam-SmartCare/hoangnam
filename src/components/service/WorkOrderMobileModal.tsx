@@ -52,13 +52,16 @@ import { WorkOrderMobilePaymentSection } from "./components/WorkOrderMobilePayme
 interface WorkOrderMobileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (workOrderData: any) => Promise<void> | void;
   workOrder?: WorkOrder | null;
   customers: Customer[];
   parts: Part[];
   employees: Employee[];
   currentBranchId: string;
   upsertCustomer?: (customer: any) => void;
+  /** Store settings for work-order prefix (ledger records). */
+  storeSettings?: import("./types/service.types").StoreSettings | null;
+  /** Ownership guard (ServiceManager.canModifyOrder). Omit = allow. */
+  canModifyWorkOrder?: (order: WorkOrder) => boolean;
   viewMode?: boolean; // true = xem chi tiết, false = chỉnh sửa
   onSwitchToEdit?: () => void; // callback khi bấm nút chỉnh sửa từ view mode
   canUpdateWorkOrderStatus?: boolean;
@@ -85,13 +88,14 @@ const getWarrantyText = (part: Part | null | undefined): string => {
 export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   isOpen,
   onClose,
-  onSave,
   workOrder,
   customers,
   parts,
   employees,
   currentBranchId,
   upsertCustomer,
+  storeSettings,
+  canModifyWorkOrder,
   viewMode = false,
   onSwitchToEdit,
   canUpdateWorkOrderStatus = true,
@@ -234,13 +238,14 @@ export const WorkOrderMobileModal: React.FC<WorkOrderMobileModalProps> = ({
   } = useWorkOrderMobileFormState({
     isOpen,
     onClose,
-    onSave,
     workOrder,
     customers,
     parts,
     employees,
     currentBranchId,
     upsertCustomer,
+    storeSettings,
+    canModifyWorkOrder,
     canUpdateWorkOrderStatus,
     canUpdateWorkOrderPayment,
     canUpdateWorkOrderParts,

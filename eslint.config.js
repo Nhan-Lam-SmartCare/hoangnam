@@ -69,5 +69,21 @@ export default tseslint.config(
       "max-lines": "off",
       "max-lines-per-function": "off",
     },
+  },
+  {
+    files: ["src/components/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/supabaseClient"],
+              message: "Vui lòng không import supabaseClient trực tiếp ở tầng giao diện (UI). Hãy sử dụng tầng repository hoặc hook tương ứng."
+            }
+          ]
+        }
+      ]
+    }
   }
 );

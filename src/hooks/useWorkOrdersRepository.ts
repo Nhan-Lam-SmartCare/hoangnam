@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "../supabaseClient";
 import {
   fetchWorkOrders,
   fetchWorkOrdersFiltered,
@@ -173,4 +175,27 @@ export const useRefundWorkOrderRepo = () => {
     },
     onError: (err: any) => showToast.error(mapRepoErrorForUser(err)),
   });
+};
+
+export const useWorkOrdersRealtime = (refetch: () => void) => {
+  useEffect(() => {
+    const channel = supabase
+      .channel("work_orders_realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "work_orders",
+        },
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 };

@@ -38,30 +38,27 @@ import {
   generateWorkOrderId,
 } from "../../utils/format";
 import {
-  completeWorkOrderPayment,
   recordWorkOrderPaymentTransactions,
 } from "../../lib/repository/workOrdersRepository";
-import { syncRepairOrderServices } from "../../lib/repository/repairLaborRepository";
 import { createNotification } from "../../lib/repository/notificationsRepository";
 import {
-  useCreateWorkOrderAtomicRepo,
-  useUpdateWorkOrderAtomicRepo,
-  useRefundWorkOrderRepo,
   useDeleteWorkOrderRepo,
   useWorkOrdersFilteredRepo,
+  useWorkOrdersRealtime,
+  useRefundWorkOrderRepo,
 } from "../../hooks/useWorkOrdersRepository";
+import { useWorkOrderSave } from "../../hooks/useWorkOrderSave";
+import { derivePaymentStatus } from "../../lib/services/workOrderCalculations";
+import { useProfilesForTechnicians } from "../../hooks/useProfilesRepository";
+import { getCustomerStatsByPhone, updateCustomerStats } from "../../lib/repository/customersRepository";
 import type { RepairTemplate } from "../../hooks/useRepairTemplatesRepository";
 import { usePartsRepo } from "../../hooks/usePartsRepository";
 import { useEmployeesDirectoryRepo } from "../../hooks/useEmployeesRepository";
-import {
-  useCreateCustomerDebtRepo,
-  useUpdateCustomerDebtRepo,
-} from "../../hooks/useDebtsRepository";
+// Debt repository hooks no longer needed here — saveWorkOrder handles debt sync
 import { showToast } from "../../utils/toast";
 import { printElementById } from "../../utils/print";
 import { shareBlobNative } from "../../utils/nativeShare";
 import { usePrinter } from "../../hooks/usePrinter";
-import { supabase } from "../../supabaseClient";
 import { WorkOrderMobileModal } from "../service/WorkOrderMobileModal";
 import WorkOrderModal from "../service/components/WorkOrderModal";
 import { ServiceManagerMobile } from "../service/ServiceManagerMobile";
@@ -82,6 +79,7 @@ import { USER_ROLES } from "../../constants";
 
 // Import custom hooks and types
 import { useServiceStats } from "../service/hooks/useServiceStats";
+import { useServiceFilters } from "../service/hooks/useServiceFilters";
 import { useWorkOrderPrinter } from "./hooks/useWorkOrderPrinter";
 import {
   StoreSettings,
@@ -102,6 +100,7 @@ import {
   handleCallCustomer as callCustomer,
   sanitizeIssueDescriptionForPrint,
 } from "../service/utils/service.utils";
+import { templateToWorkOrderDraft } from "../service/utils/templateConversion.utils";
 
 // Local types removed - now imported from ./types/service.types
 
@@ -177,17 +176,7 @@ export default function ServiceManager() {
   // Fallback to fetchedParts if context is empty
   const parts = contextParts.length > 0 ? contextParts : (fetchedParts || []);
   const displayCustomers = customers;
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["profilesForTechnicians", currentBranchId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name, full_name, email, role, branch_id")
-        .order("name");
-      if (error) return [];
-      return data || [];
-    },
-  });
+  const { data: profiles = [] } = useProfilesForTechnicians();
 
   const displayEmployees = useMemo(() => {
     const map = new Map<string, any>();
@@ -281,30 +270,7 @@ export default function ServiceManager() {
   }, [fetchedWorkOrders, setWorkOrders]);
 
   // 🔹 REALTIME SUBSCRIPTION - Auto refresh when work orders change
-  useEffect(() => {
-
-    const channel = supabase
-      .channel("work_orders_realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // Listen to INSERT, UPDATE, DELETE
-          schema: "public",
-          table: "work_orders",
-        },
-        (_payload) => {
-          // Refetch work orders to get latest data
-          refetchWorkOrders();
-        }
-      )
-      .subscribe((_status) => {
-      });
-
-    // Cleanup on unmount
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetchWorkOrders]);
+  useWorkOrdersRealtime(refetchWorkOrders);
 
   const [showModal, setShowModal] = useState(false);
   const [showMobileModal, setShowMobileModal] = useState(false);
@@ -313,15 +279,26 @@ export default function ServiceManager() {
   const [editingOrder, setEditingOrder] = useState<WorkOrder | undefined>(
     undefined
   );
-  const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // Debounce search for better performance
-  const [_statusFilter, _setStatusFilter] = useState<"all" | WorkOrderStatus>(
-    "all"
-  );
-  const [activeTab, setActiveTab] = useState<ServiceTabKey>("all");
-  const [dateFilter, setDateFilter] = useState("week"); // Default to 7 days
-  const [technicianFilter, setTechnicianFilter] = useState("all");
-  const [paymentFilter, setPaymentFilter] = useState("all");
+
+  const {
+    filters: { searchQuery, activeTab, dateFilter, technicianFilter, paymentFilter },
+    debouncedSearchQuery,
+    visibleCount,
+    filteredOrders,
+    paginatedOrders,
+    hasMoreOrders,
+    setSearchQuery,
+    setActiveTab,
+    setDateFilter,
+    setTechnicianFilter,
+    setPaymentFilter,
+    loadMore,
+  } = useServiceFilters({
+    workOrders: displayWorkOrders,
+    stats: { pending: 0, inProgress: 0, done: 0, delivered: 0, filteredRevenue: 0, filteredProfit: 0 },
+    dateFilteredOrders: [],
+  });
+
   const [showProfit, setShowProfit] = useState(false); // Toggle profit visibility
   const [rowActionMenuId, setRowActionMenuId] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{
@@ -332,9 +309,6 @@ export default function ServiceManager() {
     top: 0,
     right: 0,
   });
-
-  // PAGE_SIZE imported from constants
-  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
 
   // Sync dateFilter with dateRangeDays for API query
   useEffect(() => {
@@ -356,17 +330,13 @@ export default function ServiceManager() {
   }, [dateFilter, debouncedSearchQuery]);
 
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [searchQuery, activeTab, dateFilter, technicianFilter, paymentFilter]);
-
-  useEffect(() => {
     if (profile?.role !== USER_ROLES.STAFF) return;
     if (!defaultStaffTechnicianName) return;
 
-    setTechnicianFilter((prev) =>
-      prev === "all" ? defaultStaffTechnicianName : prev
-    );
-  }, [defaultStaffTechnicianName, profile?.role]);
+    if (technicianFilter === "all") {
+      setTechnicianFilter(defaultStaffTechnicianName);
+    }
+  }, [defaultStaffTechnicianName, profile?.role, technicianFilter, setTechnicianFilter]);
 
   useEffect(() => {
     // Increase limit when searching to find older records
@@ -534,110 +504,6 @@ export default function ServiceManager() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [rowActionMenuId]);
 
-  const filteredOrders = useMemo(() => {
-    let filtered = displayWorkOrders.filter(
-      (o) => !o.refunded && o.status !== "Đã hủy"
-    );
-    const normalizedQuery = debouncedSearchQuery.toLowerCase().trim();
-    const normalizedPhoneQuery = normalizedQuery.replace(/\D/g, "");
-
-    // Apply status filter based on active tab ONLY if not searching
-    // If searching, we want to look through ALL history (Global Search)
-    if (!debouncedSearchQuery) {
-      if (activeTab === "delivered") {
-        filtered = filtered.filter((o) => o.status === "Trả máy");
-      } else {
-        filtered = filtered.filter((o) => o.status !== "Trả máy");
-
-        if (activeTab === "pending")
-          filtered = filtered.filter((o) => o.status === "Tiếp nhận");
-        else if (activeTab === "inProgress")
-          filtered = filtered.filter((o) => o.status === "Đang sửa");
-        else if (activeTab === "done")
-          filtered = filtered.filter((o) => o.status === "Đã sửa xong");
-      }
-    }
-
-    // Search filter (using debounced value)
-    if (debouncedSearchQuery) {
-      filtered = filtered.filter(
-        (o) =>
-          o.customerName.toLowerCase().includes(normalizedQuery) ||
-          o.vehicleModel?.toLowerCase().includes(normalizedQuery) ||
-          o.licensePlate?.toLowerCase().includes(normalizedQuery) ||
-          o.id?.toLowerCase().includes(normalizedQuery) ||
-          (!!normalizedPhoneQuery &&
-            (o.customerPhone || "").replace(/\D/g, "").includes(normalizedPhoneQuery))
-      );
-    }
-
-    // Date filter
-    // 🔹 QUAN TRỌNG: Chỉ áp dụng date filter cho phiếu "Trả máy" (đã hoàn thành)
-    // Phiếu đang sửa chữa (Tiếp nhận, Đang sửa, Đã sửa xong) LUÔN hiển thị bất kể ngày tạo
-    if (dateFilter !== "all" && !debouncedSearchQuery) {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      filtered = filtered.filter((o) => {
-        // Phiếu chưa hoàn thành → luôn hiển thị
-        if (o.status !== "Trả máy") {
-          return true;
-        }
-
-        // Phiếu đã trả máy → áp dụng date filter
-        const orderDate = new Date(o.creationDate || (o as any).creationdate);
-
-        if (dateFilter === "today") {
-          return orderDate >= today;
-        } else if (dateFilter === "week") {
-          const weekAgo = new Date(today);
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          return orderDate >= weekAgo;
-        } else if (dateFilter === "month") {
-          const monthAgo = new Date(today);
-          monthAgo.setMonth(monthAgo.getMonth() - 1);
-          return orderDate >= monthAgo;
-        }
-        return true;
-      });
-    }
-
-    // Technician filter
-    if (technicianFilter !== "all") {
-      filtered = filtered.filter((o) => o.technicianName === technicianFilter);
-    }
-
-    // Payment filter
-    if (paymentFilter !== "all") {
-      filtered = filtered.filter((o) => {
-        const status = o.paymentStatus || (o as any).paymentstatus;
-        if (paymentFilter === "paid") return status === "paid";
-        if (paymentFilter === "unpaid") return status === "unpaid";
-        if (paymentFilter === "partial") return status === "partial";
-        return true;
-      });
-    }
-
-    return filtered.sort((a, b) => {
-      const dateA = a.creationDate || (a as any).creationdate;
-      const dateB = b.creationDate || (b as any).creationdate;
-      if (!dateA || !dateB) return 0;
-      return new Date(dateB).getTime() - new Date(dateA).getTime();
-    });
-  }, [
-    displayWorkOrders,
-    activeTab,
-    debouncedSearchQuery, // Use debounced value to reduce re-renders
-    dateFilter,
-    technicianFilter,
-    paymentFilter,
-  ]);
-
-  const paginatedOrders = useMemo(
-    () => filteredOrders.slice(0, visibleCount),
-    [filteredOrders, visibleCount]
-  );
-  const hasMoreOrders = filteredOrders.length > visibleCount;
   const showTableSkeleton =
     (workOrdersLoading || workOrdersFetching) &&
     (displayWorkOrders?.length ?? 0) === 0;
@@ -645,13 +511,13 @@ export default function ServiceManager() {
     workOrdersIsError && (displayWorkOrders?.length ?? 0) === 0;
 
   const handleLoadMore = useCallback(() => {
-    setVisibleCount((c) => c + PAGE_SIZE);
+    loadMore();
     const loadedCount =
       fetchedWorkOrders?.length ?? displayWorkOrders?.length ?? 0;
     if (!workOrdersFetching && loadedCount >= fetchLimit) {
       setFetchLimit((l) => l + 100);
     }
-  }, [displayWorkOrders?.length, fetchLimit, fetchedWorkOrders?.length, workOrdersFetching]);
+  }, [loadMore, displayWorkOrders?.length, fetchLimit, fetchedWorkOrders?.length, workOrdersFetching]);
 
   // Scroll-to-load: auto load more when sentinel becomes visible
   useEffect(() => {
@@ -752,722 +618,10 @@ export default function ServiceManager() {
   // 🔹 Handle delete work order
   const { mutateAsync: deleteWorkOrderAsync } = useDeleteWorkOrderRepo();
 
-  // 🔹 Handle create/update customer debts
-  const createCustomerDebt = useCreateCustomerDebtRepo();
-  const _updateCustomerDebt = useUpdateCustomerDebtRepo();
-
-  // 🔔 Helper: Create notification when work order is created
-  const createWorkOrderNotification = async (
-    orderId: string,
-    customerName: string,
-    vehicleModel: string,
-    licensePlate: string,
-    total: number,
-    createdByName: string
-  ) => {
-    try {
-      const res = await createNotification({
-        type: "work_order",
-        title: "Phiếu sửa chữa mới",
-        message: `${createdByName} tạo phiếu ${orderId} - ${customerName} (${licensePlate || vehicleModel
-          }) - ${formatCurrency(total)}`,
-        data: {
-          workOrderId: orderId,
-          customerName,
-          vehicleModel,
-          licensePlate,
-          total,
-          createdBy: createdByName,
-        },
-        createdBy: profile?.id || null,
-        recipientRole: "owner", // Gửi đến owner
-        branchId: currentBranchId,
-      });
-
-      if (!res.ok) {
-        console.error("❌ Error creating notification:", res.error.cause);
-      }
-    } catch (err) {
-      console.error("❌ Error in createWorkOrderNotification:", err);
-    }
-  };
-
-  // Helper: Update vehicle currentKm and maintenance records
-  const updateVehicleKmAndMaintenance = async (
-    customer: Customer,
-    vehicleId: string,
-    currentKm: number,
-    partsUsed: Array<{ partName: string }>,
-    additionalServices: Array<{ description: string }>,
-    issueDescription?: string
-  ) => {
-    try {
-      // Find the vehicle in customer's vehicles array
-      const vehicle = customer.vehicles?.find((v) => v.id === vehicleId);
-      if (!vehicle) {
-        console.warn(
-          "[updateVehicleKmAndMaintenance] Vehicle not found:",
-          vehicleId
-        );
-        return;
-      }
-
-      // Detect maintenance types from the work order
-      const maintenanceTypes = detectMaintenancesFromWorkOrder(
-        partsUsed,
-        additionalServices,
-        issueDescription
-      );
-
-      // Update vehicle with new km and maintenance records
-      const updatedVehicle = updateVehicleMaintenances(
-        { ...vehicle, currentKm },
-        maintenanceTypes,
-        currentKm
-      );
-
-      // Update the vehicles array
-      const updatedVehicles = customer.vehicles?.map((v) =>
-        v.id === vehicleId ? updatedVehicle : v
-      ) || [updatedVehicle];
-
-      // Save to database via upsertCustomer
-      await upsertCustomer({
-        ...customer,
-        vehicles: updatedVehicles,
-      });
-
-    } catch (err) {
-      console.error("[updateVehicleKmAndMaintenance] Error:", err);
-      // Don't throw - this is a non-critical update
-    }
-  };
-
-  // Helper: Auto-create customer debt if there's remaining amount (defined early for handleMobileSave)
-  const createCustomerDebtIfNeeded = async (
-    workOrder: WorkOrder,
-    remainingAmount: number,
-    totalAmount: number,
-    paidAmount: number
-  ) => {
-    if (remainingAmount <= 0) return;
-
-
-
-    try {
-      const safeCustomerId =
-        workOrder.customerPhone || workOrder.id || `CUST-ANON-${Date.now()}`;
-      const safeCustomerName =
-        workOrder.customerName?.trim() ||
-        workOrder.customerPhone ||
-        "Khách vãng lai";
-
-      // Tạo nội dung chi tiết từ phiếu sửa chữa
-      const workOrderNumber = formatWorkOrderId(
-        workOrder.id,
-        storeSettings?.work_order_prefix
-      );
-
-      let description = `${workOrder.vehicleModel || "Thiết bị"
-        } (Phiếu sửa chữa #${workOrderNumber})`;
-
-      // Mô tả vấn đề
-      if (workOrder.issueDescription) {
-        description += `\nVấn đề: ${workOrder.issueDescription}`;
-      }
-
-      // Danh sách phụ tùng đã sử dụng
-      if (workOrder.partsUsed && workOrder.partsUsed.length > 0) {
-        description += "\n\nPhụ tùng đã thay:";
-        workOrder.partsUsed.forEach((part) => {
-          description += `\n  • ${part.quantity} x ${part.partName
-            } - ${formatCurrency(part.price * part.quantity)}`;
-        });
-      }
-
-      // Danh sách dịch vụ bổ sung (gia công, đặt hàng)
-      if (
-        workOrder.additionalServices &&
-        workOrder.additionalServices.length > 0
-      ) {
-        description += "\n\nDịch vụ:";
-        workOrder.additionalServices.forEach((service) => {
-          description += `\n  • ${service.quantity} x ${service.description
-            } - ${formatCurrency(service.price * service.quantity)}`;
-        });
-      }
-
-      // Công lao động
-      if (workOrder.laborCost && workOrder.laborCost > 0) {
-        description += `\n\nCông lao động: ${formatCurrency(
-          workOrder.laborCost
-        )}`;
-      }
-
-      // Giảm giá (nếu có)
-      if (workOrder.discount && workOrder.discount > 0) {
-        description += `\nGiảm giá: -${formatCurrency(workOrder.discount)}`;
-      }
-
-      // Thông tin nhân viên tạo phiếu
-      const createdByDisplay = profile?.name || profile?.full_name || "N/A";
-      description += `\n\nNV: ${createdByDisplay}`;
-
-      // Thông tin nhân viên kỹ thuật
-      if (workOrder.technicianName) {
-        description += `\nNVKỹ thuật: ${workOrder.technicianName}`;
-      }
-
-      const payload = {
-        customerId: safeCustomerId,
-        customerName: safeCustomerName,
-        phone: workOrder.customerPhone || null,
-        licensePlate: workOrder.licensePlate || null,
-        description: description,
-        totalAmount: totalAmount,
-        paidAmount: paidAmount,
-        remainingAmount: remainingAmount,
-        createdDate: new Date().toISOString().split("T")[0],
-        branchId: currentBranchId,
-        workOrderId: workOrder.id, // 🔹 Link debt với work order
-      };
-
-      const result = await createCustomerDebt.mutateAsync(payload as any);
-      showToast.success(
-        `Đã tạo/cập nhật công nợ ${remainingAmount.toLocaleString()}đ (Mã: ${result?.id || "N/A"
-        })`
-      );
-    } catch (error) {
-      console.error("Error creating/updating customer debt:", error);
-      showToast.error("Không thể tạo/cập nhật công nợ tự động");
-    }
-  };
-
-  // 🔹 Handle create/update work orders (for mobile)
-  const { mutateAsync: createWorkOrderAtomicAsync } =
-    useCreateWorkOrderAtomicRepo();
-  const { mutateAsync: updateWorkOrderAtomicAsync } =
-    useUpdateWorkOrderAtomicRepo();
-
-  // 🔹 Handle Mobile Save - Similar to desktop handleSave
-  const handleMobileSave = async (workOrderData: any) => {
-    try {
-      if (editingOrder?.id && !canModifyOrder(editingOrder)) {
-        showToast.error("Bạn chỉ có thể sửa phiếu do chính bạn tạo");
-        throw new Error("UNAUTHORIZED_WORK_ORDER_OWNER");
-      }
-
-      // Validate required fields
-      if (!workOrderData.customer?.name) {
-        showToast.error("Vui lòng nhập tên khách hàng");
-        return;
-      }
-      if (!workOrderData.customer?.phone) {
-        showToast.error("Vui lòng nhập số điện thoại");
-        return;
-      }
-
-      // Extract data from workOrderData
-      const {
-        status,
-        customer,
-        vehicle,
-        currentKm = 0,
-        issueDescription,
-        technicianId,
-        parts = [],
-        additionalServices = [],
-        repairServices = [],
-        laborCost = 0,
-        discount = 0,
-        total = 0,
-        depositAmount = 0,
-        paymentMethod,
-        paymentType: _paymentType,
-        totalPaid = 0,
-        remainingAmount = 0,
-      } = workOrderData;
-
-      // 🔹 Ensure vehicle info is saved to customer record
-      // This handles the case when a new vehicle is added during work order creation
-      if (customer && vehicle && vehicle.licensePlate) {
-        const existingCustomer = displayCustomers.find(
-          (c: any) => c.id === customer.id || c.phone === customer.phone
-        );
-
-        if (existingCustomer) {
-          // Check if this vehicle already exists in customer's vehicles
-          const existingVehicles = existingCustomer.vehicles || [];
-          const vehicleExists = existingVehicles.some(
-            (v: any) => v.licensePlate === vehicle.licensePlate
-          );
-
-          if (!vehicleExists) {
-            // Add new vehicle to customer
-            const updatedCustomer = {
-              ...existingCustomer,
-              vehicles: [
-                ...existingVehicles,
-                {
-                  id: vehicle.id || `veh-${Date.now()}`,
-                  licensePlate: vehicle.licensePlate,
-                  model: vehicle.model || "",
-                  currentKm: currentKm > 0 ? currentKm : undefined,
-                },
-              ],
-              // Also update top-level fields for legacy compatibility
-              licensePlate: vehicle.licensePlate,
-              vehicleModel: vehicle.model || existingCustomer.vehicleModel,
-            };
-
-            upsertCustomer(updatedCustomer);
-          } else if (currentKm > 0) {
-            // Vehicle exists, just update currentKm if provided
-            const updatedVehicles = existingVehicles.map((v: any) =>
-              v.licensePlate === vehicle.licensePlate
-                ? { ...v, currentKm: currentKm }
-                : v
-            );
-            const updatedCustomer = {
-              ...existingCustomer,
-              vehicles: updatedVehicles,
-            };
-            upsertCustomer(updatedCustomer);
-          }
-        } else {
-          // Customer is new (created in modal), ensure it has vehicle info
-          const newCustomer = {
-            ...customer,
-            vehicles: customer.vehicles || [
-              {
-                id: vehicle.id || `veh-${Date.now()}`,
-                licensePlate: vehicle.licensePlate,
-                model: vehicle.model || "",
-                currentKm: currentKm > 0 ? currentKm : undefined,
-              },
-            ],
-            licensePlate: vehicle.licensePlate,
-            vehicleModel: vehicle.model,
-          };
-          upsertCustomer(newCustomer);
-        }
-      }
-
-      // Determine payment status
-      let paymentStatus: "unpaid" | "paid" | "partial" = "unpaid";
-      // Fix: Chỉ coi là "paid" khi total > 0 VÀ totalPaid >= total
-      // Nếu total = 0 nhưng có deposit → vẫn là "partial" (đặt cọc trước)
-      if (total > 0 && totalPaid >= total) {
-        paymentStatus = "paid";
-      } else if (totalPaid > 0) {
-        paymentStatus = "partial";
-      }
-
-      // Find technician name
-      const technician = displayEmployees.find(
-        (e: any) => e.id === technicianId
-      );
-      const technicianName = technician?.name || "";
-
-      let finalOrderId = "";
-      let isNew = false;
-      let finalOrderData: WorkOrder | null = null;
-
-      // 1. SAVE WORK ORDER (Blocking operation - must succeed first)
-      if (!editingOrder?.id) {
-        // --- NEW ORDER ---
-        isNew = true;
-        const orderId = `${storeSettings?.work_order_prefix || "SC"
-          }-${Date.now()}`;
-        finalOrderId = orderId;
-
-        const responseData = await createWorkOrderAtomicAsync({
-          id: orderId,
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          vehicleModel: vehicle?.model || "",
-          licensePlate: vehicle?.licensePlate || "",
-          vehicleId: vehicle?.id || "",
-          currentKm: currentKm > 0 ? currentKm : undefined,
-          issueDescription: issueDescription || "",
-          technicianName: technicianName,
-          status: status,
-          laborCost: laborCost,
-          discount: discount,
-          partsUsed: parts,
-          additionalServices:
-            additionalServices.length > 0 ? additionalServices : undefined,
-          total: total,
-          branchId: currentBranchId,
-          paymentStatus: paymentStatus,
-          paymentMethod: paymentMethod,
-          depositAmount: depositAmount > 0 ? depositAmount : undefined,
-          additionalPayment:
-            totalPaid > depositAmount ? totalPaid - depositAmount : undefined,
-          totalPaid: totalPaid > 0 ? totalPaid : undefined,
-          remainingAmount: remainingAmount,
-          creationDate: new Date().toISOString(),
-          created_by: profile?.id || undefined,
-        } as any);
-
-        // 🔹 FIX Mobile: Fallback inventory deduction if atomic didn't do it
-        if (
-          (paymentStatus === "paid" || status === "Trả máy") &&
-          parts.length > 0 &&
-          !responseData?.inventoryDeducted
-        ) {
-          try {
-            const deductResult = await completeWorkOrderPayment(
-              orderId,
-              paymentMethod || "cash",
-              0 // Zero amount as it's already considered paid
-            );
-            if (deductResult.ok && deductResult.data.usedFallback) {
-              showToast.warning(
-                "Đã lưu phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
-              );
-            }
-          } catch (err) {
-            console.error("[handleMobileSave] Error in fallback deduction:", err);
-          }
-        }
-
-        finalOrderData = {
-          id: orderId,
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          vehicleModel: vehicle?.model || "",
-          licensePlate: vehicle?.licensePlate || "",
-          vehicleId: vehicle?.id || "",
-          currentKm: currentKm > 0 ? currentKm : undefined,
-          issueDescription: issueDescription || "",
-          technicianName: technicianName,
-          status: status,
-          laborCost: laborCost,
-          laborTotal: laborCost,
-          discount: discount,
-          partsUsed: parts,
-          repairServices:
-            repairServices.length > 0 ? repairServices : undefined,
-          additionalServices:
-            additionalServices.length > 0 ? additionalServices : undefined,
-          total: total,
-          branchId: currentBranchId,
-          depositAmount: depositAmount > 0 ? depositAmount : undefined,
-          paymentStatus: paymentStatus,
-          paymentMethod: paymentMethod,
-          totalPaid: totalPaid > 0 ? totalPaid : undefined,
-          remainingAmount: remainingAmount,
-          creationDate: new Date().toISOString(),
-        };
-
-        showToast.success("Tạo phiếu sửa chữa thành công!");
-      } else {
-        // --- UPDATE ORDER ---
-        finalOrderId = editingOrder.id;
-
-        await updateWorkOrderAtomicAsync({
-          id: editingOrder.id,
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          vehicleModel: vehicle?.model || "",
-          licensePlate: vehicle?.licensePlate || "",
-          vehicleId: vehicle?.id || "",
-          currentKm: currentKm > 0 ? currentKm : undefined,
-          issueDescription: issueDescription || "",
-          technicianName: technicianName,
-          status: status,
-          laborCost: laborCost,
-          discount: discount,
-          partsUsed: parts,
-          additionalServices:
-            additionalServices.length > 0 ? additionalServices : undefined,
-          total: total,
-          branchId: currentBranchId,
-          paymentStatus: paymentStatus,
-          paymentMethod: paymentMethod,
-          depositAmount: depositAmount > 0 ? depositAmount : undefined,
-          additionalPayment:
-            totalPaid > depositAmount ? totalPaid - depositAmount : undefined,
-          totalPaid: totalPaid > 0 ? totalPaid : undefined,
-          remainingAmount: remainingAmount,
-        } as any);
-
-        // 🔹 FIX Mobile: Nếu cập nhật phiếu thành paymentStatus = 'paid' hoặc status = 'Trả máy', gọi complete_payment để trừ kho
-        const wasUnpaidOrPartial = editingOrder.paymentStatus !== "paid";
-        const wasNotInventoryDeducted = !editingOrder.inventoryDeducted;
-        if (
-          (paymentStatus === "paid" || status === "Trả máy") &&
-          (wasUnpaidOrPartial || wasNotInventoryDeducted) &&
-          parts.length > 0
-        ) {
-          try {
-            const deductResult = await completeWorkOrderPayment(
-              editingOrder.id,
-              paymentMethod || "cash",
-              0 // Số tiền = 0 vì đã thanh toán hết rồi, chỉ cần trừ kho
-            );
-            if (deductResult.ok && deductResult.data.usedFallback) {
-              showToast.warning(
-                "Đã cập nhật phiếu nhưng KHO CHƯA ĐƯỢC TRỪ tự động (thiếu RPC trên database). Vui lòng liên hệ quản trị để chạy migration."
-              );
-            }
-          } catch (err: any) {
-            console.error("[handleMobileSave] Error deducting inventory:", err);
-            showToast.warning(
-              "Đã cập nhật phiếu nhưng có lỗi khi trừ kho: " +
-              (err.message || "Lỗi không xác định")
-            );
-          }
-        }
-
-        finalOrderData = {
-          ...editingOrder,
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          vehicleModel: vehicle?.model || "",
-          licensePlate: vehicle?.licensePlate || "",
-          vehicleId: vehicle?.id || "",
-          currentKm: currentKm > 0 ? currentKm : undefined,
-          issueDescription: issueDescription || "",
-          technicianName: technicianName,
-          status: status,
-          laborCost: laborCost,
-          laborTotal: laborCost,
-          discount: discount,
-          partsUsed: parts,
-          repairServices:
-            repairServices.length > 0 ? repairServices : undefined,
-          additionalServices:
-            additionalServices.length > 0 ? additionalServices : undefined,
-          total: total,
-          paymentStatus: paymentStatus,
-          paymentMethod: paymentMethod,
-          totalPaid: totalPaid > 0 ? totalPaid : undefined,
-          remainingAmount: remainingAmount,
-        };
-
-        showToast.success("Cập nhật phiếu sửa chữa thành công!");
-      }
-
-      // 🔹 Ghi sổ quỹ: thu đặt cọc + thu tiền sửa chữa.
-      // Luồng mobile trước đây bỏ sót bước này → doanh thu sửa chữa không vào sổ quỹ/báo cáo.
-      // Helper idempotent (chỉ ghi phần chênh lệch) nên an toàn khi lưu/sửa phiếu nhiều lần.
-      if (finalOrderId && (depositAmount > 0 || totalPaid > 0)) {
-        try {
-          const servicePayment = Math.max(0, totalPaid - depositAmount);
-          const createdTx = await recordWorkOrderPaymentTransactions({
-            orderId: finalOrderId,
-            customerName: customer.name,
-            branchId: currentBranchId,
-            paymentMethod: paymentMethod || "cash",
-            depositAmount,
-            servicePayment,
-            workOrderPrefix: storeSettings?.work_order_prefix,
-          });
-
-          if (createdTx.length > 0) {
-            setCashTransactions((prev: any[]) => [...prev, ...createdTx]);
-            const addedAmount = createdTx.reduce((sum, tx) => sum + tx.amount, 0);
-            const sourceId = paymentMethod || "cash";
-            setPaymentSources((prev: any[]) =>
-              prev.map((ps: any) =>
-                ps.id === sourceId
-                  ? {
-                      ...ps,
-                      balance: {
-                        ...ps.balance,
-                        [currentBranchId]:
-                          (ps.balance?.[currentBranchId] || 0) + addedAmount,
-                      },
-                    }
-                  : ps
-              )
-            );
-            queryClient.invalidateQueries({ queryKey: ["cashTransactions"] });
-          }
-        } catch (err) {
-          console.error("[handleMobileSave] Ghi sổ quỹ thất bại:", err);
-          showToast.warning(
-            "Đã lưu phiếu nhưng ghi sổ quỹ chưa thành công. Vui lòng kiểm tra lại sổ quỹ."
-          );
-        }
-      }
-
-      // 2. PARALLEL BACKGROUND TASKS (Fire and forget from user perspective)
-      // We don't await this block to block the close modal action, 
-      // but we wrap in try-catch to ensure no unhandled promise rejections if we wanted to
-      // or just trust the individual error handling.
-      if (finalOrderData) {
-        if (repairServices.length > 0) {
-          const laborSyncResult = await syncRepairOrderServices(
-            finalOrderId,
-            repairServices
-          );
-
-          if (laborSyncResult.ok) {
-            finalOrderData.repairServices = laborSyncResult.data;
-            finalOrderData.laborTotal = laborSyncResult.data.reduce(
-              (sum, service) => sum + Number(service.laborAmount || 0),
-              0
-            );
-            finalOrderData.workerTotal = laborSyncResult.data.reduce(
-              (sum, service) =>
-                sum +
-                (service.workers && service.workers.length > 0
-                  ? service.workers.reduce(
-                    (workerSum, worker) => workerSum + Number(worker.workerAmount || 0),
-                    0
-                  )
-                  : Number(service.workerAmount || 0)),
-              0
-            );
-            finalOrderData.laborCost =
-              finalOrderData.laborTotal || finalOrderData.laborCost;
-          } else {
-            showToast.warning(
-              "Đã lưu phiếu nhưng chưa đồng bộ được công sửa: " +
-              (laborSyncResult as { error: any }).error.message
-            );
-          }
-        }
-
-        const orderForAsync = finalOrderData; // Capture for closure
-
-        // Execute auxiliary tasks in parallel
-        Promise.all([
-          // Task A: Update Vehicle KM & Maintenance
-          (async () => {
-            if (currentKm > 0 && customer?.id && vehicle?.id) {
-              await updateVehicleKmAndMaintenance(
-                customer,
-                vehicle.id,
-                currentKm,
-                parts,
-                additionalServices,
-                issueDescription
-              );
-            }
-          })(),
-
-          // Task B: Create Debt if needed
-          (async () => {
-            if (status === "Trả máy" && remainingAmount > 0) {
-              await createCustomerDebtIfNeeded(
-                orderForAsync,
-                remainingAmount,
-                total,
-                totalPaid
-              );
-            }
-          })(),
-
-          // Task C: Create Notification (only for new orders)
-          (async () => {
-            if (isNew) {
-              const createdByName =
-                profile?.name || profile?.full_name || profile?.email || "Nhân viên";
-              await createWorkOrderNotification(
-                finalOrderId,
-                customer.name,
-                vehicle?.model || "",
-                vehicle?.licensePlate || "",
-                total,
-                createdByName
-              );
-            }
-          })(),
-
-          // Task D: Update Customer Stats (Total Spent)
-          (async () => {
-            if (customer.phone) {
-              try {
-                // Short delay to ensure RPC triggered DB updates/triggers have settled if any
-                await new Promise((resolve) => setTimeout(resolve, 500));
-
-                const { data: camelCustomer, error: camelError } = await supabase
-                  .from("customers")
-                  .select("id, totalSpent, visitCount")
-                  .eq("phone", customer.phone)
-                  .maybeSingle();
-
-                const { data: lowerCustomer } = camelError
-                  ? await supabase
-                      .from("customers")
-                      .select("id, totalspent, visitcount")
-                      .eq("phone", customer.phone)
-                      .maybeSingle()
-                  : { data: null as any };
-
-                const currentCustomer = camelCustomer || lowerCustomer;
-
-                if (currentCustomer) {
-                  const currentTotal =
-                    currentCustomer?.totalSpent ?? currentCustomer?.totalspent ?? 0;
-                  const currentVisits =
-                    currentCustomer?.visitCount ?? currentCustomer?.visitcount ?? 0;
-
-                  let newTotalSpent = currentTotal;
-                  let newVisits = currentVisits;
-
-                  if (isNew) {
-                    // New order: add total and increment visit
-                    newTotalSpent = total > 0 ? currentTotal + total : currentTotal;
-                    newVisits = currentVisits + 1;
-                  } else if (editingOrder && editingOrder.total !== total) {
-                    // Update order: adjust total
-                    const oldTotal = editingOrder.total || 0;
-                    newTotalSpent = Math.max(0, currentTotal - oldTotal + total);
-                    // visit count doesn't change on update usually, or we assume correct
-                  }
-
-                  if (newTotalSpent !== currentTotal || newVisits !== currentVisits) {
-                    const { error: updateCamelError } = await supabase
-                      .from("customers")
-                      .update({
-                        totalSpent: newTotalSpent,
-                        visitCount: newVisits,
-                        lastVisit: new Date().toISOString(),
-                      })
-                      .eq("id", currentCustomer.id);
-
-                    if (updateCamelError) {
-                      await supabase
-                        .from("customers")
-                        .update({
-                          totalspent: newTotalSpent,
-                          visitcount: newVisits,
-                          lastvisit: new Date().toISOString(),
-                        })
-                        .eq("id", currentCustomer.id);
-                    }
-
-                  }
-                }
-              } catch (err) {
-                console.error("[WorkOrder] Error updating customer stats:", err);
-              }
-            }
-          })()
-        ]).catch(err => {
-          console.error("❌ Error in background parallel tasks:", err);
-        });
-      }
-
-      // 🔄 Force refresh data immediately after save
-      queryClient.invalidateQueries({ queryKey: ["workOrdersRepo"] });
-      queryClient.invalidateQueries({ queryKey: ["workOrdersFiltered"] });
-
-      setShowMobileModal(false);
-      setEditingOrder(undefined);
-    } catch (error: any) {
-      console.error("[handleMobileSave] Error:", error);
-      showToast.error(
-        `Lỗi: ${error.message || "Không thể lưu phiếu sửa chữa"}`
-      );
-      throw error; // Re-throw so WorkOrderMobileModal can handle state
-    }
-  };
+  // Phase 7: handleMobileSave (517 dòng) đã bị xoá — mobile lưu trực tiếp qua
+  // useWorkOrderMobileFormState → useWorkOrderMobileSubmit → useWorkOrderSave.
+  // Các helper (notification, vehicle km/maintenance, customer stats, ghi sổ quỹ)
+  // chuyển sang hooks/useWorkOrderMobileSubmit.ts.
 
   const handleRefundOrder = (order: WorkOrder) => {
     if (!canRefundWorkOrder) {
@@ -1571,7 +725,7 @@ export default function ServiceManager() {
     }
   };
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchQuery("");
     setActiveTab("all");
     setTechnicianFilter(
@@ -1581,7 +735,7 @@ export default function ServiceManager() {
     );
     setPaymentFilter("all");
     setDateFilter("week");
-  };
+  }, [profile?.role, defaultStaffTechnicianName, setSearchQuery, setActiveTab, setTechnicianFilter, setPaymentFilter, setDateFilter]);
 
   // Handle delete work order - using hook for proper query invalidation
   const handleDelete = async (workOrder: WorkOrder) => {
@@ -1604,30 +758,10 @@ export default function ServiceManager() {
 
   // Handle apply template
   const handleApplyRepairTemplate = (template: RepairTemplate) => {
-    const newOrder: WorkOrder = {
-      id: "", // Empty ID to trigger creation mode
-      customerName: "",
-      customerPhone: "",
-      vehicleModel: "",
-      issueDescription: template.description || template.name,
-      status: "Tiếp nhận",
-      creationDate: new Date().toISOString(),
-      estimatedCompletion: new Date(
-        Date.now() + (template.duration || 30) * 60000
-      ).toISOString(),
-      technicianName: "",
-      laborCost: template.labor_cost || 0,
-      partsUsed: (template.parts || []).map((p: any) => ({
-        partId: p.partId || "",
-        partName: p.name,
-        quantity: p.quantity,
-        price: p.price,
-        sku: p.sku || "",
-      })),
-      notes: "",
-      total: 0,
+    const newOrder = templateToWorkOrderDraft(template, {
       branchId: currentBranchId,
-    };
+      generateId: false,
+    });
     setEditingOrder(newOrder);
 
     if (isMobile) {
@@ -1689,7 +823,7 @@ export default function ServiceManager() {
           onApplyTemplate={handleApplyRepairTemplate}
           currentBranchId={currentBranchId}
           dateFilter={dateFilter}
-          setDateFilter={setDateFilter}
+          setDateFilter={(v) => setDateFilter(v as any)}
           setDateRangeDays={setDateRangeDays}
         />
 
@@ -1701,13 +835,14 @@ export default function ServiceManager() {
             setEditingOrder(undefined);
             setMobileModalViewMode(false);
           }}
-          onSave={handleMobileSave}
           workOrder={editingOrder}
           customers={displayCustomers}
           parts={parts}
           employees={displayEmployees || []}
           currentBranchId={currentBranchId}
           upsertCustomer={upsertCustomer}
+          storeSettings={storeSettings}
+          canModifyWorkOrder={canModifyOrder}
           viewMode={mobileModalViewMode}
           onSwitchToEdit={
             editingOrder && canModifyOrder(editingOrder)
@@ -1748,30 +883,11 @@ export default function ServiceManager() {
           onClose={() => setShowTemplateModal(false)}
           onApplyTemplate={(template) => {
             // Convert and apply template to current work order for mobile
-            const newOrder: WorkOrder = {
-                id: generateWorkOrderId(storeSettings?.work_order_prefix),
-              customerName: "",
-              customerPhone: "",
-              vehicleModel: "",
-              issueDescription: template.description,
-              status: "Tiếp nhận",
-              creationDate: new Date().toISOString(),
-              estimatedCompletion: new Date(
-                Date.now() + template.duration * 60000
-              ).toISOString(),
-              technicianName: "",
-              laborCost: template.laborCost,
-              partsUsed: template.parts.map((p) => ({
-                partId: "",
-                partName: p.name,
-                quantity: p.quantity,
-                price: p.price,
-                sku: p.sku || "",
-              })),
-              notes: "",
-              total: 0,
+            const newOrder = templateToWorkOrderDraft(template, {
               branchId: currentBranchId,
-            };
+              generateId: true,
+              prefix: storeSettings?.work_order_prefix,
+            });
             setEditingOrder(newOrder);
             setShowTemplateModal(false);
             setShowModal(true); // Use Desktop modal
@@ -1835,11 +951,11 @@ export default function ServiceManager() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         dateFilter={dateFilter}
-        onDateFilterChange={setDateFilter}
+        onDateFilterChange={(v) => setDateFilter(v as any)}
         technicianFilter={technicianFilter}
         onTechnicianFilterChange={setTechnicianFilter}
         paymentFilter={paymentFilter}
-        onPaymentFilterChange={setPaymentFilter}
+        onPaymentFilterChange={(v) => setPaymentFilter(v as any)}
         employees={employees}
         workOrdersFetching={workOrdersFetching}
         onRefresh={() => refetchWorkOrders()}
@@ -1892,30 +1008,11 @@ export default function ServiceManager() {
         onClose={() => setShowTemplateModal(false)}
         onApplyTemplate={(template) => {
           // Convert and apply template to current work order
-          const newOrder: WorkOrder = {
-            id: generateWorkOrderId(storeSettings?.work_order_prefix),
-            customerName: "",
-            customerPhone: "",
-            vehicleModel: "",
-            issueDescription: template.description,
-            status: "Tiếp nhận",
-            creationDate: new Date().toISOString(),
-            estimatedCompletion: new Date(
-              Date.now() + template.duration * 60000
-            ).toISOString(),
-            technicianName: "",
-            laborCost: template.laborCost,
-            partsUsed: template.parts.map((p) => ({
-              partId: p.partId || "",
-              partName: p.name,
-              quantity: p.quantity,
-              price: p.price,
-              sku: p.sku || "",
-            })),
-            notes: "",
-            total: 0,
+          const newOrder = templateToWorkOrderDraft(template, {
             branchId: currentBranchId,
-          };
+            generateId: true,
+            prefix: storeSettings?.work_order_prefix,
+          });
           setEditingOrder(newOrder);
           setShowTemplateModal(false);
           setShowModal(true);

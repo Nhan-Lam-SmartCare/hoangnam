@@ -3,7 +3,33 @@
  * Extracted from ServiceManager.tsx for reusability
  */
 
-import type { WorkOrder, WorkOrderPart } from "../../../types";
+import type { WorkOrder, WorkOrderPart, ServiceConfig } from "../../../types";
+
+// ============================================
+// Repair Service Draft Types
+// ============================================
+export interface RepairServiceDraftWorker {
+  worker_id: string;
+  worker_name?: string;
+  share_percent: number;
+}
+
+export interface RepairServiceDraft {
+  id: string;
+  serviceId?: string;
+  serviceName: string;
+  laborCalcType: ServiceConfig["laborCalcType"];
+  laborFixedAmount: number;
+  laborPercentOfCost: number;
+  minimumLaborAmount: number;
+  defaultWorkerSharePercent: number;
+  manualLabor: number;
+  relatedItemIds: string[];
+  workers: RepairServiceDraftWorker[];
+  isBillable: boolean;
+  isPayableToWorker: boolean;
+  note: string;
+}
 
 // ============================================
 // Store Settings

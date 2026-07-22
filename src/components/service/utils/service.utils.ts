@@ -3,7 +3,7 @@
  * Extracted from ServiceManager.tsx for reusability
  */
 
-import { supabase } from "../../../supabaseClient";
+import { fetchStoreSettingsForBranch as fetchStoreSettingsForBranchRepo } from "../../../lib/repository/storeSettingsRepository";
 import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import type { WorkOrder } from "../../../types";
@@ -35,90 +35,15 @@ export interface PrintableStoreSettings {
     work_order_prefix?: string;
 }
 
-const normalizeStoreSettings = (data: Record<string, any> | null): PrintableStoreSettings | null => {
-    if (!data) return null;
-
-    const normalized: Record<string, any> = { ...data };
-
-    if (!normalized.store_name && normalized.storeName) normalized.store_name = normalized.storeName;
-    if (!normalized.address && normalized.storeAddress) normalized.address = normalized.storeAddress;
-    if (!normalized.phone && normalized.storePhone) normalized.phone = normalized.storePhone;
-    if (!normalized.email && normalized.storeEmail) normalized.email = normalized.storeEmail;
-    if (!normalized.bank_name && normalized.bankName) normalized.bank_name = normalized.bankName;
-    if (!normalized.bank_account_number && normalized.bankAccount) normalized.bank_account_number = normalized.bankAccount;
-    if (!normalized.bank_account_holder && normalized.bankAccountName) normalized.bank_account_holder = normalized.bankAccountName;
-    if (!normalized.bank_qr_url && normalized.bankQrUrl) normalized.bank_qr_url = normalized.bankQrUrl;
-    if (!normalized.work_order_prefix && normalized.workOrderPrefix) normalized.work_order_prefix = normalized.workOrderPrefix;
-
-    return normalized as PrintableStoreSettings;
-};
-
 export const fetchStoreSettingsForBranch = async (
     branchId?: string
 ): Promise<PrintableStoreSettings | null> => {
-    const normalizedBranchId = String(branchId || "").trim();
-
-    const attempts: Array<() => Promise<Record<string, any> | null>> = [
-        async () => {
-            if (!normalizedBranchId) return null;
-            const { data, error } = await supabase
-                .from("store_settings")
-                .select("*")
-                .eq("branchId", normalizedBranchId)
-                .order("updated_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            if (error) throw error;
-            return data;
-        },
-        async () => {
-            if (!normalizedBranchId) return null;
-            const { data, error } = await supabase
-                .from("store_settings")
-                .select("*")
-                .eq("branch_id", normalizedBranchId)
-                .order("updated_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            if (error) throw error;
-            return data;
-        },
-        async () => {
-            const { data, error } = await supabase
-                .from("store_settings")
-                .select("*")
-                .eq("id", "default")
-                .maybeSingle();
-
-            if (error) throw error;
-            return data;
-        },
-        async () => {
-            const { data, error } = await supabase
-                .from("store_settings")
-                .select("*")
-                .order("updated_at", { ascending: false })
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            if (error) throw error;
-            return data;
-        },
-    ];
-
-    for (const attempt of attempts) {
-        try {
-            const result = await attempt();
-            if (result) return normalizeStoreSettings(result);
-        } catch (error) {
-            console.warn("[service.utils] Skipping incompatible store_settings query:", error);
-        }
+    const res = await fetchStoreSettingsForBranchRepo(branchId);
+    if (!res.ok) {
+        console.warn("[service.utils] Failed to fetch store settings:", res.error);
+        return null;
     }
-
-    return null;
+    return res.data;
 };
 
 export const sanitizeIssueDescriptionForPrint = (issueDescription?: string): string => {

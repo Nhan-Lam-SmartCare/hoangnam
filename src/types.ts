@@ -141,6 +141,15 @@ export interface Sale {
   tracking_number?: string; // Mã vận đơn (GHN, GHTK, etc.)
 }
 
+export interface AdditionalService {
+  id: string;
+  description: string;
+  quantity: number;
+  price: number;
+  laborPrice?: number;
+  costPrice?: number;
+}
+
 export interface WorkOrderPart {
   partId: string;
   partName: string;
@@ -243,19 +252,14 @@ export interface WorkOrder {
   discount?: number; // Order level discount
   partsUsed?: WorkOrderPart[];
   repairServices?: RepairOrderService[];
-  additionalServices?: Array<{
-    id: string;
-    description: string;
-    quantity: number;
-    price: number;
-    laborPrice?: number; // Tiền công thu thêm của khách (mỗi đơn vị)
-    costPrice?: number; // Giá nhập
-  }>; // Báo giá (Gia công, Đặt hàng)
+  additionalServices?: AdditionalService[]; // Báo giá (Gia công, Đặt hàng)
   notes?: string;
   total: number; // labor + parts - discount
   branchId: string;
+  /** @deprecated Sẽ xoá — dùng createdBy */
   created_by?: string | null;
   createdBy?: string | null;
+  /** @deprecated Sẽ xoá — dùng createdBy */
   createdby?: string | null;
 
   // Deposit (Đặt cọc)
