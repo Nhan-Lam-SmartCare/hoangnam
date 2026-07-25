@@ -9,6 +9,7 @@ export interface StockMobileListProps {
   openMenuIndex: number | null;
   canUpdatePart: boolean;
   canDeletePart: boolean;
+  hideLaborCost?: boolean;
   isDuplicateSku: (sku: string) => boolean;
   onToggleMenu: (index: number) => void;
   onEdit: (part: Part) => void;
@@ -24,6 +25,7 @@ const StockMobileList: React.FC<StockMobileListProps> = ({
   openMenuIndex,
   canUpdatePart,
   canDeletePart,
+  hideLaborCost = false,
   isDuplicateSku,
   onToggleMenu,
   onEdit,
@@ -44,6 +46,7 @@ const StockMobileList: React.FC<StockMobileListProps> = ({
             isMenuOpen={openMenuIndex === index}
             canUpdatePart={canUpdatePart}
             canDeletePart={canDeletePart}
+            hideLaborCost={hideLaborCost}
             onToggleMenu={onToggleMenu}
             onEdit={onEdit}
             onQuickWarranty={onQuickWarranty}

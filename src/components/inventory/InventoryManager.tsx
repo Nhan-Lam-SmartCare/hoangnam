@@ -67,10 +67,14 @@ import { useInventoryImport } from "./hooks/useInventoryImport";
 import { useInventoryFilters } from "./hooks/useInventoryFilters";
 import { useInventoryData } from "./hooks/useInventoryData";
 import { useGoodsReceiptActions } from "./hooks/useGoodsReceiptActions";
+import { useBranchesRepo } from "../../hooks/useBranchesRepository";
+import { isPhoneBranch } from "../../utils/branchUtils";
 
 // Main Inventory Manager Component (New)
 const InventoryManagerNew: React.FC = () => {
   const { currentBranchId } = useAppContext();
+  const { data: branches = [] } = useBranchesRepo();
+  const hideLaborCost = isPhoneBranch(currentBranchId, branches);
   const [searchParams, setSearchParams] = useSearchParams();
   // Supabase repository mutation for inventory transactions
   useCreateInventoryTxRepo();
@@ -627,6 +631,7 @@ const InventoryManagerNew: React.FC = () => {
                 openMenuIndex={mobileMenuOpenIndex}
                 canUpdatePart={canUpdatePart}
                 canDeletePart={canDeletePart}
+                hideLaborCost={hideLaborCost}
                 isDuplicateSku={hasDuplicateSku}
                 onToggleMenu={(index) =>
                   setMobileMenuOpenIndex((prev) =>
@@ -656,13 +661,14 @@ const InventoryManagerNew: React.FC = () => {
                       displayedParts.length > 0 &&
                       displayedParts.every((p) => selectedItems.includes(p.id))
                     }
+                    hideLaborCost={hideLaborCost}
                     onSelectAll={handleSelectAll}
                   />
                   <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
                     {filteredParts.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={canViewImportPrice ? 8 : 7}
+                          colSpan={canViewImportPrice ? (hideLaborCost ? 7 : 8) : (hideLaborCost ? 6 : 7)}
                           className="px-4 py-6 text-center text-slate-400 dark:text-slate-500"
                         >
                           <div className="text-4xl mb-2">🗂️</div>
@@ -687,6 +693,7 @@ const InventoryManagerNew: React.FC = () => {
                           canViewImportPrice={canViewImportPrice}
                           canUpdatePart={canUpdatePart}
                           canDeletePart={canDeletePart}
+                          hideLaborCost={hideLaborCost}
                           onToggleSelect={handleSelectItem}
                           onShowReservedInfo={setReservedInfoPartId}
                           onToggleActions={(id, pos) => {

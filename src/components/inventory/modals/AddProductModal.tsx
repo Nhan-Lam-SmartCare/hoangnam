@@ -8,6 +8,10 @@ import { calcSellingFromRule, getCategoryPricingRule } from '../../../utils/cate
 import BarcodeScannerModal from '../../common/BarcodeScannerModal';
 import UiModal from '../../ui/Modal';
 
+import { useAppContext } from '../../../contexts/AppContext';
+import { useBranchesRepo } from '../../../hooks/useBranchesRepository';
+import { isPhoneBranch } from '../../../utils/branchUtils';
+
 // Add New Product Modal Component
 const AddProductModal: React.FC<{
   isOpen: boolean;
@@ -25,6 +29,10 @@ const AddProductModal: React.FC<{
     warrantyUnit: string;
   }) => void;
 }> = ({ isOpen, onClose, onSave }) => {
+  const { currentBranchId } = useAppContext();
+  const { data: branchesRepo = [] } = useBranchesRepo();
+  const hideLaborCost = isPhoneBranch(currentBranchId, branchesRepo);
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -304,16 +312,18 @@ const AddProductModal: React.FC<{
                 </div>
 
                 {/* Tiền công */}
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
-                    Tiền công (đ)
-                  </label>
-                  <FormattedNumberInput
-                    value={laborCost}
-                    onValue={(v) => setLaborCost(Math.max(0, Math.round(v)))}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-right font-bold outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
-                  />
-                </div>
+                {!hideLaborCost && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
+                      Tiền công (đ)
+                    </label>
+                    <FormattedNumberInput
+                      value={laborCost}
+                      onValue={(v) => setLaborCost(Math.max(0, Math.round(v)))}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-right font-bold outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
+                    />
+                  </div>
+                )}
 
                 {/* Bảo hành */}
                 <div className="md:col-span-2">

@@ -14,6 +14,7 @@ export interface StockMobileCardProps {
   isMenuOpen: boolean;
   canUpdatePart: boolean;
   canDeletePart: boolean;
+  hideLaborCost?: boolean;
   onToggleMenu: (index: number) => void;
   onEdit: (part: Part) => void;
   onQuickWarranty: (part: Part) => void;
@@ -33,6 +34,7 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
   isMenuOpen,
   canUpdatePart,
   canDeletePart,
+  hideLaborCost = false,
   onToggleMenu,
   onEdit,
   onQuickWarranty,
@@ -41,10 +43,7 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
   const hasPartActions = canUpdatePart || canDeletePart;
   const stock = part.stock[branchId] || 0;
   const retailPrice = part.retailPrice[branchId] || 0;
-  const hasLaborCost = Object.prototype.hasOwnProperty.call(part, "laborCost");
-  const laborCost = hasLaborCost
-    ? (part as any).laborCost?.[branchId] || 0
-    : part.wholesalePrice?.[branchId] || 0;
+  const laborCost = Number((part as any).laborCost?.[branchId] || 0);
 
   return (
     <div
@@ -90,9 +89,11 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
             <div className="text-[13px] text-emerald-400 font-semibold">
               {formatCurrency(retailPrice)}
             </div>
-            <div className="text-[11px] text-cyan-400 mt-1 font-medium">
-              Công: {formatCurrency(laborCost)}
-            </div>
+            {!hideLaborCost && (
+              <div className="text-[11px] text-cyan-400 mt-1 font-medium">
+                Công: {formatCurrency(laborCost)}
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-2 flex items-center justify-between">

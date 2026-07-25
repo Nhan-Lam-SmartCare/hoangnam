@@ -5,6 +5,8 @@ import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
 import type { Sale } from "../../types";
 
+import FormattedNumberInput from "../common/FormattedNumberInput";
+
 interface Props {
   sale: Sale;
   onClose: () => void;
@@ -143,14 +145,10 @@ export const ReturnSaleModal: React.FC<Props> = ({ sale, onClose, onDone }) => {
                 </label>
                 <label className="block">
                   <span className="text-xs text-slate-500">Số tiền hoàn</span>
-                  <input
-                    type="number"
-                    min={0}
+                  <FormattedNumberInput
                     value={effectiveRefund}
-                    onChange={(e) =>
-                      setRefundOverride(Math.max(0, Number(e.target.value) || 0))
-                    }
-                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-right"
+                    onValue={(v) => setRefundOverride(Math.max(0, Math.round(v)))}
+                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-right font-bold"
                   />
                 </label>
               </div>

@@ -6,6 +6,7 @@ export interface StockTableHeaderProps {
   onSort: (field: string) => void;
   canViewImportPrice: boolean;
   allSelected: boolean;
+  hideLaborCost?: boolean;
   onSelectAll: (checked: boolean) => void;
 }
 
@@ -16,6 +17,7 @@ const StockTableHeader: React.FC<StockTableHeaderProps> = ({
   onSort,
   canViewImportPrice,
   allSelected,
+  hideLaborCost = false,
   onSelectAll,
 }) => {
   const arrow = (field: string) =>
@@ -72,15 +74,17 @@ const StockTableHeader: React.FC<StockTableHeaderProps> = ({
             {arrow("retailPrice")}
           </div>
         </th>
-        <th
-          className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[110px]"
-          onClick={() => onSort("laborCost")}
-        >
-          <div className="flex items-center justify-end gap-1.5">
-            <span>Tiền công</span>
-            {arrow("laborCost")}
-          </div>
-        </th>
+        {!hideLaborCost && (
+          <th
+            className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[110px]"
+            onClick={() => onSort("laborCost")}
+          >
+            <div className="flex items-center justify-end gap-1.5">
+              <span>Tiền công</span>
+              {arrow("laborCost")}
+            </div>
+          </th>
+        )}
         <th
           className="px-3 py-2.5 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none w-[120px]"
           onClick={() => onSort("totalValue")}

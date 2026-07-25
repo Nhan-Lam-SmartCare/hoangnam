@@ -59,13 +59,18 @@ export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    setDisplay(raw);
     const parsed = parseToNumber(raw);
-
-    // Only enforce max during typing if it's way out of bounds? 
-    // Actually, better to just let parent handle validation or do it on blur.
-    // But for now, let's pass the parsed value directly.
     onValue(parsed);
+
+    if (raw === "" || raw === "-") {
+      setDisplay(raw);
+    } else if (Number.isFinite(parsed) && parsed !== 0) {
+      setDisplay(nf.format(parsed));
+    } else if (parsed === 0) {
+      setDisplay(raw === "0" ? "0" : raw);
+    } else {
+      setDisplay(raw);
+    }
   };
 
   const handleBlur = () => {

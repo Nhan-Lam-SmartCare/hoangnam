@@ -20,6 +20,7 @@ export interface StockTableRowProps {
   canViewImportPrice: boolean;
   canUpdatePart: boolean;
   canDeletePart: boolean;
+  hideLaborCost?: boolean;
   onToggleSelect: (id: string, checked: boolean) => void;
   onShowReservedInfo: (id: string) => void;
   onToggleActions: (id: string, pos: { top: number; right: number }) => void;
@@ -44,6 +45,7 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
   canViewImportPrice,
   canUpdatePart,
   canDeletePart,
+  hideLaborCost = false,
   onToggleSelect,
   onShowReservedInfo,
   onToggleActions,
@@ -55,10 +57,7 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
   const reserved = part.reservedStock?.[branchKey] || 0;
   const available = getAvailable(part, branchId);
   const retailPrice = part.retailPrice?.[branchKey] || 0;
-  const hasLaborCost = Object.prototype.hasOwnProperty.call(part, "laborCost");
-  const laborCost = hasLaborCost
-    ? (part as any).laborCost?.[branchKey] || 0
-    : part.wholesalePrice?.[branchKey] || 0;
+  const laborCost = Number((part as any).laborCost?.[branchKey] || 0);
   const costPrice =
     Number(part.costPrice?.[branchKey] || 0) || Number(latestImportPrice || 0);
   const value = available * retailPrice;
@@ -208,9 +207,11 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-medium text-slate-900 dark:text-slate-100">
         {formatCurrency(retailPrice)}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap text-right text-xs text-slate-600 dark:text-slate-300">
-        {formatCurrency(laborCost)}
-      </td>
+      {!hideLaborCost && (
+        <td className="px-3 py-2 whitespace-nowrap text-right text-xs text-slate-600 dark:text-slate-300">
+          {formatCurrency(laborCost)}
+        </td>
+      )}
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-semibold text-slate-900 dark:text-slate-100">
         {formatCurrency(value)}
       </td>

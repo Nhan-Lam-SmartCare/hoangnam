@@ -1,44 +1,36 @@
 /**
- * Generate compact SKU
- * Format: PT-XXXXXX (uppercase alphanumeric)
- * Example: PT-A3K9M2
+ * Generate ultra-compact 3-character SKU / barcode
+ * Format: 1 uppercase letter + 2 digits (e.g., A01, A02, B15)
+ * Capacity: 24 letters (A-Z except I, O) * 100 numbers (00-99) = 2,400 unique codes
  */
 export function generateSKU(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude confusing chars: 0,O,1,I
-  let suffix = "";
-
-  for (let i = 0; i < 6; i++) {
-    const randomIndex = Math.floor(Math.random() * chars.length);
-    suffix += chars[randomIndex];
-  }
-
-  return `PT-${suffix}`;
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // Exclude I, O to avoid confusion with 1, 0
+  const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+  const randomNum = String(Math.floor(Math.random() * 100)).padStart(2, "0");
+  return `${randomLetter}${randomNum}`;
 }
 
 /**
- * Generate SKU with timestamp for better uniqueness
- * Format: TTTTXXXX (4 chars from timestamp + 4 random)
+ * Generate SKU with timestamp for fallback uniqueness if needed
+ * Format: TTTTXXXX
  */
 export function generateSKUWithTimestamp(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const timestamp = Date.now()
-    .toString(36)
-    .toUpperCase()
-    .slice(-4)
-    .padStart(4, "0");
-
-  let random = "";
-  for (let i = 0; i < 4; i++) {
-    random += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  return timestamp + random;
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+  const randomNum = String(Math.floor(Math.random() * 100)).padStart(2, "0");
+  return `${randomLetter}${randomNum}`;
 }
 
 /**
  * Validate SKU format.
- * Supports both legacy 8-char SKUs and new compact PT-XXXXXX format.
+ * Supports 3-character SKUs (e.g. A01), short numeric/alphanumeric SKUs (3-12 chars), and legacy formats.
  */
 export function isValidSKU(sku: string): boolean {
-  return /^[A-Z0-9]{8}$/.test(sku) || /^PT-[A-Z0-9]{6}$/.test(sku);
+  if (!sku) return false;
+  const clean = sku.trim().toUpperCase();
+  return (
+    /^[A-Z][0-9]{2}$/.test(clean) ||
+    /^[A-Z0-9]{3,12}$/.test(clean) ||
+    /^PT-[A-Z0-9]{6}$/.test(clean)
+  );
 }

@@ -9,6 +9,8 @@ import { supabase } from "../../../supabaseClient";
 
 
 
+import { isPhoneBranch } from "../../../utils/branchUtils";
+
 interface EditPartModalProps {
   part: Part;
   onClose: () => void;
@@ -30,6 +32,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
     }
   });
 
+  const hideLaborCost = isPhoneBranch(currentBranchId, branches);
 
   const [formData, setFormData] = useState({
     name: part.name,
@@ -41,10 +44,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
       (part as any).warranty ||
       "",
     retailPrice: part.retailPrice?.[currentBranchId] || 0,
-    laborCost:
-      (part as any).laborCost?.[currentBranchId] ||
-      part.wholesalePrice?.[currentBranchId] ||
-      0,
+    laborCost: Number((part as any).laborCost?.[currentBranchId] || 0),
     costPrice: part.costPrice?.[currentBranchId] || 0,
     stock: part.stock?.[currentBranchId] || 0,
     branchId: (part as any).branch_id || (part as any).branchId || "",
@@ -191,7 +191,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className={`grid ${hideLaborCost ? "grid-cols-2" : "grid-cols-3"} gap-4`}>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               Giá nhập
@@ -224,21 +224,23 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Tiền công
-            </label>
-            <FormattedNumberInput
-              value={formData.laborCost}
-              onValue={(v) =>
-                setFormData({
-                  ...formData,
-                  laborCost: Math.max(0, Math.round(v)),
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm"
-            />
-          </div>
+          {!hideLaborCost && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Tiền công
+              </label>
+              <FormattedNumberInput
+                value={formData.laborCost}
+                onValue={(v) =>
+                  setFormData({
+                    ...formData,
+                    laborCost: Math.max(0, Math.round(v)),
+                  })
+                }
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm"
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

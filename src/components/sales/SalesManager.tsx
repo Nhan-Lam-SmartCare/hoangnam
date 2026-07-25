@@ -31,6 +31,7 @@ import {
   BookOpen,
   CreditCard,
 } from "lucide-react";
+import FormattedNumberInput from "../common/FormattedNumberInput";
 import PrintSalesPreviewModal, { PrintSalesPayload } from "./modals/PrintSalesPreviewModal";
 import { useAppContext } from "../../contexts/AppContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -706,12 +707,13 @@ Cam on quy khach da tin tuong!
 
   const addPartToCart = (part: Part) => {
     const branchStock = getBranchStock(part, currentBranchId);
+    const isService = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
 
     setCartItems((prev) => {
       const existing = prev.find((item) => item.partId === part.id);
       const existingQty = existing?.quantity || 0;
 
-      if (existingQty >= branchStock) {
+      if (!isService && existingQty >= branchStock) {
         showToast.warning(`Tồn kho còn ${branchStock}, không thể thêm thêm.`);
         return prev;
       }
@@ -732,6 +734,7 @@ Cam on quy khach da tin tuong!
         quantity: 1,
         sellingPrice: getBranchRetailPrice(part, currentBranchId),
         stockSnapshot: branchStock,
+        isService,
       };
 
       return [...prev, newItem];
@@ -750,13 +753,17 @@ Cam on quy khach da tin tuong!
       parts.find((p) => p.id === partId) ||
       inventoryParts.find((p) => p.id === partId);
 
+    const isService = livePart
+      ? ["dịch vụ", "công thợ"].includes((livePart.category || "").trim().toLowerCase())
+      : false;
+
     setCartItems((prev) =>
       prev.map((item) => {
         if (item.partId !== partId) return item;
         const liveStock = livePart
           ? getBranchStock(livePart, currentBranchId)
           : item.stockSnapshot;
-        if (nextQty > liveStock) {
+        if (!isService && !item.isService && nextQty > liveStock) {
           showToast.warning(`Tồn kho chỉ còn ${liveStock}.`);
           return item;
         }
@@ -822,11 +829,21 @@ Cam on quy khach da tin tuong!
     const keyword = search.trim().toLowerCase();
     if (!keyword) return;
 
-    // 1. Ưu tiên tìm chính xác theo mã SKU hoặc Mã vạch
+    const cleanKeyword = keyword.replace(/[^a-z0-9]/g, "");
+
+    // 1. Ưu tiên tìm chính xác theo mã SKU hoặc Mã vạch (hỗ trợ gõ a01, PT-01, 01...)
     const matchByCode = inventoryParts.find((p) => {
       const sku = (p.sku || "").toLowerCase();
       const barcode = (p.barcode || "").toLowerCase();
-      return sku === keyword || barcode === keyword;
+      const cleanSku = sku.replace(/[^a-z0-9]/g, "");
+      const cleanBarcode = barcode.replace(/[^a-z0-9]/g, "");
+
+      return (
+        sku === keyword ||
+        barcode === keyword ||
+        (cleanKeyword.length >= 2 && (cleanSku === cleanKeyword || cleanBarcode === cleanKeyword)) ||
+        (cleanKeyword.length >= 2 && cleanSku.endsWith(cleanKeyword))
+      );
     });
 
     if (matchByCode) {
@@ -861,11 +878,20 @@ Cam on quy khach da tin tuong!
   const handleScannedBarcode = (code: string) => {
     const keyword = String(code || "").trim().toLowerCase();
     if (!keyword) return;
+    const cleanKeyword = keyword.replace(/[^a-z0-9]/g, "");
     const stockSourceParts = enablePartsPaging ? parts : inventoryParts;
     const match = stockSourceParts.find((p) => {
       const sku = (p.sku || "").toLowerCase();
       const barcode = (p.barcode || "").toLowerCase();
-      return sku === keyword || barcode === keyword;
+      const cleanSku = sku.replace(/[^a-z0-9]/g, "");
+      const cleanBarcode = barcode.replace(/[^a-z0-9]/g, "");
+
+      return (
+        sku === keyword ||
+        barcode === keyword ||
+        (cleanKeyword.length >= 2 && (cleanSku === cleanKeyword || cleanBarcode === cleanKeyword)) ||
+        (cleanKeyword.length >= 2 && cleanSku.endsWith(cleanKeyword))
+      );
     });
     if (match) {
       const stock = getBranchStock(match, currentBranchId);
@@ -1075,10 +1101,15 @@ Cam on quy khach da tin tuong!
 
     for (const item of cartItems) {
       const part = stockSourceParts.find((p) => p.id === item.partId);
-      const availableStock = part ? getBranchStock(part, currentBranchId) : 0;
-      if (item.quantity > availableStock) {
-        showToast.warning(`Sản phẩm ${item.partName} không đủ tồn (${availableStock}).`);
-        return;
+      const isService = part
+        ? ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase())
+        : item.isService;
+      if (!isService) {
+        const availableStock = part ? getBranchStock(part, currentBranchId) : 0;
+        if (item.quantity > availableStock) {
+          showToast.warning(`Sản phẩm ${item.partName} không đủ tồn (${availableStock}).`);
+          return;
+        }
       }
     }
 
@@ -1937,24 +1968,18 @@ Cam on quy khach da tin tuong!
                   <div className="mt-3 grid grid-cols-2 gap-2 border-t border-dashed border-slate-200 dark:border-slate-700 pt-3">
                     <label className="block">
                       <span className="text-[11px] text-slate-500">Đơn giá</span>
-                      <input
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
+                      <FormattedNumberInput
                         value={item.sellingPrice}
-                        onChange={(e) => updateLinePrice(item.partId, Number(e.target.value))}
-                        className="mt-0.5 w-full px-2 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm"
+                        onValue={(v) => updateLinePrice(item.partId, Math.max(0, Math.round(v)))}
+                        className="mt-0.5 w-full px-2 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm font-semibold"
                       />
                     </label>
                     <label className="block">
                       <span className="text-[11px] text-slate-500">Giảm giá (đ)</span>
-                      <input
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
+                      <FormattedNumberInput
                         value={item.discount || 0}
-                        onChange={(e) => updateLineDiscount(item.partId, Number(e.target.value))}
-                        className="mt-0.5 w-full px-2 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm"
+                        onValue={(v) => updateLineDiscount(item.partId, Math.max(0, Math.round(v)))}
+                        className="mt-0.5 w-full px-2 h-9 rounded-lg border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right text-sm font-semibold"
                       />
                     </label>
                   </div>
@@ -2104,13 +2129,10 @@ Cam on quy khach da tin tuong!
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <span className="text-xs text-slate-500 font-medium">Giảm giá</span>
-                  <input
-                    type="number"
-                    min={0}
-                    inputMode="numeric"
+                  <FormattedNumberInput
                     value={discount}
-                    onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
+                    onValue={(v) => setDiscount(Math.max(0, Math.round(v)))}
+                    className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 text-right font-bold focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                   />
                 </div>
                 <div className="w-16">
@@ -2209,14 +2231,11 @@ Cam on quy khach da tin tuong!
                     <span className="text-[11px] text-slate-400 font-normal">Tính tiền thừa</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
+                    <FormattedNumberInput
+                      value={Number(cashGiven || 0)}
+                      onValue={(v) => setCashGiven(v > 0 ? Math.round(v) : "")}
                       placeholder="0"
-                      value={cashGiven || ""}
-                      onChange={(e) => setCashGiven(e.target.value ? Number(e.target.value) : "")}
-                      aria-label="Nhập số tiền khách đưa"
+                      ariaLabel="Nhập số tiền khách đưa"
                       className="flex-1 px-3 h-10 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-right font-bold text-sm text-slate-900 dark:text-white"
                     />
                     <button
@@ -2274,28 +2293,18 @@ Cam on quy khach da tin tuong!
                 <div className="space-y-3 pt-1">
                   <label className="block">
                     <span className="text-[11px] font-medium text-slate-400">Tiền mặt</span>
-                    <input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
+                    <FormattedNumberInput
                       value={splitCash}
-                      onChange={(e) =>
-                        setSplitCash(Math.max(0, Number(e.target.value) || 0))
-                      }
-                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm"
+                      onValue={(v) => setSplitCash(Math.max(0, Math.round(v)))}
+                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm font-bold text-right"
                     />
                   </label>
                   <label className="block">
                     <span className="text-[11px] font-medium text-slate-400">Chuyển khoản</span>
-                    <input
-                      type="number"
-                      min={0}
-                      inputMode="numeric"
+                    <FormattedNumberInput
                       value={splitBank}
-                      onChange={(e) =>
-                        setSplitBank(Math.max(0, Number(e.target.value) || 0))
-                      }
-                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm"
+                      onValue={(v) => setSplitBank(Math.max(0, Math.round(v)))}
+                      className="mt-1 w-full px-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm font-bold text-right"
                     />
                   </label>
                   <button

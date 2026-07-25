@@ -17,6 +17,8 @@ import FormattedNumberInput from '../../common/FormattedNumberInput';
 import BarcodeScannerModal from '../../common/BarcodeScannerModal';
 import SupplierModal from '../../inventory/components/SupplierModal';
 import AddProductModal from './AddProductModal';
+import { isPhoneBranch } from '../../../utils/branchUtils';
+import { useBranchesRepo } from '../../../hooks/useBranchesRepository';
 import type { Part } from '../../../types';
 
 const DEFAULT_MARKUP_PERCENT = 50;
@@ -53,6 +55,8 @@ const GoodsReceiptModal: React.FC<{
     }
   ) => void;
 }> = ({ isOpen, onClose, parts, currentBranchId, canViewImportPrice = true, onSave }) => {
+  const { data: branchesRepo = [] } = useBranchesRepo();
+  const hideLaborCost = isPhoneBranch(currentBranchId, branchesRepo);
   const [searchTerm, setSearchTerm] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -246,10 +250,7 @@ const GoodsReceiptModal: React.FC<{
           sku: part.sku,
           quantity: 1,
           importPrice,
-          laborCost:
-            (part as any).laborCost?.[currentBranchId] ||
-            part.wholesalePrice?.[currentBranchId] ||
-            0,
+          laborCost: Number((part as any).laborCost?.[currentBranchId] || 0),
           sellingPrice: calcSellingFromRule(
             importPrice,
             rule.markupPercent,
@@ -344,10 +345,7 @@ const GoodsReceiptModal: React.FC<{
             sku: foundPart.sku,
             quantity: 1,
             importPrice,
-            laborCost:
-              (foundPart as any).laborCost?.[currentBranchId] ||
-              foundPart.wholesalePrice?.[currentBranchId] ||
-              0,
+            laborCost: Number((foundPart as any).laborCost?.[currentBranchId] || 0),
             sellingPrice: calcSellingFromRule(
               importPrice,
               rule.markupPercent,
@@ -469,7 +467,7 @@ const GoodsReceiptModal: React.FC<{
           laborCost: { [currentBranchId]: Number(productData.laborCost || 0) } as any,
           retailPrice: { [currentBranchId]: productData.retailPrice },
           wholesalePrice: {
-            [currentBranchId]: Math.round(productData.retailPrice * 0.9),
+            [currentBranchId]: Number(productData.wholesalePrice || 0),
           },
         });
 
@@ -828,13 +826,17 @@ const GoodsReceiptModal: React.FC<{
                                       {formatCurrency(displayRetailPrice)}
                                     </span>
                                   </div>
-                                  <span className="text-slate-300 dark:text-slate-600">•</span>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Công:</span>
-                                    <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
-                                      {formatCurrency(displayLaborCost)}
-                                    </span>
-                                  </div>
+                                  {!hideLaborCost && (
+                                    <>
+                                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Công:</span>
+                                        <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
+                                          {formatCurrency(displayLaborCost)}
+                                        </span>
+                                      </div>
+                                    </>
+                                  )}
                                 </>
                               );
                             })()}
@@ -1159,9 +1161,11 @@ const GoodsReceiptModal: React.FC<{
 
                           {/* Total amount */}
                           <div className="min-w-[70px] text-right flex-shrink-0">
-                            <div className="text-[10px] text-cyan-600 dark:text-cyan-400 whitespace-nowrap mb-0.5">
-                              Công: {formatCurrency(item.laborCost || 0)}
-                            </div>
+                            {!hideLaborCost && (
+                              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 whitespace-nowrap mb-0.5">
+                                Công: {formatCurrency(item.laborCost || 0)}
+                              </div>
+                            )}
                             <div className="text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
                               {formatCurrency(
                                 item.importPrice * item.quantity

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canDo } from '../../../utils/permissions';
 import { GoodsReceiptMobileModal } from '../../inventory/GoodsReceiptMobileModal';
@@ -135,9 +135,7 @@ const GoodsReceiptMobileWrapper: React.FC<{
           importPrice: productData.importPrice,
           laborCost: productData.laborCost || 0,
           retailPrice: productData.retailPrice,
-          wholesalePrice:
-            productData.wholesalePrice ||
-            Math.round(productData.retailPrice * 0.9),
+          wholesalePrice: Number(productData.wholesalePrice || 0),
         },
       },
     ]);
