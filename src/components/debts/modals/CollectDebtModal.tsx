@@ -203,6 +203,32 @@ export const CollectDebtModal: React.FC<Props> = ({
               onValue={(val) => setPayAmount(Math.max(0, Math.round(val)))}
               className="w-full h-11 px-3 bg-slate-800 border border-slate-700 rounded-xl text-right font-bold text-emerald-400 text-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
             />
+            {/* Phím gõ nhanh số tiền */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <button
+                type="button"
+                onClick={() => setPayAmount(debt.remainingAmount)}
+                className="px-2 py-1 text-[11px] rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold transition-colors"
+              >
+                Trả hết ({formatCurrency(debt.remainingAmount)})
+              </button>
+              {[
+                { label: "100k", val: 100000 },
+                { label: "200k", val: 200000 },
+                { label: "500k", val: 500000 },
+                { label: "1 triệu", val: 1000000 },
+                { label: "2 triệu", val: 2000000 },
+              ].map((btn) => (
+                <button
+                  key={btn.val}
+                  type="button"
+                  onClick={() => setPayAmount(Math.min(debt.remainingAmount, btn.val))}
+                  className="px-2 py-1 text-[11px] rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 font-semibold transition-colors"
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Hình thức thanh toán */}

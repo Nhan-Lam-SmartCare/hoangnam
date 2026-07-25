@@ -219,7 +219,7 @@ export const DebtManager: React.FC = () => {
               {formatCurrency(totalAllRemaining)}
             </div>
             <span className="text-[10px] text-slate-500 block">
-              ~{customerUnpaidCount + supplierUnpaidCount} khoản
+              -{customerUnpaidCount + supplierUnpaidCount} khoản
             </span>
           </div>
 
@@ -232,7 +232,7 @@ export const DebtManager: React.FC = () => {
               {formatCurrency(totalCustomerRemaining)}
             </div>
             <span className="text-[10px] text-slate-500 block">
-              ~{customerUnpaidCount} khoản
+              -{customerUnpaidCount} khoản
             </span>
           </div>
 
@@ -245,7 +245,7 @@ export const DebtManager: React.FC = () => {
               {formatCurrency(totalSupplierRemaining)}
             </div>
             <span className="text-[10px] text-slate-500 block">
-              ~{supplierUnpaidCount} khoản
+              -{supplierUnpaidCount} khoản
             </span>
           </div>
 
@@ -257,7 +257,7 @@ export const DebtManager: React.FC = () => {
             <div className="text-base font-black text-amber-300">
               {formatCurrency(0)}
             </div>
-            <span className="text-[10px] text-slate-500 block">~0 khoản</span>
+            <span className="text-[10px] text-slate-500 block">-0 khoản</span>
           </div>
         </div>
       </div>
