@@ -498,24 +498,47 @@ export interface CustomerDebt {
   customerName: string;
   phone?: string;
   licensePlate?: string;
+  vehicleModel?: string;
   description: string; // Nội dung
   totalAmount: number; // Số tiền
   paidAmount: number; // Đã trả
   remainingAmount: number; // Còn nợ
   createdDate: string;
+  dueDate?: string; // Hạn hẹn trả
+  staffName?: string; // Nhân viên phụ trách
+  workOrderId?: string;
+  saleId?: string;
   branchId: string;
+  paymentHistory?: Array<{
+    date: string;
+    amount: number;
+    method: "cash" | "bank";
+    note?: string;
+    staffName?: string;
+  }>;
 }
 
 export interface SupplierDebt {
   id: string;
   supplierId: string;
   supplierName: string;
+  phone?: string;
   description: string; // Nội dung
   totalAmount: number; // Số tiền
   paidAmount: number; // Đã trả
   remainingAmount: number; // Còn nợ
   createdDate: string;
+  dueDate?: string; // Hạn hẹn trả
+  staffName?: string;
+  receiptId?: string;
   branchId: string;
+  paymentHistory?: Array<{
+    date: string;
+    amount: number;
+    method: "cash" | "bank";
+    note?: string;
+    staffName?: string;
+  }>;
 }
 
 // Employee Advance (Ứng lương)

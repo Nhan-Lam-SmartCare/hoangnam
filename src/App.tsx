@@ -86,6 +86,9 @@ const StaffDashboard = lazyImport(() =>
 const PawnManager = lazyImport(
   () => import("./components/pawn/PawnManager")
 );
+const DebtManager = lazyImport(
+  () => import("./components/debts/DebtManager")
+);
 
 
 // Loading component for Suspense fallback
@@ -190,8 +193,11 @@ const Pawn = () => (
     <PawnManager />
   </Suspense>
 );
-
-
+const Debts = () => (
+  <Suspense fallback={<PageLoader />}>
+    <DebtManager />
+  </Suspense>
+);
 
 const MainLayout: React.FC = () => {
   const location = useLocation();
@@ -209,6 +215,7 @@ const MainLayout: React.FC = () => {
     "/lookup",
     "/cash-book",
     "/pawn",
+    "/debts",
   ].some((path) => location.pathname.startsWith(path));
 
 
@@ -253,6 +260,19 @@ const MainLayout: React.FC = () => {
                 denyMessage="Bạn không có quyền xem sổ quỹ."
               >
                 <CashBook />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/debts"
+            element={
+              <ProtectedRoute
+                allow={({ profile }) =>
+                  canDo(profile, "debt.view") || canDo(profile, "finance.view")
+                }
+                denyMessage="Bạn không có quyền xem công nợ."
+              >
+                <Debts />
               </ProtectedRoute>
             }
           />

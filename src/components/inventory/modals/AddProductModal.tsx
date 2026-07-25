@@ -268,7 +268,7 @@ const AddProductModal: React.FC<{
                       const result = validatePriceAndQty(importPrice, v);
                       if (result.warnings.length)
                         result.warnings.forEach((w) => showToast.warning(w));
-                      setQuantity(Math.max(1, result.clean.quantity));
+                      setQuantity(Math.max(0, result.clean.quantity));
                     }}
                     className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center font-bold outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
                   />

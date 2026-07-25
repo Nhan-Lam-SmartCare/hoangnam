@@ -13,84 +13,82 @@ export interface FormattedNumberInputProps {
   ariaLabel?: string;
 }
 
-const nf = new Intl.NumberFormat("vi-VN", {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
+const nf = new Intl.NumberFormat("vi-VN");
 
-function parseToNumber(input: string): number {
-  // Accept both dot and comma for decimal; vi-VN uses comma
-  // Remove spaces and currency symbols
-  let s = input.replace(/[^0-9.,-]/g, "");
-  // Normalize: if both comma and dot exist, assume dot thousands, comma decimal
-  const hasDot = s.includes(".");
-  const hasComma = s.includes(",");
-  if (hasDot && hasComma) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  } else if (hasComma && !hasDot) {
-    // only comma -> decimal
-    s = s.replace(",", ".");
-  } // only dot -> decimal already
-  const n = Number(s);
+/**
+ * Parse Vietnamese formatted string (e.g. "1.000.000" or "10.000") to integer
+ * Strips all non-digit characters so thousands separators never break parsing.
+ */
+function parseDigitsToNumber(input: string): number {
+  if (!input) return 0;
+  const digitsOnly = input.replace(/[^0-9]/g, "");
+  if (!digitsOnly) return 0;
+  const n = parseInt(digitsOnly, 10);
   return Number.isFinite(n) ? n : 0;
 }
 
 export const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
   value,
   onValue,
-  placeholder,
+  placeholder = "0",
   className,
   min,
   max,
   disabled,
   ariaLabel,
 }) => {
-  const [display, setDisplay] = React.useState<string>(
-    value !== undefined && value !== null ? nf.format(value) : ""
-  );
-  const [isEditing, setIsEditing] = React.useState(false);
+  // Format value to string: if 0, show "" so input is empty by default and placeholder shows
+  const formatDisplay = (num: number | undefined | null): string => {
+    if (num === undefined || num === null || num === 0) return "";
+    return nf.format(num);
+  };
+
+  const [display, setDisplay] = React.useState<string>(() => formatDisplay(value));
+  const [isFocused, setIsFocused] = React.useState(false);
 
   React.useEffect(() => {
-    // Sync when external value changes (e.g., programmatic updates)
-    if (!isEditing) {
-      setDisplay(value !== undefined && value !== null ? nf.format(value) : "");
+    if (!isFocused) {
+      setDisplay(formatDisplay(value));
     }
-  }, [value, isEditing]);
+  }, [value, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const parsed = parseToNumber(raw);
+    const parsed = parseDigitsToNumber(raw);
+
+    // Pass numeric value back to parent
     onValue(parsed);
 
-    if (raw === "" || raw === "-") {
-      setDisplay(raw);
-    } else if (Number.isFinite(parsed) && parsed !== 0) {
-      setDisplay(nf.format(parsed));
-    } else if (parsed === 0) {
-      setDisplay(raw === "0" ? "0" : raw);
+    if (!raw || parsed === 0) {
+      setDisplay("");
     } else {
-      setDisplay(raw);
+      setDisplay(nf.format(parsed));
     }
   };
 
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    setIsFocused(true);
+    // Auto-select text on focus so user can type over existing value immediately
+    e.target.select();
+  };
+
   const handleBlur = () => {
-    setIsEditing(false);
+    setIsFocused(false);
     let finalVal = value;
     if (min !== undefined && finalVal < min) finalVal = min;
     if (max !== undefined && finalVal > max) finalVal = max;
 
     if (finalVal !== value) onValue(finalVal);
-
-    setDisplay(finalVal !== undefined && finalVal !== null ? nf.format(finalVal) : "");
+    setDisplay(formatDisplay(finalVal));
   };
 
   return (
     <input
       type="text"
-      inputMode="decimal"
+      inputMode="numeric"
       value={display}
       onChange={handleChange}
-      onFocus={() => setIsEditing(true)}
+      onFocus={handleFocus}
       onBlur={handleBlur}
       placeholder={placeholder}
       className={className}

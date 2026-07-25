@@ -30,6 +30,7 @@ import {
   Menu,
   Home,
   Scale,
+  HandCoins,
 } from "lucide-react";
 
 
@@ -99,7 +100,7 @@ export function Nav() {
     viewFinance: canViewCashBook,
     viewPayroll: false,
     viewAnalytics: false,
-    viewDebt: false,
+    viewDebt: canDo(profile, "debt.view") || isOwnerOrManager,
     viewEmployees: isOwnerOrManager,
     viewSettings: isOwnerOrManager,
     viewInventory: canViewInventory,
@@ -421,7 +422,14 @@ export function Nav() {
                 label="Sổ quỹ"
               />
             )}
-            {/* Removed unrelated links: Finance, Debt, Analytics, Promotions */}
+            {can.viewDebt && (
+              <NavLink
+                to="/debts"
+                colorKey="amber"
+                icon={<HandCoins className="w-4 h-4" />}
+                label="Công nợ"
+              />
+            )}
           </div>
 
           {/* Right: Notifications and Home Icon (mobile only) */}
