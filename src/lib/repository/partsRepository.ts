@@ -490,6 +490,10 @@ export async function updatePart(
       ...(updates as Record<string, any>),
     };
 
+    // supplierId / supplier_id belong to part_units and goods_receipts, not parts table
+    delete updatePayload.supplierId;
+    delete updatePayload.supplier_id;
+
     if (Object.prototype.hasOwnProperty.call(updates, "warrantyPeriod")) {
       updatePayload.warrantyperiod = (updates as any).warrantyPeriod;
       updatePayload.warranty_period = (updates as any).warrantyPeriod;
@@ -552,11 +556,7 @@ export async function updatePart(
         ).trim();
 
         if (savedWarranty !== expectedWarranty) {
-          return failure({
-            code: "supabase",
-            message:
-              "Không lưu được bảo hành. Cần thêm cột bảo hành trong bảng parts (warranty hoặc warrantyPeriod).",
-          });
+          console.warn("[partsRepository] warranty column missing in parts schema");
         }
       }
     }

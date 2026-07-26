@@ -427,7 +427,7 @@ export async function releaseUnitsBySale(
  */
 export async function updateUnit(
   id: string,
-  patch: Partial<Pick<PartUnit, "imei" | "color" | "sellingPrice" | "note">>
+  patch: Partial<Pick<PartUnit, "imei" | "color" | "sellingPrice" | "note" | "supplierId">>
 ): Promise<RepoResult<PartUnit>> {
   try {
     if (!id) return failure({ code: "validation", message: "Thiếu mã máy" });
@@ -445,6 +445,7 @@ export async function updateUnit(
     if (patch.color !== undefined) payload.color = (patch.color || "").trim() || null;
     if (patch.sellingPrice !== undefined) payload.selling_price = patch.sellingPrice ?? null;
     if (patch.note !== undefined) payload.note = (patch.note || "").trim() || null;
+    if (patch.supplierId !== undefined) payload.supplier_id = patch.supplierId || null;
 
     if (Object.keys(payload).length === 0) {
       return failure({ code: "validation", message: "Không có gì để cập nhật" });

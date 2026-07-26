@@ -49,6 +49,11 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
         };
       });
       setUnitEdits(initial);
+
+      const firstUnitSupplier = units.find((u) => u.supplierId)?.supplierId;
+      if (firstUnitSupplier) {
+        setFormData((prev) => ({ ...prev, supplierId: firstUnitSupplier }));
+      }
     }
   }, [units]);
 
@@ -83,30 +88,34 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
       return;
     }
 
-    // Save individual units if any were edited
+    // Save individual units if any were edited or if supplier changed
     if (units.length > 0) {
       for (const unit of units) {
         const edited = unitEdits[unit.id];
-        if (edited) {
-          const newImei = edited.imei.trim();
-          const newColor = edited.color.trim();
-          const origImei = unit.isPlaceholder ? "" : unit.imei || "";
-          const origColor = unit.color || "";
+        const newImei = edited ? edited.imei.trim() : (unit.isPlaceholder ? "" : unit.imei || "");
+        const newColor = edited ? edited.color.trim() : (unit.color || "");
+        const newSupplierId = formData.supplierId || undefined;
 
-          if (newImei !== origImei || newColor !== origColor) {
-            if (newImei) {
-              try {
-                await updateUnitMutation.mutateAsync({
-                  id: unit.id,
-                  patch: {
-                    imei: newImei,
-                    color: newColor || undefined,
-                  },
-                });
-              } catch (err: any) {
-                console.error("Lỗi cập nhật IMEI máy:", err);
-              }
-            }
+        const origImei = unit.isPlaceholder ? "" : unit.imei || "";
+        const origColor = unit.color || "";
+        const origSupplierId = unit.supplierId;
+
+        if (
+          (newImei && newImei !== origImei) ||
+          newColor !== origColor ||
+          newSupplierId !== origSupplierId
+        ) {
+          try {
+            await updateUnitMutation.mutateAsync({
+              id: unit.id,
+              patch: {
+                imei: newImei || (unit.isPlaceholder ? undefined : unit.imei),
+                color: newColor || undefined,
+                supplierId: newSupplierId || undefined,
+              },
+            });
+          } catch (err: any) {
+            console.error("Lỗi cập nhật máy:", err);
           }
         }
       }

@@ -157,6 +157,7 @@ const GoodsReceiptModal: React.FC<{
       imei?: string;
       imeis?: string[];
       color?: string;
+      colors?: string[];
     }>
   >([]);
 
@@ -1014,57 +1015,101 @@ const GoodsReceiptModal: React.FC<{
                               {/* Phone Branch Sub-row for N IMEIs & Color */}
                               {hideLaborCost && (
                                 <tr className="bg-slate-100/50 dark:bg-slate-950/60">
-                                  <td colSpan={7} className="py-1.5 px-3 border-b border-slate-200 dark:border-slate-800">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1">
-                                        <Smartphone className="w-3 h-3" />
-                                        <span>IMEI/Seri ({item.quantity} máy):</span>
-                                      </span>
-                                      {/* Một ô cho MỖI máy. Trước đây bị chặn ở 10 ô nên
-                                          nhập 15 máy thì 5 máy cuối không có chỗ điền IMEI. */}
-                                      {Array.from({ length: item.quantity }).map((_, imeiIndex) => {
-                                        const currentImeis = item.imeis || (item.imei ? [item.imei] : []);
-                                        const value = currentImeis[imeiIndex] || "";
-                                        const isConflict = conflictImeis.has(value.trim().toUpperCase());
-                                        return (
-                                          <div key={imeiIndex} className="flex items-center gap-1">
-                                            <span className="text-[10px] text-slate-400 font-mono">#{imeiIndex + 1}:</span>
-                                            <input
-                                              type="text"
-                                              value={value}
-                                              onChange={(e) => {
-                                                const newImeis = [...currentImeis];
-                                                newImeis[imeiIndex] = e.target.value;
-                                                setReceiptItems((items) =>
-                                                  items.map((it) =>
-                                                    it.partId === item.partId
-                                                      ? { ...it, imeis: newImeis, imei: newImeis[0] || "" }
-                                                      : it
-                                                  )
-                                                );
-                                              }}
-                                              placeholder={`IMEI ${imeiIndex + 1}...`}
-                                              title={isConflict ? "IMEI này đã tồn tại trong hệ thống" : undefined}
-                                              className={`w-28 px-2 py-0.5 text-xs font-mono border rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none ${isConflict
-                                                ? "border-red-500 ring-1 ring-red-500/40"
-                                                : "border-slate-300 dark:border-slate-700"
-                                                }`}
-                                            />
-                                          </div>
-                                        );
-                                      })}
-                                      <div className="flex items-center gap-1 ml-auto">
-                                        <span className="text-[11px] font-bold text-purple-500 flex items-center gap-1">
-                                          <Palette className="w-3 h-3" />
-                                          <span>Màu:</span>
+                                  <td colSpan={7} className="py-2 px-3 border-b border-slate-200 dark:border-slate-800">
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1">
+                                          <Smartphone className="w-3.5 h-3.5" />
+                                          <span>Danh sách IMEI & Màu sắc ({item.quantity} máy):</span>
                                         </span>
-                                        <input
-                                          type="text"
-                                          value={item.color || ""}
-                                          onChange={(e) => updateReceiptItem(item.partId, "color", e.target.value)}
-                                          placeholder="Màu sắc..."
-                                          className="w-28 px-2 py-0.5 text-xs border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none"
-                                        />
+                                        <div className="flex items-center gap-1 text-[11px]">
+                                          <span className="font-bold text-purple-500 flex items-center gap-1 whitespace-nowrap">
+                                            <Palette className="w-3 h-3" />
+                                            <span>Màu chung:</span>
+                                          </span>
+                                          <input
+                                            type="text"
+                                            value={item.color || ""}
+                                            onChange={(e) => {
+                                              const globalColor = e.target.value;
+                                              const newColors = Array(item.quantity).fill(globalColor);
+                                              setReceiptItems((items) =>
+                                                items.map((it) =>
+                                                  it.partId === item.partId
+                                                    ? { ...it, color: globalColor, colors: newColors }
+                                                    : it
+                                                )
+                                              );
+                                            }}
+                                            placeholder="Gán màu cho tất cả..."
+                                            className="w-32 px-2 py-0.5 text-xs border border-purple-300 dark:border-purple-800 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-purple-500"
+                                            title="Nhập màu ở đây để áp dụng màu này cho toàn bộ máy bên dưới"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {Array.from({ length: item.quantity }).map((_, imeiIndex) => {
+                                          const currentImeis = item.imeis || (item.imei ? [item.imei] : []);
+                                          const imeiVal = currentImeis[imeiIndex] || "";
+                                          const isConflict = conflictImeis.has(imeiVal.trim().toUpperCase());
+
+                                          const currentColors = item.colors || (item.color ? Array(item.quantity).fill(item.color) : []);
+                                          const colorVal = currentColors[imeiIndex] || "";
+
+                                          return (
+                                            <div
+                                              key={imeiIndex}
+                                              className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm"
+                                            >
+                                              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono shrink-0">
+                                                #{imeiIndex + 1}:
+                                              </span>
+                                              <input
+                                                type="text"
+                                                value={imeiVal}
+                                                onChange={(e) => {
+                                                  const newImeis = [...currentImeis];
+                                                  newImeis[imeiIndex] = e.target.value;
+                                                  setReceiptItems((items) =>
+                                                    items.map((it) =>
+                                                      it.partId === item.partId
+                                                        ? { ...it, imeis: newImeis, imei: newImeis[0] || "" }
+                                                        : it
+                                                    )
+                                                  );
+                                                }}
+                                                placeholder={`IMEI ${imeiIndex + 1}...`}
+                                                title={isConflict ? "IMEI này đã tồn tại trong hệ thống" : undefined}
+                                                className={`w-28 px-2 py-0.5 text-xs font-mono border rounded bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none ${
+                                                  isConflict
+                                                    ? "border-red-500 ring-1 ring-red-500/40"
+                                                    : "border-slate-300 dark:border-slate-700"
+                                                }`}
+                                              />
+                                              <div className="flex items-center gap-1">
+                                                <Palette className="w-3 h-3 text-purple-400 shrink-0" />
+                                                <input
+                                                  type="text"
+                                                  value={colorVal}
+                                                  onChange={(e) => {
+                                                    const newColors = [...currentColors];
+                                                    newColors[imeiIndex] = e.target.value;
+                                                    setReceiptItems((items) =>
+                                                      items.map((it) =>
+                                                        it.partId === item.partId
+                                                          ? { ...it, colors: newColors, color: newColors[0] || e.target.value }
+                                                          : it
+                                                      )
+                                                    );
+                                                  }}
+                                                  placeholder="Màu sắc..."
+                                                  className="w-20 px-1.5 py-0.5 text-xs border border-purple-200 dark:border-purple-900/50 rounded bg-purple-50/50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 outline-none focus:border-purple-500"
+                                                />
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   </td>

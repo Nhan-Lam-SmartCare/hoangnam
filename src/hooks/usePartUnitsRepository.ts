@@ -183,7 +183,7 @@ export const useUpdatePartUnit = () => {
   return useMutation({
     mutationFn: async (params: {
       id: string;
-      patch: Partial<Pick<PartUnit, "imei" | "color" | "sellingPrice" | "note">>;
+      patch: Partial<Pick<PartUnit, "imei" | "color" | "sellingPrice" | "note" | "supplierId">>;
     }) => {
       const res = await updateUnit(params.id, params.patch);
       if (!res.ok) throw res.error;
