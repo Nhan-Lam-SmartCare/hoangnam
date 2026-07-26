@@ -78,6 +78,16 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
                 {part.category}
               </span>
             )}
+            {(part.imei || (part as any).imeis?.length > 0) && (
+              <div className="mt-1 text-[11px] font-mono font-semibold text-blue-300">
+                📱 IMEI: {part.imei || (part as any).imeis?.join(", ")}
+              </div>
+            )}
+            {part.color && (
+              <div className="mt-0.5 text-[11px] font-semibold text-purple-300">
+                🎨 Màu: {part.color}
+              </div>
+            )}
             {getPartWarrantyText(part) && (
               <div className="mt-1 text-[10px] font-semibold text-indigo-300">
                 Bảo hành: {getPartWarrantyText(part)}

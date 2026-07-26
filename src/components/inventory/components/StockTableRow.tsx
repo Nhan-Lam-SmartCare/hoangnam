@@ -159,6 +159,16 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
                 {part.category}
               </span>
             )}
+            {(part.imei || (part as any).imeis?.length > 0) && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                📱 IMEI: {part.imei || (part as any).imeis?.join(", ")}
+              </span>
+            )}
+            {part.color && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                🎨 Màu: {part.color}
+              </span>
+            )}
             {getPartWarrantyText(part) && (
               <span className="inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
                 BH: {getPartWarrantyText(part)}
