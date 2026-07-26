@@ -887,10 +887,21 @@ export async function deletePartById(
       });
     }
 
-    // 2. Nếu chưa từng bán ra: Tự động dọn dẹp các bản ghi phụ (part_units, receipt_items, transfers)
-    await supabase.from("part_units").delete().eq("part_id", id);
-    await supabase.from("inventory_receipt_items").delete().eq("part_id", id);
-    await supabase.from("inventory_transfers").delete().eq("part_id", id);
+    // 2. Lấy danh sách ID của các máy con trong part_units và dọn dẹp các bảng phụ liên quan
+    const { data: units } = await supabase.from("part_units").select("id").eq("part_id", id);
+    if (units && units.length > 0) {
+      const unitIds = units.map((u) => u.id);
+      await supabase.from("part_units").delete().in("id", unitIds);
+    }
+
+    await Promise.allSettled([
+      supabase.from("inventory_receipt_items").delete().eq("part_id", id),
+      supabase.from("inventory_transactions").delete().eq("part_id", id),
+      supabase.from("inventory_transfers").delete().eq("part_id", id),
+      supabase.from("repair_order_service_items").delete().eq("part_id", id),
+      supabase.from("ticket_items").delete().eq("part_id", id),
+      supabase.from("warranty_claims").delete().eq("part_id", id),
+    ]);
 
     // 3. Thực hiện xóa sản phẩm khỏi bảng parts
     const { error } = await supabase.from(PARTS_TABLE).delete().eq("id", id);
