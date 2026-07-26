@@ -79,6 +79,8 @@ const GoodsReceiptModal: React.FC<{
       wholesalePrice: number;
       markupPercent: number;
       roundingRule: RoundingRule;
+      imei?: string;
+      color?: string;
     }>
   >([]);
 
@@ -378,8 +380,10 @@ const GoodsReceiptModal: React.FC<{
       | "importPrice"
       | "sellingPrice"
       | "wholesalePrice"
-      | "markupPercent",
-    value: number
+      | "markupPercent"
+      | "imei"
+      | "color",
+    value: any
   ) => {
     setReceiptItems((items) =>
       items.map((item) =>
@@ -490,6 +494,8 @@ const GoodsReceiptModal: React.FC<{
             laborCost: productData.laborCost || 0,
             sellingPrice: productData.retailPrice,
             wholesalePrice: productData.wholesalePrice || 0,
+            imei: productData.imei || "",
+            color: productData.color || "",
             markupPercent: calcMarkupPercent(
               Number(productData.importPrice || 0),
               Number(productData.retailPrice || 0)
@@ -519,8 +525,8 @@ const GoodsReceiptModal: React.FC<{
         aria-labelledby="goods-receipt-title"
       >
         <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 w-full max-w-7xl h-[92vh] rounded-2xl shadow-2xl overflow-hidden flex">
-          {/* Left Panel - Product Browser (50%) */}
-          <div className="w-1/2 flex flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-r border-slate-200/50 dark:border-slate-700/50">
+          {/* Left Panel - Product Browser (3 phần ~ 30%) */}
+          <div className="w-[30%] flex flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-r border-slate-200/50 dark:border-slate-700/50">
             {/* Modern Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-slate-800/50 dark:to-slate-800/50">
               <div className="flex items-center gap-3">
@@ -863,8 +869,8 @@ const GoodsReceiptModal: React.FC<{
             </div>
           </div>
 
-          {/* Right Panel - Cart & Checkout (50%) */}
-          <div className="w-1/2 bg-white dark:bg-slate-800 flex flex-col">
+          {/* Right Panel - Cart & Checkout (7 phần ~ 70%) */}
+          <div className="w-[70%] bg-white dark:bg-slate-800 flex flex-col">
             {/* Supplier Selection - Modern */}
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-emerald-50/30 to-teal-50/30 dark:from-slate-800/50 dark:to-slate-800/50">
               <div className="flex items-center gap-2 mb-2">
@@ -1171,6 +1177,38 @@ const GoodsReceiptModal: React.FC<{
                                 item.importPrice * item.quantity
                               )}
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Sub row: IMEI / Seri & Màu sắc */}
+                        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                              IMEI / Seri:
+                            </span>
+                            <input
+                              type="text"
+                              value={item.imei || ""}
+                              onChange={(e) =>
+                                updateReceiptItem(item.partId, "imei", e.target.value)
+                              }
+                              placeholder="Nhập số IMEI / Seri..."
+                              className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/60 text-slate-900 dark:text-slate-100 text-xs focus:border-blue-500 font-mono"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                              Màu sắc:
+                            </span>
+                            <input
+                              type="text"
+                              value={item.color || ""}
+                              onChange={(e) =>
+                                updateReceiptItem(item.partId, "color", e.target.value)
+                              }
+                              placeholder="Màu sắc (VD: Đen, Titanium...)"
+                              className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/60 text-slate-900 dark:text-slate-100 text-xs focus:border-blue-500"
+                            />
                           </div>
                         </div>
                       </div>

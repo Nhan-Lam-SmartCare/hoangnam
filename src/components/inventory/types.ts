@@ -9,11 +9,18 @@ export interface ReceiptItem {
     importPrice: number;
     sellingPrice: number;
     wholesalePrice: number;
+    imei?: string;
+    color?: string;
+    laborCost?: number;
+    markupPercent?: number;
+    roundingRule?: string;
     _isNewProduct?: boolean;
     _productData?: {
         name: string;
         sku: string;
         barcode: string;
+        imei?: string;
+        color?: string;
         category: string;
         description: string;
         warrantyPeriod?: string;
@@ -34,9 +41,12 @@ export interface AddProductFormData {
     name: string;
     description: string;
     barcode: string;
+    imei?: string;
+    color?: string;
     category: string;
     quantity: number;
     importPrice: number;
+    laborCost?: number;
     retailPrice: number;
     warranty: number;
     warrantyUnit: string;

@@ -49,6 +49,8 @@ interface ReceiptItem {
   wholesalePrice: number;
   markupPercent: number;
   roundingRule: RoundingRule;
+  imei?: string;
+  color?: string;
 }
 
 const DEFAULT_MARKUP_PERCENT = 50;
@@ -762,6 +764,38 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                             {formatCurrency(
                               item.quantity * item.importPrice
                             )} đ
+                          </div>
+                        </div>
+
+                        {/* Sub row: IMEI & Color */}
+                        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-semibold block mb-0.5">IMEI / Seri:</span>
+                            <input
+                              type="text"
+                              value={item.imei || ""}
+                              onChange={(e) => {
+                                const updated = [...receiptItems];
+                                updated[index].imei = e.target.value;
+                                setReceiptItems(updated);
+                              }}
+                              placeholder="Nhập IMEI / Seri..."
+                              className="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-semibold block mb-0.5">Màu sắc:</span>
+                            <input
+                              type="text"
+                              value={item.color || ""}
+                              onChange={(e) => {
+                                const updated = [...receiptItems];
+                                updated[index].color = e.target.value;
+                                setReceiptItems(updated);
+                              }}
+                              placeholder="Nhập màu sắc..."
+                              className="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                            />
                           </div>
                         </div>
                       </div>

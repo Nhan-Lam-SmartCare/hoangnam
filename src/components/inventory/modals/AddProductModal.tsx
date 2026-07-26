@@ -20,6 +20,8 @@ const AddProductModal: React.FC<{
     name: string;
     description: string;
     barcode: string;
+    imei?: string;
+    color?: string;
     category: string;
     quantity: number;
     importPrice: number;
@@ -36,6 +38,8 @@ const AddProductModal: React.FC<{
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [imei, setImei] = useState("");
+  const [color, setColor] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [category, setCategory] = useState("");
   const [quantity, setQuantity] = useState<number>(1);
@@ -81,6 +85,8 @@ const AddProductModal: React.FC<{
       name: name.trim(),
       description: description.trim(),
       barcode: barcode.trim(),
+      imei: imei.trim(),
+      color: color.trim(),
       category: category || "Chưa phân loại",
       quantity: Number(quantity) || 1,
       importPrice: Number(importPrice) || 0,
@@ -94,6 +100,8 @@ const AddProductModal: React.FC<{
     setName("");
     setDescription("");
     setBarcode("");
+    setImei("");
+    setColor("");
     setCategory("");
     setQuantity(1);
     setImportPrice(0);
@@ -165,28 +173,57 @@ const AddProductModal: React.FC<{
                   </div>
                 </div>
 
-                {/* Barcode / SKU / IMEI */}
+                {/* Mã vạch / SKU */}
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400 mb-1.5 pl-1">
-                    Mã vạch / SKU / IMEI
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
+                    Mã vạch / SKU sản phẩm
+                  </label>
+                  <input
+                    type="text"
+                    value={barcode}
+                    onChange={(e) => setBarcode(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 font-mono"
+                    placeholder="VD: A01, IP17PRO..."
+                  />
+                </div>
+
+                {/* Số IMEI / Seri (Cấu hình riêng) */}
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1 flex items-center justify-between">
+                    <span>Số IMEI / Seri máy (Riêng biệt)</span>
                   </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
-                      placeholder="Nhập mã vạch hoặc IMEI..."
+                      value={imei}
+                      onChange={(e) => setImei(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500 font-mono"
+                      placeholder="Nhập IMEI / Seri riêng..."
                     />
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
                       className="w-10 h-10 flex items-center justify-center bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 transition-colors flex-shrink-0"
-                      aria-label="Quét mã vạch hoặc IMEI"
+                      aria-label="Quét IMEI hoặc Mã vạch"
+                      title="Quét IMEI / Mã vạch"
                     >
                       <Camera className="w-4 h-4" />
                     </button>
                   </div>
+                </div>
+
+                {/* Màu sắc */}
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 pl-1">
+                    Màu sắc
+                  </label>
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500"
+                    placeholder="VD: Đen, Trắng, Titanium, Xám..."
+                  />
                 </div>
               </div>
             </div>
