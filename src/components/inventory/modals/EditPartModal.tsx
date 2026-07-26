@@ -1,14 +1,12 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
+import { useSuppliers } from "../../../hooks/useSuppliers";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import type { Part } from "../../../types";
 import UiModal from "../../ui/Modal";
 import { supabase } from "../../../supabaseClient";
-
-
-
 import { isPhoneBranch } from "../../../utils/branchUtils";
 
 interface EditPartModalProps {
@@ -32,6 +30,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
     }
   });
 
+  const { data: suppliers = [] } = useSuppliers();
   const hideLaborCost = isPhoneBranch(currentBranchId, branches);
 
   const [formData, setFormData] = useState({
@@ -47,7 +46,9 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
     laborCost: Number((part as any).laborCost?.[currentBranchId] || 0),
     costPrice: part.costPrice?.[currentBranchId] || 0,
     stock: part.stock?.[currentBranchId] || 0,
-    branchId: (part as any).branch_id || (part as any).branchId || "",
+    imei: part.imei || "",
+    color: part.color || "",
+    supplierId: (part as any).supplierId || (part as any).supplier_id || "",
   });
 
   const { data: categories = [] } = useCategories();
@@ -88,10 +89,26 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
         ...(part.wholesalePrice || {}),
         [currentBranchId]: formData.laborCost,
       },
-      branch_id: formData.branchId || null,
+      imei: formData.imei.trim() || undefined,
+      color: formData.color.trim() || undefined,
+      supplierId: formData.supplierId || undefined,
+      supplier_id: formData.supplierId || undefined,
     } as any);
   };
 
+  const currentBranchName = branches.find((b: any) => b.id === currentBranchId)?.name || "hiện tại";
+
+  const { currentBranchSuppliers, otherSuppliers } = React.useMemo(() => {
+    const branchSupps = suppliers.filter((s: any) => {
+      const bId = s.branch_id || s.branchId;
+      return bId === currentBranchId;
+    });
+    const otherSupps = suppliers.filter((s: any) => {
+      const bId = s.branch_id || s.branchId;
+      return !bId || bId !== currentBranchId;
+    });
+    return { currentBranchSuppliers: branchSupps, otherSuppliers: otherSupps };
+  }, [suppliers, currentBranchId]);
 
   return (
     <UiModal
@@ -191,6 +208,38 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
           </div>
         </div>
 
+        {/* IMEI / Seri & Màu sắc */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              📱 Số IMEI / Seri máy (Riêng biệt)
+            </label>
+            <input
+              type="text"
+              value={formData.imei}
+              onChange={(e) =>
+                setFormData({ ...formData, imei: e.target.value })
+              }
+              placeholder="Nhập IMEI hoặc số Seri..."
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              🎨 Màu sắc sản phẩm
+            </label>
+            <input
+              type="text"
+              value={formData.color}
+              onChange={(e) =>
+                setFormData({ ...formData, color: e.target.value })
+              }
+              placeholder="Ví dụ: Đen, Trắng, Titanium..."
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
         <div className={`grid ${hideLaborCost ? "grid-cols-2" : "grid-cols-3"} gap-4`}>
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -281,28 +330,40 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
           </div>
         </div>
 
+        {/* Thay thế Gán sản phẩm cho chi nhánh bằng Nhà cung cấp */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-            Gán sản phẩm cho chi nhánh
+            🏭 Nhà cung cấp (Gán lúc nhập kho)
           </label>
           <select
-            value={formData.branchId}
-            onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+            value={formData.supplierId}
+            onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="">Tất cả chi nhánh</option>
-            {branches.map((b: any) => (
-              <option key={b.id} value={b.id}>
-                {b.name} ({b.id})
-              </option>
-            ))}
-
+            <option value="">-- Chưa gán nhà cung cấp --</option>
+            {currentBranchSuppliers.length > 0 && (
+              <optgroup label={`📍 Chi nhánh ${currentBranchName}`}>
+                {currentBranchSuppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.phone ? `• ${s.phone}` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {otherSuppliers.length > 0 && (
+              <optgroup label={currentBranchSuppliers.length > 0 ? "🌐 Nhà cung cấp chung / Chi nhánh khác" : "Danh sách nhà cung cấp"}>
+                {otherSuppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.phone ? `• ${s.phone}` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-            Sản phẩm được gán cho chi nhánh cụ thể sẽ chỉ hiển thị ở kho chi nhánh đó. Chọn "Tất cả chi nhánh" để hiển thị mọi nơi.
+            Nhà cung cấp được chọn/gán khi thực hiện nhập kho sản phẩm này.
           </p>
         </div>
-
 
         {/* Info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-xs">
@@ -310,7 +371,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
             <div className="font-medium mb-1">Lưu ý:</div>
             <ul className="list-disc list-inside space-y-1">
               <li>
-                Bạn có thể chỉnh sửa trực tiếp giá nhập, giá bán, tiền công và tồn kho
+                Bạn có thể chỉnh sửa trực tiếp IMEI/Seri, Màu sắc, giá nhập, giá bán, tiền công và tồn kho
               </li>
               <li>
                 Hoặc sử dụng "Tạo phiếu nhập" để ghi nhận lịch sử nhập kho chi tiết

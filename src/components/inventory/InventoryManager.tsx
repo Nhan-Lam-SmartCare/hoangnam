@@ -1007,7 +1007,11 @@ const InventoryManagerNew: React.FC = () => {
               wholesalePrice: updatedPart.wholesalePrice,
               laborCost: (updatedPart as any).laborCost,
               warrantyPeriod: updatedPart.warrantyPeriod,
-            };
+              imei: updatedPart.imei,
+              color: updatedPart.color,
+              supplierId: (updatedPart as any).supplierId,
+              supplier_id: (updatedPart as any).supplierId,
+            } as any;
             // Try to add costPrice if it exists in schema
             if (updatedPart.costPrice) {
               updates.costPrice = updatedPart.costPrice;

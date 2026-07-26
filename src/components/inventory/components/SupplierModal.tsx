@@ -7,6 +7,7 @@ interface SupplierModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (supplier: any) => void;
+    currentBranchId?: string;
     initialData?: {
         id?: string;
         name: string;
@@ -21,6 +22,7 @@ const SupplierModal: React.FC<SupplierModalProps> = ({
     isOpen,
     onClose,
     onSave,
+    currentBranchId,
     initialData,
     mode,
 }) => {
@@ -61,7 +63,8 @@ const SupplierModal: React.FC<SupplierModalProps> = ({
                     phone: phone.trim() || undefined,
                     address: address.trim() || undefined,
                     email: email.trim() || undefined,
-                });
+                    branch_id: currentBranchId || undefined,
+                } as any);
 
                 onSave(newSupplier);
             } else if (mode === "edit" && initialData?.id) {

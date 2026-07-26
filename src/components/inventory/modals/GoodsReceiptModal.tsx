@@ -1,4 +1,4 @@
-import { X, Smartphone, Palette } from 'lucide-react';
+import { X, Smartphone, Palette, Camera } from 'lucide-react';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canDo } from '../../../utils/permissions';
@@ -56,6 +56,8 @@ const GoodsReceiptModal: React.FC<{
     }
   ) => void;
 }> = ({ isOpen, onClose, parts, currentBranchId, canViewImportPrice = true, onSave }) => {
+  const { profile } = useAuth();
+  const canCreatePart = canDo(profile, "part.create");
   const { data: branchesRepo = [] } = useBranchesRepo();
   const hideLaborCost = isPhoneBranch(currentBranchId, branchesRepo);
   const [searchTerm, setSearchTerm] = useState("");
@@ -81,6 +83,7 @@ const GoodsReceiptModal: React.FC<{
       markupPercent: number;
       roundingRule: RoundingRule;
       imei?: string;
+      imeis?: string[];
       color?: string;
     }>
   >([]);
@@ -98,6 +101,7 @@ const GoodsReceiptModal: React.FC<{
     "amount"
   );
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
 
   // Auto-save key cho localStorage
   const DRAFT_KEY = `goods_receipt_draft_${currentBranchId}`;
@@ -405,12 +409,6 @@ const GoodsReceiptModal: React.FC<{
     );
   }, [receiptItems]);
 
-  const totalAmount = useMemo(() => {
-    return Math.max(0, subtotal - discount);
-  }, [subtotal, discount]);
-
-  const { profile } = useAuth();
-  const canCreatePart = canDo(profile, "part.create");
   const handleSave = () => {
     if (!canDo(profile, "part.update_price")) {
       showToast.error("Bạn không có quyền cập nhật giá");
@@ -420,9 +418,28 @@ const GoodsReceiptModal: React.FC<{
       showToast.warning("Vui lòng chọn sản phẩm nhập kho");
       return;
     }
-    // Calculate paidAmount based on paymentType
-    // Default to "full" if paymentType is null (user selected payment method but didn't explicitly click payment type)
+
+    if (totalAmount <= 0) {
+      showToast.warning("Tổng tiền nhập kho phải lớn hơn 0đ. Vui lòng kiểm tra lại giá nhập!");
+      return;
+    }
+
     const effectivePaymentType = paymentType || "full";
+    if ((effectivePaymentType === "note" || effectivePaymentType === "partial") && !selectedSupplier) {
+      showToast.warning("Vui lòng chọn Nhà cung cấp để ghi nợ / theo dõi công nợ!");
+      return;
+    }
+
+    if (!paymentMethod) {
+      showToast.warning("Vui lòng chọn phương thức thanh toán (Tiền mặt hoặc Chuyển khoản)");
+      return;
+    }
+
+    if (effectivePaymentType === "partial" && partialAmount <= 0) {
+      showToast.warning("Vui lòng nhập số tiền thanh toán!");
+      return;
+    }
+
     const calculatedPaidAmount =
       effectivePaymentType === "full"
         ? totalAmount
@@ -432,17 +449,35 @@ const GoodsReceiptModal: React.FC<{
 
     onSave(receiptItems, selectedSupplier, totalAmount, "", {
       paymentMethod: paymentMethod || "cash",
-      paymentType: paymentType || "full",
+      paymentType: effectivePaymentType,
       paidAmount: calculatedPaidAmount,
-      discount,
+      discount: discountAmount,
     });
-    clearDraft(); // Xóa draft sau khi hoàn tất
+    clearDraft();
     setReceiptItems([]);
     setSelectedSupplier("");
     setSearchTerm("");
     setDiscount(0);
     setDiscountPercent(0);
     setDiscountType("amount");
+    showToast.success("Nhập kho thành công!");
+  };
+
+  const handleCancelReceipt = () => {
+    if (receiptItems.length > 0 || selectedSupplier) {
+      if (window.confirm("Bạn có chắc chắn muốn HỦY phiếu nhập này và XÓA bản nháp không?")) {
+        clearDraft();
+        setReceiptItems([]);
+        setSelectedSupplier("");
+        setSearchTerm("");
+        setDiscount(0);
+        setDiscountPercent(0);
+        setLastSavedTime(null);
+        onClose();
+      }
+    } else {
+      onClose();
+    }
   };
 
   const handleAddNewProduct = (productData: any) => {
@@ -451,39 +486,31 @@ const GoodsReceiptModal: React.FC<{
       return;
     }
 
-    // Tạo sản phẩm mới với stock = 0, stock sẽ được cập nhật khi hoàn tất phiếu nhập
     (async () => {
       try {
-        // Nếu người dùng nhập mã thì dùng, không thì tự sinh SKU ngắn gọn thống nhất.
-        const productSku =
-          productData.barcode?.trim() || productData.sku?.trim() || generateSKU();
-        const createRes = await createPartMutation.mutateAsync({
+        const productSku = productData.barcode || generateSKU();
+        const result = await createPartMutation.mutateAsync({
           name: productData.name,
           sku: productSku,
-          barcode: productData.barcode?.trim() || "", // Lưu lại để tìm kiếm
-          category: productData.category,
-          description: productData.description,
-          warrantyPeriod:
-            Number(productData.warranty || 0) > 0
-              ? `${Number(productData.warranty)} ${productData.warrantyUnit || "tháng"}`
-              : undefined,
-          stock: { [currentBranchId]: 0 }, // Stock = 0, sẽ cập nhật khi hoàn tất phiếu nhập
-          costPrice: { [currentBranchId]: productData.importPrice },
-          laborCost: { [currentBranchId]: Number(productData.laborCost || 0) } as any,
-          retailPrice: { [currentBranchId]: productData.retailPrice },
-          wholesalePrice: {
-            [currentBranchId]: Number(productData.wholesalePrice || 0),
-          },
+          barcode: productData.barcode || productSku,
+          category: productData.category || "Chưa phân loại",
+          description: productData.description || "",
+          warrantyPeriod: productData.warranty
+            ? `${productData.warranty} ${productData.warrantyUnit}`
+            : undefined,
+          stock: { [currentBranchId]: productData.quantity || 0 },
+          costPrice: { [currentBranchId]: productData.importPrice || 0 },
+          retailPrice: { [currentBranchId]: productData.retailPrice || 0 },
+          wholesalePrice: { [currentBranchId]: productData.retailPrice || 0 },
+          laborCost: { [currentBranchId]: productData.laborCost || 0 },
         });
 
-        // Xử lý response - có thể là { ok, data } hoặc trực tiếp Part object
-        const partData = (createRes as any)?.data || createRes;
+        const partData = (result as any)?.data || result;
         const partId =
           partData?.id ||
           `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const partSku = partData?.sku || productSku;
 
-        // Add to receipt items from persisted part
         setReceiptItems((prev) => [
           ...prev,
           {
@@ -515,910 +542,521 @@ const GoodsReceiptModal: React.FC<{
     })();
   };
 
+  const totalQuantity = useMemo(() => {
+    return receiptItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [receiptItems]);
+
+  const totalRetailSelling = useMemo(() => {
+    return receiptItems.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
+  }, [receiptItems]);
+
+  const estimatedProfitRate = useMemo(() => {
+    if (subtotal <= 0) return 0;
+    return Math.round(((totalRetailSelling - subtotal) / subtotal) * 100);
+  }, [subtotal, totalRetailSelling]);
+
+  const discountAmount = useMemo(() => {
+    if (discountType === "percent") {
+      return Math.round((subtotal * discountPercent) / 100);
+    }
+    return discount;
+  }, [subtotal, discount, discountType, discountPercent]);
+
+  const totalAmount = useMemo(() => {
+    return Math.max(0, subtotal - discountAmount);
+  }, [subtotal, discountAmount]);
+
+  const currentBranchName = branchesRepo.find((b) => b.id === currentBranchId)?.name || "hiện tại";
+
+  const { currentBranchSuppliers, otherSuppliers } = useMemo(() => {
+    const branchSupps = suppliers.filter((s: any) => {
+      const bId = s.branch_id || s.branchId;
+      return bId === currentBranchId;
+    });
+    const otherSupps = suppliers.filter((s: any) => {
+      const bId = s.branch_id || s.branchId;
+      return !bId || bId !== currentBranchId;
+    });
+    return { currentBranchSuppliers: branchSupps, otherSuppliers: otherSupps };
+  }, [suppliers, currentBranchId]);
+
   if (!isOpen) return null;
 
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3"
         role="dialog"
         aria-modal="true"
         aria-labelledby="goods-receipt-title"
       >
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 w-full max-w-7xl h-[92vh] rounded-2xl shadow-2xl overflow-hidden flex">
-          {/* Left Panel - Product Browser (3 phần ~ 30%) */}
-          <div className="w-[30%] flex flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-r border-slate-200/50 dark:border-slate-700/50">
-            {/* Modern Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-slate-800/50 dark:to-slate-800/50">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onClose}
-                  className="w-9 h-9 flex items-center justify-center hover:bg-white/80 dark:hover:bg-slate-700/80 rounded-lg text-slate-600 dark:text-slate-400 transition-all hover:scale-105"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                </button>
-                <div>
-                  <h2 id="goods-receipt-title" className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    Danh mục sản phẩm
-                  </h2>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    Chọn để thêm vào giỏ
-                  </p>
-                </div>
+        <div className="bg-white dark:bg-slate-900 w-full max-w-7xl h-[94vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200 dark:border-slate-800">
+          {/* Top Unified Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-900 text-white select-none">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold">
+                📥
               </div>
-              {canCreatePart && (
-                <button
-                  onClick={() => setShowAddProductModal(true)}
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  <span>Thêm mới</span>
-                </button>
-              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 id="goods-receipt-title" className="text-base font-bold text-white tracking-wide">
+                    PHIẾU NHẬP KHO
+                  </h2>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                    {branchesRepo.find((b) => b.id === currentBranchId)?.name || "Chi nhánh"} • {new Date().toLocaleDateString("vi-VN")}
+                  </span>
+                </div>
+                {lastSavedTime && (
+                  <p className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
+                    <span>✓ Đã tự động lưu nháp lúc {lastSavedTime}</span>
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Search Bar with Icon */}
-            <div className="p-3 bg-white/50 dark:bg-slate-800/50 space-y-2">
-              {/* Barcode Scanner Input - Toggle visibility */}
-              {showBarcodeInput && (
-                <form onSubmit={handleBarcodeSubmit}>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <svg
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                        />
-                      </svg>
-                      <input
-                        ref={barcodeInputRef}
-                        type="text"
-                        placeholder="Quét mã vạch hoặc nhập SKU..."
-                        value={barcodeInput}
-                        onChange={(e) => setBarcodeInput(e.target.value)}
-                        className="w-full pl-10 pr-8 py-2.5 border-2 border-blue-300 dark:border-blue-600 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 text-slate-900 dark:text-slate-100 text-sm placeholder:text-blue-500/60 dark:placeholder:text-blue-400/60 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-mono"
-                      />
-                      {barcodeInput && (
-                        <button
-                          type="button"
-                          onClick={() => setBarcodeInput("")}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    {/* Close barcode input */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowBarcodeInput(false);
-                        setBarcodeInput("");
-                      }}
-                      className="px-3 py-2.5 rounded-xl border-2 border-slate-300 dark:border-slate-600 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
-                      title="Đóng"
-                    >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Manual Search with barcode toggle */}
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Hoặc tìm kiếm thủ công..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
-                  />
-                </div>
-
-                {/* Barcode Toggle Button */}
-                {!showBarcodeInput && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowBarcodeInput(true);
-                      setTimeout(() => barcodeInputRef.current?.focus(), 100);
-                    }}
-                    className="px-3 py-2.5 rounded-xl border-2 border-blue-400 text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-400 font-semibold text-sm flex items-center gap-1.5 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                    title="Quét mã vạch"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                      />
-                    </svg>
-                  </button>
-                )}
-
-                {/* Camera Scanner Button */}
+            {/* Top Right Header Controls: Supplier & Close */}
+            <div className="flex items-center gap-3">
+              {/* Supplier Selector */}
+              <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                <span className="text-xs font-bold text-slate-300 whitespace-nowrap">Nhà cung cấp:</span>
+                <select
+                  value={selectedSupplier}
+                  onChange={(e) => setSelectedSupplier(e.target.value)}
+                  className="bg-slate-900 text-white text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-700 outline-none max-w-[220px]"
+                >
+                  <option value="">-- Chọn Nhà Cung Cấp --</option>
+                  {currentBranchSuppliers.length > 0 && (
+                    <optgroup label={`📍 Chi nhánh ${currentBranchName}`}>
+                      {currentBranchSuppliers.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.phone ? `• ${s.phone}` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherSuppliers.length > 0 && (
+                    <optgroup label={currentBranchSuppliers.length > 0 ? "🌐 Nhà cung cấp chung / Chi nhánh khác" : "Danh sách nhà cung cấp"}>
+                      {otherSuppliers.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.phone ? `• ${s.phone}` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
                 <button
                   type="button"
-                  onClick={() => setShowCameraScanner(true)}
-                  className="px-3 py-2.5 rounded-xl border-2 border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20 font-semibold text-sm flex items-center gap-1.5 transition-all hover:bg-green-100"
-                  title="Quét bằng camera"
+                  onClick={() => setShowSupplierModal(true)}
+                  className="text-xs px-2 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 rounded-lg border border-emerald-500/30 font-semibold transition"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
+                  + Thêm
                 </button>
               </div>
-            </div>
 
-            {/* Products Grid */}
-            <div className="flex-1 overflow-y-auto p-3">
-              {filteredParts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                  <svg
-                    className="w-16 h-16 mb-3 opacity-30"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                    />
-                  </svg>
-                  <p className="text-sm font-medium">Không tìm thấy sản phẩm</p>
-                  <p className="text-xs mt-1">Thử tìm kiếm với từ khóa khác</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredParts.map((part) => (
-                    <div
-                      key={part.id}
-                      onClick={() => addToReceipt(part)}
-                      className="group p-3 bg-white dark:bg-slate-800 rounded-xl hover:shadow-lg hover:shadow-blue-500/10 cursor-pointer border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 transition-all duration-200 hover:scale-[1.02]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                          <svg
-                            className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                            />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {part.name}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
-                              {part.sku}
-                            </span>
-                            <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${part.category
-                                ? `${getCategoryColor(part.category).bg} ${getCategoryColor(part.category).text
-                                }`
-                                : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                                }`}
-                            >
-                              {part.category || "Chưa phân loại"}
-                            </span>
-                          </div>
-                          {/* Price Information */}
-                          <div className="flex items-center gap-2 mt-1.5">
-                            {(() => {
-                              const inCart = receiptItems.find((item) => item.partId === part.id);
-                              const displayImportPrice =
-                                inCart?.importPrice ?? part.costPrice?.[currentBranchId] ?? 0;
-                              const displayRetailPrice =
-                                inCart?.sellingPrice ?? part.retailPrice?.[currentBranchId] ?? 0;
-                              const displayLaborCost =
-                                inCart?.laborCost ?? (part as any).laborCost?.[currentBranchId] ?? 0;
-
-                              return (
-                                <>
-                                  {canViewImportPrice && (
-                                    <>
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Nhập:</span>
-                                        <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400">
-                                          {formatCurrency(displayImportPrice)}
-                                        </span>
-                                      </div>
-                                      <span className="text-slate-300 dark:text-slate-600">•</span>
-                                    </>
-                                  )}
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Bán:</span>
-                                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                      {formatCurrency(displayRetailPrice)}
-                                    </span>
-                                  </div>
-                                  {!hideLaborCost && (
-                                    <>
-                                      <span className="text-slate-300 dark:text-slate-600">•</span>
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Công:</span>
-                                        <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
-                                          {formatCurrency(displayLaborCost)}
-                                        </span>
-                                      </div>
-                                    </>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                        <svg
-                          className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Close Button */}
+              <button
+                onClick={handleCancelReceipt}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                title="Đóng phiếu (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
-          {/* Right Panel - Cart & Checkout (7 phần ~ 70%) */}
-          <div className="w-[70%] bg-white dark:bg-slate-800 flex flex-col">
-            {/* Supplier Selection - Modern */}
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-emerald-50/30 to-teal-50/30 dark:from-slate-800/50 dark:to-slate-800/50">
-              <div className="flex items-center gap-2 mb-2">
-                <svg
-                  className="w-4 h-4 text-emerald-600 dark:text-emerald-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                  />
-                </svg>
-                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Nhà cung cấp
-                </label>
-                <button
-                  onClick={() => {
-                    setShowSupplierModal(true);
-                  }}
-                  className="ml-auto flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 font-medium transition-all"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
+          {/* Main Content Body */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Panel - Product Browser (36%) */}
+            <div className="w-[36%] flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+              {/* Search Bar & Quick Tools */}
+              <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Tìm tên, SKU, mã vạch... (Enter để chọn)"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs outline-none focus:border-blue-500"
                     />
-                  </svg>
-                  Thêm NCC
-                </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCameraScanner(true)}
+                    className="px-2.5 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20 font-bold text-xs"
+                    title="Quét camera"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {canCreatePart && (
+                  <button
+                    onClick={() => setShowAddProductModal(true)}
+                    className="w-full py-1.5 border border-dashed border-blue-400/50 hover:border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-500/10 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition"
+                  >
+                    <span>+ Tạo sản phẩm mới</span>
+                  </button>
+                )}
               </div>
-              <select
-                value={selectedSupplier}
-                onChange={(e) => setSelectedSupplier(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-medium focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
-              >
-                <option value="">Chọn nhà cung cấp...</option>
-                {suppliers.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} {s.phone ? `• ${s.phone}` : ""}
-                  </option>
-                ))}
-              </select>
+
+              {/* Product List */}
+              <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 custom-scrollbar bg-slate-900/50">
+                {filteredParts.map((part) => {
+                  const stock = part.stock?.[currentBranchId] ?? 0;
+                  const isZeroStock = stock <= 0;
+                  const retailPrice = part.retailPrice?.[currentBranchId] ?? 0;
+
+                  return (
+                    <div
+                      key={part.id}
+                      onClick={() => addToReceipt(part)}
+                      className="p-2.5 rounded-xl border border-slate-700/80 bg-slate-800/90 hover:bg-slate-800 hover:border-blue-500 cursor-pointer transition flex items-center justify-between group shadow-sm"
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="font-bold text-xs text-slate-100 truncate group-hover:text-blue-400">
+                          {part.name}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="font-mono text-[10px] text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/30">
+                            {part.sku}
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isZeroStock ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-slate-900 text-slate-200 border border-slate-700'}`}>
+                            {isZeroStock ? 'Tồn: 0 ⚠️' : `Tồn: ${stock}`}
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-semibold ml-auto">
+                            Bán: {formatCurrency(retailPrice)}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="w-7 h-7 rounded-lg bg-blue-500/20 group-hover:bg-blue-600 text-blue-400 group-hover:text-white flex items-center justify-center font-bold text-xs transition shrink-0"
+                      >
+                        +
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {showSupplierModal && (
-              <SupplierModal
-                isOpen={showSupplierModal}
-                onClose={() => setShowSupplierModal(false)}
-                onSave={(supplier) => {
-                  if (supplier?.id) {
-                    setSelectedSupplier(supplier.id);
-                    // Refresh suppliers list if needed, but react-query should handle it if we invalidate queries
-                    // The SupplierModal already invalidates 'suppliers' query
-                  }
-                  setShowSupplierModal(false);
-                }}
-                mode="add"
-              />
-            )}
-
-            {/* Cart Items - Modern Cards */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="flex items-center justify-between mb-3">
+            {/* Right Panel - Cart & Calculation (64%) */}
+            <div className="w-[64%] flex flex-col bg-slate-50 dark:bg-slate-900">
+              {/* Cart Header */}
+              <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-2">
-                  <svg
-                    className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                    />
-                  </svg>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                    Giỏ hàng nhập
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                    GIỎ HÀNG NHẬP
                   </h3>
-                </div>
-                <span className="text-xs text-white bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 rounded-full font-semibold shadow-lg">
-                  {receiptItems.length} sản phẩm
-                </span>
-              </div>
-
-              {receiptItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                  <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-2xl flex items-center justify-center mb-4">
-                    <svg
-                      className="w-12 h-12 text-slate-300 dark:text-slate-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                      />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                    Giỏ hàng trống
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Chọn sản phẩm bên trái để thêm vào
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {receiptItems.map((item, index) => {
-                    // Tìm part gốc để lấy category
-                    const originalPart = parts.find(
-                      (p) => p.id === item.partId
-                    );
-                    return (
-                      <div
-                        key={item.partId}
-                        className="bg-slate-900/90 dark:bg-slate-800/90 border border-slate-700/80 rounded-xl p-3 shadow-sm hover:border-blue-500/50 transition-all space-y-2.5"
-                      >
-                        {/* Header: #, Name, SKU, Category, Delete */}
-                        <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="px-2 py-0.5 rounded-lg bg-blue-600/20 text-blue-400 font-extrabold text-xs border border-blue-500/30">
-                              #{index + 1}
-                            </span>
-                            <h4 className="font-bold text-sm text-slate-100 truncate">
-                              {item.partName}
-                            </h4>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                              {item.sku}
-                            </span>
-                            {originalPart?.category && (
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${getCategoryColor(originalPart.category).bg
-                                  } ${getCategoryColor(originalPart.category).text
-                                  }`}
-                              >
-                                {originalPart.category}
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => removeReceiptItem(item.partId)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                            title="Xóa khỏi giỏ"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {/* Row 1: Quantity | Import Price | Profit % | Selling Price | Total */}
-                        <div className="grid grid-cols-12 gap-2 items-end bg-slate-950/40 p-2.5 rounded-lg border border-slate-800">
-                          {/* Col 1: Quantity (3 cols) */}
-                          <div className="col-span-3">
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
-                              Số lượng
-                            </label>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateReceiptItem(
-                                    item.partId,
-                                    "quantity",
-                                    Math.max(1, item.quantity - 1)
-                                  )
-                                }
-                                className="w-7 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-sm border border-slate-700"
-                              >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 1;
-                                  updateReceiptItem(item.partId, "quantity", Math.max(1, val));
-                                }}
-                                className="w-10 h-8 text-center border border-slate-700 rounded-lg bg-slate-900 text-white text-xs font-bold"
-                                min="1"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateReceiptItem(item.partId, "quantity", item.quantity + 1)
-                                }
-                                className="w-7 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-sm border border-slate-700"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Col 2: Giá nhập (3 cols) */}
-                          <div className="col-span-3">
-                            <label className="block text-[10px] font-bold text-orange-400 uppercase mb-1">
-                              Giá nhập (đ)
-                            </label>
-                            <FormattedNumberInput
-                              value={item.importPrice}
-                              onValue={(val) => {
-                                const { clean } = validatePriceAndQty(val, item.quantity);
-                                const newImport = clean.importPrice;
-                                const autoPrice = calcSellingFromRule(
-                                  newImport,
-                                  Number(item.markupPercent || DEFAULT_MARKUP_PERCENT),
-                                  item.roundingRule || "integer"
-                                );
-                                setReceiptItems((items) =>
-                                  items.map((it) =>
-                                    it.partId === item.partId
-                                      ? {
-                                          ...it,
-                                          importPrice: newImport,
-                                          sellingPrice: autoPrice,
-                                        }
-                                      : it
-                                  )
-                                );
-                              }}
-                              className="w-full h-8 px-2 border border-slate-700 rounded-lg bg-slate-900 text-orange-300 text-right text-xs font-bold focus:border-orange-500"
-                              placeholder="Giá nhập"
-                            />
-                          </div>
-
-                          {/* Col 3: Lợi nhuận % (2 cols) */}
-                          <div className="col-span-2">
-                            <label className="block text-[10px] font-bold text-purple-400 uppercase mb-1">
-                              % Lãi
-                            </label>
-                            <FormattedNumberInput
-                              value={item.markupPercent}
-                              onValue={(val) => {
-                                const markupPercent = Math.max(0, Math.round(val));
-                                const targetCategory = originalPart?.category || "";
-                                setReceiptItems((items) =>
-                                  items.map((it) =>
-                                    (() => {
-                                      if (it.partId === item.partId) return true;
-                                      if (!targetCategory) return false;
-                                      const itPart = parts.find((p) => p.id === it.partId);
-                                      return (itPart?.category || "") === targetCategory;
-                                    })()
-                                      ? {
-                                          ...it,
-                                          markupPercent,
-                                          sellingPrice: calcSellingFromRule(
-                                            Number(it.importPrice || 0),
-                                            markupPercent,
-                                            it.roundingRule || "integer"
-                                          ),
-                                        }
-                                      : it
-                                  )
-                                );
-                              }}
-                              className="w-full h-8 px-2 border border-purple-500/30 rounded-lg bg-slate-900 text-purple-300 text-right text-xs font-bold focus:border-purple-500"
-                              placeholder="%"
-                            />
-                          </div>
-
-                          {/* Col 4: Giá bán (2 cols) */}
-                          <div className="col-span-2">
-                            <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">
-                              Giá bán (đ)
-                            </label>
-                            <FormattedNumberInput
-                              value={item.sellingPrice}
-                              onValue={(val) => {
-                                const sellingPrice = Math.max(0, Math.round(val));
-                                const markupPercent = calcMarkupPercent(
-                                  Number(item.importPrice || 0),
-                                  sellingPrice
-                                );
-                                setReceiptItems((items) =>
-                                  items.map((it) =>
-                                    it.partId === item.partId
-                                      ? { ...it, sellingPrice, markupPercent }
-                                      : it
-                                  )
-                                );
-                              }}
-                              className="w-full h-8 px-2 border border-slate-700 rounded-lg bg-slate-900 text-emerald-300 text-right text-xs font-bold focus:border-emerald-500"
-                              placeholder="Giá bán"
-                            />
-                          </div>
-
-                          {/* Col 5: Thành tiền (2 cols) */}
-                          <div className="col-span-2 text-right">
-                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">
-                              Thành tiền
-                            </label>
-                            <div className="text-xs font-black text-blue-400">
-                              {formatCurrency(item.importPrice * item.quantity)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Row 2: IMEI / Seri & Màu sắc (Inputs with labels & icons) */}
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-300 mb-1 flex items-center gap-1">
-                              <Smartphone className="w-3 h-3 text-blue-400" />
-                              <span>Số IMEI / Seri máy (Cấu hình)</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={item.imei || ""}
-                              onChange={(e) =>
-                                updateReceiptItem(item.partId, "imei", e.target.value)
-                              }
-                              placeholder="Nhập số IMEI hoặc Seri máy..."
-                              className="w-full h-8 px-2.5 border border-slate-700 rounded-lg bg-slate-900 text-slate-100 text-xs font-mono focus:border-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-300 mb-1 flex items-center gap-1">
-                              <Palette className="w-3 h-3 text-purple-400" />
-                              <span>Màu sắc máy</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={item.color || ""}
-                              onChange={(e) =>
-                                updateReceiptItem(item.partId, "color", e.target.value)
-                              }
-                              placeholder="VD: Titanium, Đen, Trắng..."
-                              className="w-full h-8 px-2.5 border border-slate-700 rounded-lg bg-slate-900 text-slate-100 text-xs focus:border-blue-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Payment Section - Compact */}
-            <div className="p-3 border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-              {/* Total Display - Always visible */}
-              <div className="mb-3 p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-white uppercase">
-                    Tổng thanh toán
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                    {receiptItems.length} SP • {totalQuantity} cái
                   </span>
-                  <div className="text-right">
-                    <div className="text-xl font-black text-white">
-                      {formatCurrency(totalAmount)}
-                    </div>
-                    <div className="text-[10px] text-white/70">
-                      {receiptItems.length} SP
-                    </div>
-                  </div>
                 </div>
               </div>
 
-              {/* Payment Method - Compact buttons */}
-              <div className="mb-3">
-                <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Phương thức thanh toán <span className="text-red-500">*</span>
-                </label>
+              {/* Data Table Area */}
+              <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+                {receiptItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 py-12">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-3 text-2xl">
+                      📦
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Giỏ hàng nhập kho đang trống</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Chọn sản phẩm bên danh sách trái hoặc dùng máy quét barcode</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase text-[10px] border-b border-slate-200 dark:border-slate-700">
+                          <th className="py-2 px-2 text-center w-7">#</th>
+                          <th className="py-2 px-2 min-w-[140px]">Sản phẩm & SKU</th>
+                          <th className="py-2 px-2 text-center w-24">Số lượng</th>
+                          <th className="py-2 px-2 text-right min-w-[105px] text-orange-500">Giá nhập (đ)</th>
+                          <th className="py-2 px-2 text-right min-w-[105px] text-emerald-500">Giá bán (đ)</th>
+                          <th className="py-2 px-2 text-right min-w-[105px] text-blue-500">Thành tiền</th>
+                          <th className="py-2 px-2 text-center w-7"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                        {receiptItems.map((item, index) => {
+                          return (
+                            <React.Fragment key={item.partId}>
+                              <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                                <td className="py-2 px-2 text-center font-bold text-slate-400">{index + 1}</td>
+                                <td className="py-2 px-2">
+                                  <div className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[170px]">
+                                    {item.partName}
+                                  </div>
+                                  <span className="font-mono text-[10px] text-blue-500">{item.sku}</span>
+                                </td>
+                                <td className="py-2 px-2">
+                                  <div className="flex items-center justify-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateReceiptItem(item.partId, "quantity", Math.max(1, item.quantity - 1))}
+                                      className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-800 rounded font-bold text-xs"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      value={item.quantity}
+                                      onChange={(e) => updateReceiptItem(item.partId, "quantity", Math.max(1, parseInt(e.target.value) || 1))}
+                                      className="w-8 h-6 text-center border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-xs font-bold"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateReceiptItem(item.partId, "quantity", item.quantity + 1)}
+                                      className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-800 rounded font-bold text-xs"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2">
+                                  <FormattedNumberInput
+                                    value={item.importPrice}
+                                    onValue={(val) => {
+                                      const newImport = Math.max(0, Math.round(val));
+                                      const autoPrice = calcSellingFromRule(
+                                        newImport,
+                                        Number(item.markupPercent || DEFAULT_MARKUP_PERCENT),
+                                        item.roundingRule || "integer"
+                                      );
+                                      setReceiptItems((items) =>
+                                        items.map((it) =>
+                                          it.partId === item.partId
+                                            ? { ...it, importPrice: newImport, sellingPrice: autoPrice }
+                                            : it
+                                        )
+                                      );
+                                    }}
+                                    className="w-full px-1.5 py-1 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-orange-600 dark:text-orange-400 text-right text-xs font-bold"
+                                    placeholder="0"
+                                  />
+                                </td>
+                                <td className="py-2 px-2">
+                                  <FormattedNumberInput
+                                    value={item.sellingPrice}
+                                    onValue={(val) => {
+                                      const sellingPrice = Math.max(0, Math.round(val));
+                                      const markupPercent = calcMarkupPercent(Number(item.importPrice || 0), sellingPrice);
+                                      setReceiptItems((items) =>
+                                        items.map((it) =>
+                                          it.partId === item.partId ? { ...it, sellingPrice, markupPercent } : it
+                                        )
+                                      );
+                                    }}
+                                    className="w-full px-1.5 py-1 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-emerald-600 dark:text-emerald-400 text-right text-xs font-bold"
+                                    placeholder="0"
+                                  />
+                                </td>
+                                <td className="py-2 px-2 text-right font-black text-blue-600 dark:text-blue-400 text-xs">
+                                  {formatCurrency(item.importPrice * item.quantity)}
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeReceiptItem(item.partId)}
+                                    className="text-slate-400 hover:text-red-500 p-1"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+
+                              {/* Phone Branch Sub-row for N IMEIs & Color */}
+                              {hideLaborCost && (
+                                <tr className="bg-slate-100/50 dark:bg-slate-950/60">
+                                  <td colSpan={7} className="py-1.5 px-3 border-b border-slate-200 dark:border-slate-800">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1">
+                                        <Smartphone className="w-3 h-3" />
+                                        <span>IMEI/Seri ({item.quantity} máy):</span>
+                                      </span>
+                                      {Array.from({ length: Math.min(10, item.quantity) }).map((_, imeiIndex) => {
+                                        const currentImeis = item.imeis || (item.imei ? [item.imei] : []);
+                                        return (
+                                          <div key={imeiIndex} className="flex items-center gap-1">
+                                            <span className="text-[10px] text-slate-400 font-mono">#{imeiIndex + 1}:</span>
+                                            <input
+                                              type="text"
+                                              value={currentImeis[imeiIndex] || ""}
+                                              onChange={(e) => {
+                                                const newImeis = [...currentImeis];
+                                                newImeis[imeiIndex] = e.target.value;
+                                                setReceiptItems((items) =>
+                                                  items.map((it) =>
+                                                    it.partId === item.partId
+                                                      ? { ...it, imeis: newImeis, imei: newImeis[0] || "" }
+                                                      : it
+                                                  )
+                                                );
+                                              }}
+                                              placeholder={`IMEI ${imeiIndex + 1}...`}
+                                              className="w-28 px-2 py-0.5 text-xs font-mono border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none"
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                      <div className="flex items-center gap-1 ml-auto">
+                                        <span className="text-[11px] font-bold text-purple-500 flex items-center gap-1">
+                                          <Palette className="w-3 h-3" />
+                                          <span>Màu:</span>
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={item.color || ""}
+                                          onChange={(e) => updateReceiptItem(item.partId, "color", e.target.value)}
+                                          placeholder="Màu sắc..."
+                                          className="w-28 px-2 py-0.5 text-xs border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none"
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Calculation & Checkout Section */}
+              <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2.5">
+                {/* Summary Calculations */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <span>Tạm tính:</span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{formatCurrency(subtotal)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">Chiết khấu:</span>
+                    <div className="flex items-center gap-1">
+                      {discountType === "amount" ? (
+                        <FormattedNumberInput
+                          value={discount}
+                          onValue={(v) => setDiscount(Math.max(0, Math.round(v)))}
+                          className="w-24 px-2 py-0.5 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          placeholder="0"
+                        />
+                      ) : (
+                        <FormattedNumberInput
+                          value={discountPercent}
+                          onValue={(v) => setDiscountPercent(Math.max(0, Math.min(100, Math.round(v))))}
+                          className="w-16 px-2 py-0.5 border border-slate-300 dark:border-slate-700 rounded text-right text-xs font-bold bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          placeholder="%"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDiscountType(discountType === "amount" ? "percent" : "amount")}
+                        className="px-1.5 py-0.5 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      >
+                        {discountType === "amount" ? "₫" : "%"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Amount & Estimated Profit Banner */}
+                <div className="p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between shadow-md">
+                  <div>
+                    <div className="text-[10px] uppercase font-extrabold tracking-wider opacity-80">
+                      TỔNG THANH TOÁN
+                    </div>
+                    <div className="text-xl font-black">{formatCurrency(totalAmount)}</div>
+                  </div>
+                  {subtotal > 0 && (
+                    <div className="text-right">
+                      <div className="text-[10px] opacity-80 uppercase font-bold">Lãi dự kiến</div>
+                      <div className="text-sm font-black text-emerald-300">+{estimatedProfitRate}%</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment Method & Type Controls */}
                 <div className="grid grid-cols-2 gap-2">
+                  {/* Payment Method */}
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("cash")}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${paymentMethod === "cash" ? "bg-emerald-600 text-white border-emerald-600" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"}`}
+                    >
+                      💵 Tiền mặt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("bank")}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${paymentMethod === "bank" ? "bg-blue-600 text-white border-blue-600" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"}`}
+                    >
+                      🏦 CK
+                    </button>
+                  </div>
+
+                  {/* Payment Type */}
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => { setPaymentType("full"); setPartialAmount(0); }}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${paymentType === "full" ? "bg-blue-600 text-white border-blue-600" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"}`}
+                    >
+                      Đủ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentType("partial")}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${paymentType === "partial" ? "bg-orange-600 text-white border-orange-600" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"}`}
+                    >
+                      1 phần
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPaymentType("note"); setPartialAmount(0); }}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${paymentType === "note" ? "bg-purple-600 text-white border-purple-600" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700"}`}
+                    >
+                      Công nợ
+                    </button>
+                  </div>
+                </div>
+
+                {/* Partial Amount Input */}
+                {paymentType === "partial" && (
+                  <div className="flex items-center justify-between bg-orange-50 dark:bg-orange-950/20 p-2 rounded-lg border border-orange-200 dark:border-orange-900/40">
+                    <span className="text-xs font-bold text-orange-700 dark:text-orange-400">Số tiền trả:</span>
+                    <FormattedNumberInput
+                      value={partialAmount}
+                      onValue={(v) => setPartialAmount(Math.max(0, Math.round(v)))}
+                      className="w-32 px-2 py-1 text-right text-xs font-bold border border-orange-300 dark:border-orange-700 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      placeholder="Nhập..."
+                    />
+                  </div>
+                )}
+
+                {/* Footer Action Buttons */}
+                <div className="flex gap-2 pt-1">
                   <button
-                    onClick={() => setPaymentMethod("cash")}
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2 border-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === "cash"
-                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
-                      : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
-                      }`}
+                    type="button"
+                    onClick={handleCancelReceipt}
+                    className="flex-1 py-2 px-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs transition"
                   >
-                    💵 Tiền mặt
+                    🗑️ Hủy phiếu
                   </button>
                   <button
-                    onClick={() => setPaymentMethod("bank")}
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2 border-2 rounded-lg text-xs font-bold transition-all ${paymentMethod === "bank"
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                      : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
-                      }`}
+                    type="button"
+                    onClick={handleSave}
+                    className="flex-1 py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
                   >
-                    🏦 Chuyển khoản
+                    <span>✓ NHẬP KHO (F9)</span>
                   </button>
                 </div>
-              </div>
-
-              {/* Show details only when payment method is selected */}
-              {paymentMethod && (
-                <>
-                  {/* Payment Type */}
-                  <div className="mb-3">
-                    <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Hình thức thanh toán
-                    </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button
-                        onClick={() => {
-                          setPaymentType("full");
-                          setPartialAmount(0);
-                        }}
-                        className={`px-2 py-1.5 border-2 rounded-lg text-[10px] font-bold transition-all ${paymentType === "full"
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                          : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
-                          }`}
-                      >
-                        Đủ
-                      </button>
-                      <button
-                        onClick={() => setPaymentType("partial")}
-                        className={`px-2 py-1.5 border-2 rounded-lg text-[10px] font-bold transition-all ${paymentType === "partial"
-                          ? "border-orange-500 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
-                          : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
-                          }`}
-                      >
-                        1 phần
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPaymentType("note");
-                          setPartialAmount(0);
-                        }}
-                        className={`px-2 py-1.5 border-2 rounded-lg text-[10px] font-bold transition-all ${paymentType === "note"
-                          ? "border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
-                          : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
-                          }`}
-                      >
-                        Công nợ
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Partial Payment Input */}
-                  {paymentType === "partial" && (
-                    <div className="mb-3">
-                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Số tiền khách trả
-                      </label>
-                      <FormattedNumberInput
-                        value={partialAmount}
-                        onValue={(v) =>
-                          setPartialAmount(Math.max(0, Math.round(v)))
-                        }
-                        className="w-full px-3 py-2 border-2 border-orange-300 dark:border-orange-700 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-sm font-bold focus:border-orange-500"
-                        placeholder="Nhập số tiền..."
-                      />
-                      <div className="mt-1.5 flex items-center justify-between text-[10px]">
-                        <span className="text-slate-500">Còn lại:</span>
-                        <span className="font-bold text-red-600 dark:text-red-400">
-                          {formatCurrency(
-                            Math.max(0, totalAmount - partialAmount)
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Transaction Type */}
-                  {paymentType && (
-                    <div className="mb-3">
-                      <label className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Loại hạch toán
-                      </label>
-                      <select className="w-full px-3 py-2 border-2 border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:border-blue-500">
-                        <option>Mua hàng/nhập kho</option>
-                        <option>Nhập trả hàng</option>
-                        <option>Khác</option>
-                      </select>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Action Buttons - Always visible */}
-              <div className="flex gap-2">
-                <button
-                  onClick={onClose}
-                  className="flex-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-900 dark:text-slate-100 px-3 py-2.5 rounded-lg font-bold text-xs transition-all"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                      />
-                    </svg>
-                    LƯU NHÁP
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    if (!paymentMethod) {
-                      showToast.warning("Vui lòng chọn phương thức thanh toán");
-                      return;
-                    }
-                    if (!paymentType) {
-                      showToast.warning("Vui lòng chọn hình thức thanh toán");
-                      return;
-                    }
-                    if (paymentType === "partial" && partialAmount <= 0) {
-                      showToast.warning("Vui lòng nhập số tiền khách trả");
-                      return;
-                    }
-                    handleSave();
-                  }}
-                  disabled={
-                    !paymentMethod ||
-                    !paymentType ||
-                    (paymentType === "partial" && partialAmount <= 0)
-                  }
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2.5 rounded-lg font-bold text-xs transition-all disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed dark:disabled:bg-slate-600 dark:disabled:text-slate-400"
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                      />
-                    </svg>
-                    NHẬP KHO
-                  </div>
-                </button>
               </div>
             </div>
           </div>
@@ -1438,6 +1076,22 @@ const GoodsReceiptModal: React.FC<{
         onClose={() => setShowAddProductModal(false)}
         onSave={handleAddNewProduct}
       />
+
+      {/* Supplier Modal */}
+      {showSupplierModal && (
+        <SupplierModal
+          isOpen={showSupplierModal}
+          onClose={() => setShowSupplierModal(false)}
+          currentBranchId={currentBranchId}
+          onSave={(supplier) => {
+            if (supplier?.id) {
+              setSelectedSupplier(supplier.id);
+            }
+            setShowSupplierModal(false);
+          }}
+          mode="add"
+        />
+      )}
     </>
   );
 };
