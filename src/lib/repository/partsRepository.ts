@@ -15,9 +15,43 @@ function normalizePartRow(row: any): Part {
     row?.warranty ??
     undefined;
 
+  let imei =
+    row?.imei ??
+    (Array.isArray(row?.imeis) ? row?.imeis[0] : undefined) ??
+    row?.serial_number ??
+    row?.serialNumber ??
+    row?.seri ??
+    undefined;
+
+  let color =
+    row?.color ??
+    row?.colour ??
+    row?.mau_sac ??
+    undefined;
+
+  // Fallback: extract from description tag if column is missing/empty
+  if (row?.description) {
+    if (!imei) {
+      const imeiMatch = row.description.match(/\[IMEI:\s*([^\]]+)\]/i);
+      if (imeiMatch) imei = imeiMatch[1].trim();
+    }
+    if (!color) {
+      const colorMatch = row.description.match(/\[Màu:\s*([^\]]+)\]/i);
+      if (colorMatch) color = colorMatch[1].trim();
+    }
+  }
+
+  // Clean description for UI display
+  const cleanDescription = row?.description
+    ? row.description.replace(/\s*\[IMEI:[^\]]*\]/gi, "").replace(/\s*\[Màu:[^\]]*\]/gi, "").trim()
+    : undefined;
+
   return {
     ...(row || {}),
+    description: cleanDescription || row?.description,
     warrantyPeriod: warranty,
+    imei: imei ? String(imei) : undefined,
+    color: color ? String(color) : undefined,
   } as Part;
 }
 
@@ -414,6 +448,36 @@ export async function updatePart(
     } else if (Object.prototype.hasOwnProperty.call(updates, "branchId")) {
       updatePayload.branch_id = (updates as any).branchId;
     }
+
+    // Process imei and color updating/clearing
+    const currentNorm = normalizePartRow(oldRows);
+    const newImei = Object.prototype.hasOwnProperty.call(updates, "imei")
+      ? (updates.imei || "").trim()
+      : (currentNorm.imei || "").trim();
+    const newColor = Object.prototype.hasOwnProperty.call(updates, "color")
+      ? (updates.color || "").trim()
+      : (currentNorm.color || "").trim();
+
+    updatePayload.imei = newImei || null;
+    updatePayload.color = newColor || null;
+
+    // Update description with [IMEI: ...] and [Màu: ...] tags for zero-schema fallback
+    let baseDesc = (oldRows.description || "")
+      .replace(/\s*\[IMEI:[^\]]*\]/gi, "")
+      .replace(/\s*\[Màu:[^\]]*\]/gi, "")
+      .trim();
+    if (Object.prototype.hasOwnProperty.call(updates, "description") && updates.description !== undefined) {
+      baseDesc = (updates.description || "")
+        .replace(/\s*\[IMEI:[^\]]*\]/gi, "")
+        .replace(/\s*\[Màu:[^\]]*\]/gi, "")
+        .trim();
+    }
+
+    const tags: string[] = [];
+    if (newImei) tags.push(`[IMEI: ${newImei}]`);
+    if (newColor) tags.push(`[Màu: ${newColor}]`);
+
+    updatePayload.description = tags.length > 0 ? (baseDesc ? `${baseDesc} ${tags.join(" ")}` : tags.join(" ")) : (baseDesc || null);
 
     const { data, error } = await updatePartWithSchemaFallback(id, updatePayload);
     if (error || !data)
