@@ -88,7 +88,7 @@ const normalizeSaleRow = (row: any): Sale => ({
   subtotal: Number(row.subtotal || 0),
   discount: Number(row.discount || 0),
   total: Number(row.total || 0),
-  customer: row.customer || { name: "Khách lẻ" },
+  customer: row.customer || { name: "Người tiêu dùng" },
   paymentMethod: row.paymentMethod || row.paymentmethod || "cash",
   userId: row.userId || row.userid || "local-user",
   userName: row.userName || row.username || "Local User",
@@ -165,8 +165,8 @@ const SalesManager: React.FC = () => {
   } = usePartsRepo();
 
   const [search, setSearch] = useState("");
-  const [customerSearch, setCustomerSearch] = useState("Khách lẻ");
-  const [customerName, setCustomerName] = useState("Khách lẻ");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
@@ -911,7 +911,7 @@ Cam on quy khach da tin tuong!
   // B7: tạo nhanh khách hàng thành viên rồi liên kết vào đơn
   const handleQuickCreateCustomer = async () => {
     const name = customerSearch.trim();
-    if (!name || name === "Khách lẻ") {
+    if (!name || name === "Khách lẻ" || name === "Người tiêu dùng") {
       showToast.warning("Vui lòng nhập tên khách hàng cần tạo.");
       return;
     }
@@ -941,8 +941,8 @@ Cam on quy khach da tin tuong!
     setPaymentMethod("cash");
     setPaidAmount("full");
     setNote("");
-    setCustomerName("Khách lẻ");
-    setCustomerSearch("Khách lẻ");
+    setCustomerName("");
+    setCustomerSearch("");
     setCustomerPhone("");
     setSelectedCustomerId(null);
     setEditingLines({});
@@ -970,7 +970,7 @@ Cam on quy khach da tin tuong!
     const held: HeldOrder = {
       id: `HOLD-${Date.now()}`,
       createdAt: new Date().toISOString(),
-      customerName: customerName.trim() || "Khách lẻ",
+      customerName: customerName.trim() || "Người tiêu dùng",
       customerPhone: customerPhone.trim(),
       selectedCustomerId,
       selectedEmployeeId,
@@ -1131,6 +1131,7 @@ Cam on quy khach da tin tuong!
       const isAnon = !selectedCustomerId && (
         !customerName.trim() ||
         customerName === "Khách lẻ" ||
+        customerName === "Người tiêu dùng" ||
         !customerPhone.trim()
       );
       if (isAnon) {
@@ -1241,8 +1242,8 @@ Cam on quy khach da tin tuong!
         setSplitCash(0);
         setSplitBank(0);
         setNote("");
-        setCustomerName("Khách lẻ");
-        setCustomerSearch("Khách lẻ");
+        setCustomerName("");
+        setCustomerSearch("");
         setCustomerPhone("");
         setSelectedCustomerId(null);
         setActiveTab("products");
@@ -1300,7 +1301,7 @@ Cam on quy khach da tin tuong!
   const reprintSale = (sale: Sale) => {
     setPrintPayload({
       customer: {
-        name: sale.customer?.name || "Khách lẻ",
+        name: sale.customer?.name || "Người tiêu dùng",
         phone: sale.customer?.phone || undefined,
       },
       items: sale.items,
@@ -1748,7 +1749,7 @@ Cam on quy khach da tin tuong!
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
                           <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                            {held.customerName || "Khách lẻ"}
+                            {held.customerName || "Người tiêu dùng"}
                           </div>
                           <div className="text-[11px] text-slate-400 font-medium mt-0.5">
                             {held.customerPhone || "Không có SĐT"}
@@ -2011,8 +2012,8 @@ Cam on quy khach da tin tuong!
                       type="button"
                       onClick={() => {
                         setSelectedCustomerId(null);
-                        setCustomerName("Khách lẻ");
-                        setCustomerSearch("Khách lẻ");
+                        setCustomerName("");
+                        setCustomerSearch("");
                         setCustomerPhone("");
                       }}
                       className="text-[11px] text-rose-500 hover:text-rose-600 font-bold hover:underline transition"
@@ -2039,7 +2040,7 @@ Cam on quy khach da tin tuong!
                     setSelectedCustomerId(null); // Clear ID when typing
                     setShowCustomerSuggestions(true);
                   }}
-                  placeholder="Tìm khách hàng (F4: Tên, SĐT, Serial/IMEI)"
+                  placeholder="Tìm / Nhập tên khách (Để trống: Người tiêu dùng)"
                   className="w-full pl-9 pr-3 h-10 rounded-xl border border-slate-300/80 dark:border-slate-600 bg-white/95 dark:bg-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200/60"
                 />
                 {showCustomerSuggestions && customerSuggestions.length > 0 && (
@@ -2694,7 +2695,7 @@ Cam on quy khach da tin tuong!
                   onClick={() => {
                     setPrintPayload({
                       customer: {
-                        name: customerName.trim() || "Khách lẻ",
+                        name: customerName.trim() || "Người tiêu dùng",
                         phone: customerPhone.trim() || undefined,
                       },
                       items: cartItems,
@@ -2750,7 +2751,7 @@ Cam on quy khach da tin tuong!
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                        {sale.customer.name || "Khách lẻ"}
+                        {sale.customer.name || "Người tiêu dùng"}
                       </div>
                       <div className="text-slate-500 truncate">{(sale as any).sale_code || sale.id}</div>
                     </div>
