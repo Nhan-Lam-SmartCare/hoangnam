@@ -60,6 +60,9 @@ DECLARE
   v_import       numeric;
   v_selling      numeric;
   v_color        text;
+  v_colors       jsonb;
+  v_unit_color   text;
+  v_idx          int;
   v_imeis        jsonb;
   v_imei         text;
   v_is_serial    boolean;
@@ -198,22 +201,31 @@ BEGIN
        NULLIF(btrim(COALESCE(p_user_id, '')), ''),
        p_notes);
 
-    -- (c) Ghi từng máy vật lý.
+    -- (c) Ghi từng máy vật lý kèm Màu sắc riêng hoặc Màu chung.
     v_imeis := CASE WHEN jsonb_typeof(v_item -> 'imeis') = 'array'
                     THEN v_item -> 'imeis' ELSE '[]'::jsonb END;
+    v_colors := CASE WHEN jsonb_typeof(v_item -> 'colors') = 'array'
+                     THEN v_item -> 'colors' ELSE '[]'::jsonb END;
+    v_idx := 0;
 
     FOR v_imei IN
       SELECT btrim(x) FROM jsonb_array_elements_text(v_imeis) AS t(x)
        WHERE btrim(COALESCE(x, '')) <> ''
     LOOP
+      v_unit_color := COALESCE(
+        NULLIF(btrim(COALESCE(v_colors ->> v_idx, '')), ''),
+        v_color
+      );
+
       INSERT INTO public.part_units
         (part_id, branch_id, imei, color, import_price, selling_price,
          status, receipt_code, supplier_id, received_at)
       VALUES
-        (v_part_id, p_branch_id, v_imei, v_color, v_import, v_selling,
+        (v_part_id, p_branch_id, v_imei, v_unit_color, v_import, v_selling,
          'in_stock', v_receipt_code,
          NULLIF(btrim(COALESCE(p_supplier_id, '')), ''), v_now);
 
+      v_idx := v_idx + 1;
       v_units := v_units + 1;
     END LOOP;
 

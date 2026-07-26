@@ -229,6 +229,7 @@ export function useGoodsReceiptActions({
                   wholesalePrice: item.wholesalePrice || 0,
                   imeis: normalizeImeis(item),
                   color: (item.color || "").trim() || undefined,
+                  colors: item.colors ? item.colors.map((c) => (c || "").trim()) : undefined,
                 };
               } catch (error) {
                 console.error("❌ Lỗi khi tạo sản phẩm:", error);
@@ -248,6 +249,7 @@ export function useGoodsReceiptActions({
               wholesalePrice: item.wholesalePrice || 0,
               imeis: normalizeImeis(item),
               color: (item.color || "").trim() || undefined,
+              colors: item.colors ? item.colors.map((c) => (c || "").trim()) : undefined,
             };
           })
         );
