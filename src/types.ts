@@ -70,6 +70,8 @@ export interface Part {
   laborCost?: { [branchId: string]: number };
   category?: string;
   description?: string;
+  imei?: string;
+  color?: string;
   warrantyPeriod?: string;
   // Tax & costing extensions (for future real data integration)
   costPrice?: { [branchId: string]: number };
