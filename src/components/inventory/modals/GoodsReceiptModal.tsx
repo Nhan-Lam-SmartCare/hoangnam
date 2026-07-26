@@ -854,7 +854,7 @@ const GoodsReceiptModal: React.FC<{
                       className="p-2.5 rounded-xl border border-slate-700/80 bg-slate-800/90 hover:bg-slate-800 hover:border-blue-500 cursor-pointer transition flex items-center justify-between group shadow-sm"
                     >
                       <div className="min-w-0 flex-1 pr-2">
-                        <div className="font-bold text-xs text-slate-100 truncate group-hover:text-blue-400">
+                        <div className="font-bold text-xs text-slate-100 break-words whitespace-normal leading-tight group-hover:text-blue-400">
                           {part.name}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
@@ -926,7 +926,7 @@ const GoodsReceiptModal: React.FC<{
                               <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
                                 <td className="py-2 px-2 text-center font-bold text-slate-400">{index + 1}</td>
                                 <td className="py-2 px-2">
-                                  <div className="font-bold text-slate-800 dark:text-slate-100 text-xs truncate max-w-[170px]">
+                                  <div className="font-bold text-slate-800 dark:text-slate-100 text-xs break-words whitespace-normal leading-tight max-w-[220px]">
                                     {item.partName}
                                   </div>
                                   <span className="font-mono text-[10px] text-blue-500">{item.sku}</span>

@@ -491,6 +491,10 @@ const SalesManager: React.FC = () => {
     payload.items.forEach((it) => {
       // Name line
       itemLines += `${it.partName}\n`;
+      // IMEI phải nằm trên hóa đơn: đây là giấy tờ khách giữ để bảo hành.
+      (it.unitImeis || [])
+        .filter(Boolean)
+        .forEach((imei) => (itemLines += `  IMEI: ${imei}\n`));
       // Qty x Price = Total (discounted)
       const qtyPrice = `${it.quantity} x ${formatCurrency(it.sellingPrice)}`;
       const totalIt = formatCurrency(it.sellingPrice * it.quantity - (it.discount || 0));
@@ -554,6 +558,13 @@ Cam on quy khach da tin tuong!
             <tr>
               <td>
                 ${escapeHtml(it.partName)}
+                ${(it.unitImeis || [])
+                  .filter(Boolean)
+                  .map(
+                    (imei) =>
+                      `<div style="font-size: 7.5pt; color: #475569; margin-top: 1px;">IMEI: ${escapeHtml(imei)}</div>`
+                  )
+                  .join("")}
                 ${it.discount && it.discount > 0 ? `<div style="font-size: 7.5pt; color: #ef4444; margin-top: 1px;">(Giảm: -${formatCurrency(it.discount)})</div>` : ""}
               </td>
               <td style="text-align:center">${it.quantity}</td>
@@ -1136,7 +1147,15 @@ Cam on quy khach da tin tuong!
         const live = liveStockOf(it.partId);
         if (it.quantity > live) {
           adjusted.push(`${it.partName} (còn ${live})`);
-          return { ...it, quantity: live, stockSnapshot: live };
+          // Hàng có IMEI: cắt số lượng thì phải cắt luôn danh sách máy. Để lệch
+          // sẽ đánh dấu ĐÃ BÁN nhiều máy hơn số thực bán lúc thanh toán.
+          return {
+            ...it,
+            quantity: live,
+            stockSnapshot: live,
+            unitIds: it.unitIds?.slice(0, live),
+            unitImeis: it.unitImeis?.slice(0, live),
+          };
         }
         return { ...it, stockSnapshot: live };
       })

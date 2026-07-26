@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import type { PartUnitStatus, PartUnit } from "../../../types";
 import { formatCurrency, formatDate } from "../../../utils/format";
 import { usePartUnits, useUpdatePartUnit } from "../../../hooks/usePartUnitsRepository";
+import { useSuppliers } from "../../../hooks/useSuppliers";
 import { Edit2, Check, X, Loader2 } from "lucide-react";
 
 export interface PartUnitsPanelProps {
@@ -38,7 +39,7 @@ const STATUS_CLASS: Record<PartUnitStatus, string> = {
 
 /**
  * Chi tiết TỪNG MÁY của một sản phẩm — trả lời câu "tồn 2 thì là hai chiếc nào".
- * Hỗ trợ chỉnh sửa trực tiếp IMEI và Màu sắc từng chiếc máy.
+ * Hỗ trợ chỉnh sửa trực tiếp IMEI và Màu sắc từng chiếc máy + hiển thị Nhà cung cấp.
  */
 const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
   partId,
@@ -48,7 +49,16 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
   dense = false,
 }) => {
   const { data: units = [], isLoading, error } = usePartUnits(partId, branchId);
+  const { data: suppliers = [] } = useSuppliers();
   const updateUnitMutation = useUpdatePartUnit();
+
+  const supplierNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    suppliers.forEach((s: any) => {
+      if (s.id && s.name) map.set(s.id, s.name);
+    });
+    return map;
+  }, [suppliers]);
 
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
   const [editImei, setEditImei] = useState("");
@@ -139,7 +149,7 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
                 <th className="px-2 py-1.5 text-right">Giá nhập</th>
               )}
               <th className="px-2 py-1.5 text-center">Trạng thái</th>
-              {!dense && <th className="px-2 py-1.5 text-left">Phiếu nhập</th>}
+              {!dense && <th className="px-2 py-1.5 text-left">Phiếu nhập & NCC</th>}
               {!dense && <th className="px-2 py-1.5 text-right">Ngày nhập</th>}
               <th className="px-2 py-1.5 text-center w-14">Sửa</th>
             </tr>
@@ -148,6 +158,7 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
             {units.map((unit, index) => {
               const isEditing = editingUnitId === unit.id;
               const isSaving = updateUnitMutation.isPending && isEditing;
+              const suppName = unit.supplierId ? supplierNameById.get(unit.supplierId) : undefined;
 
               return (
                 <tr
@@ -219,8 +230,18 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
                   </td>
 
                   {!dense && (
-                    <td className="px-2 py-1.5 font-mono text-[10px] text-slate-500 dark:text-slate-400">
-                      {unit.receiptCode || "—"}
+                    <td className="px-2 py-1.5 text-[10px]">
+                      <div className="font-mono text-slate-700 dark:text-slate-300 font-medium">
+                        {unit.receiptCode || "—"}
+                      </div>
+                      {suppName && (
+                        <div
+                          className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold truncate max-w-[150px]"
+                          title={`Nhà cung cấp: ${suppName}`}
+                        >
+                          🏢 {suppName}
+                        </div>
+                      )}
                     </td>
                   )}
 

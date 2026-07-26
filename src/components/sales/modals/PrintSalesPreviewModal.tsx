@@ -552,6 +552,17 @@ const PrintSalesPreviewModal: React.FC<PrintSalesPreviewModalProps> = ({
                         <tr key={idx}>
                           <td style={{ borderBottom: "1px dashed #cbd5e1", padding: "6px 4px" }}>
                             {it.partName}
+                            {/* Bản xem trước phải khớp bản in ra giấy. */}
+                            {(it.unitImeis || [])
+                              .filter(Boolean)
+                              .map((imei, i) => (
+                                <div
+                                  key={`${imei}-${i}`}
+                                  style={{ fontSize: "7.5pt", color: "#475569", marginTop: "1px" }}
+                                >
+                                  IMEI: {imei}
+                                </div>
+                              ))}
                             {it.discount && it.discount > 0 ? (
                               <div style={{ fontSize: "7.5pt", color: "#ef4444", marginTop: "1px" }}>
                                 (Giảm: -{formatCurrency(it.discount)} đ)

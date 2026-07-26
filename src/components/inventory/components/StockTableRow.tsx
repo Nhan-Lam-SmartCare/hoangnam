@@ -143,7 +143,7 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
               )}
             </div>
             <div className="flex flex-col gap-0.5 min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-snug max-w-[350px] lg:max-w-[480px]">
                 {part.name}
                 {isDuplicate && (
                   <span
