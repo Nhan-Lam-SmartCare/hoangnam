@@ -92,13 +92,18 @@ export const useUpdatePartRepo = () => {
 export const useDeletePartRepo = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id }: { id: string }) => deletePartById(id),
+    mutationFn: async ({ id }: { id: string }) => {
+      const result = await deletePartById(id);
+      if (!result.ok) {
+        throw result.error;
+      }
+      return result.data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["partsRepo"] });
       qc.invalidateQueries({ queryKey: ["partsRepoPaged"] });
       qc.invalidateQueries({ queryKey: ["allPartsForTotals"] });
       // Toast is handled by component
     },
-    onError: (err: any) => showToast.error(mapRepoErrorForUser(err)),
   });
 };

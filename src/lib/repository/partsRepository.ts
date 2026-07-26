@@ -873,13 +873,37 @@ export async function deletePartById(
         cause: oldErr,
       });
     }
-    const { error } = await supabase.from(PARTS_TABLE).delete().eq("id", id);
-    if (error)
+    // 1. Kiểm tra xem sản phẩm này đã từng xuất hiện trong hóa đơn bán hàng chưa
+    const { data: sales } = await supabase
+      .from("sale_items")
+      .select("id")
+      .eq("part_id", id)
+      .limit(1);
+
+    if (sales && sales.length > 0) {
       return failure({
-        code: "supabase",
-        message: "Xóa phụ tùng thất bại",
+        code: "validation",
+        message: `Sản phẩm "${(oldRows as any)?.name}" đã có trong hóa đơn bán hàng. Không thể xóa để bảo đảm báo cáo doanh thu.`,
+      });
+    }
+
+    // 2. Nếu chưa từng bán ra: Tự động dọn dẹp các bản ghi phụ (part_units, receipt_items, transfers)
+    await supabase.from("part_units").delete().eq("part_id", id);
+    await supabase.from("inventory_receipt_items").delete().eq("part_id", id);
+    await supabase.from("inventory_transfers").delete().eq("part_id", id);
+
+    // 3. Thực hiện xóa sản phẩm khỏi bảng parts
+    const { error } = await supabase.from(PARTS_TABLE).delete().eq("id", id);
+    if (error) {
+      const isFkConflict = String(error.code) === "23503" || String(error.message || "").toLowerCase().includes("foreign key");
+      return failure({
+        code: isFkConflict ? "validation" : "supabase",
+        message: isFkConflict
+          ? `Không thể xóa "${(oldRows as any)?.name || 'sản phẩm'}": đã có dữ liệu giao dịch liên quan`
+          : `Xóa sản phẩm thất bại: ${error.message}`,
         cause: error,
       });
+    }
     // Audit xóa phụ tùng
     let userId: string | null = null;
     try {
