@@ -1366,8 +1366,8 @@ Cam on quy khach da tin tuong!
   const ui = {
     pageBg: "min-h-screen bg-slate-50 dark:bg-[#151521] pb-20",
     header: "sticky md:top-[53px] top-0 z-20 bg-white/90 dark:bg-[#1e1e2d]/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-4 mb-6",
-    leftPanel: "xl:col-span-2 space-y-4",
-    rightPanel: "bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 space-y-4 shadow-sm xl:sticky xl:top-[100px] h-fit",
+    leftPanel: "md:col-span-7 lg:col-span-8 space-y-4",
+    rightPanel: "md:col-span-5 lg:col-span-4 bg-white dark:bg-[#1e1e2d] rounded-2xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 space-y-4 shadow-sm md:sticky md:top-[100px] h-fit",
     panelHead: "mb-4 flex flex-col sm:flex-row items-center justify-between gap-3",
     stockBadge: "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold",
     addBtn: "inline-flex items-center justify-center gap-1.5 h-9 w-full sm:w-auto px-4 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-bold transition border border-emerald-200 dark:border-emerald-500/30",
@@ -1448,12 +1448,12 @@ Cam on quy khach da tin tuong!
           </div>
         </div>
       </div>
-      <div className="relative grid max-w-[1600px] mx-auto px-4 grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
+      <div className="relative grid max-w-[1600px] mx-auto px-4 grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 overflow-hidden">
         <section
           className={`${ui.leftPanel} transition-all duration-300 ease-out md:translate-x-0 md:opacity-100 md:pointer-events-auto md:static ${
             activeTab === "products" || activeTab === "held"
               ? "translate-x-0 opacity-100"
-              : "absolute inset-0 -translate-x-full opacity-0 pointer-events-none"
+              : "absolute inset-0 -translate-x-full opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto md:static"
           }`}
         >
           {activeTab !== "held" ? (
