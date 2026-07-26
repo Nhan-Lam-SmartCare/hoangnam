@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createCashTransaction,
   deleteCashTransaction,
@@ -6,6 +7,11 @@ import {
 import { updatePaymentSourceBalance } from "../../lib/repository/paymentSourcesRepository";
 import { incrementStockForReturn } from "../../lib/repository/partsRepository";
 import { deleteCustomerDebt } from "../../lib/repository/debtsRepository";
+import {
+  markUnitsSold,
+  releaseUnits,
+  releaseUnitsBySale,
+} from "../../lib/repository/partUnitsRepository";
 import { showToast } from "../../utils/toast";
 import { mapRepoErrorForUser } from "../../utils/errorMapping";
 import { supabase } from "../../supabaseClient";
@@ -69,11 +75,15 @@ async function createWarrantyCardsForSale(
     end.setMonth(end.getMonth() + months);
 
     for (let i = 0; i < item.quantity; i += 1) {
+      // Hàng có IMEI: mỗi phiếu bảo hành gắn đúng IMEI của chiếc thứ i. Không có
+      // IMEI thì lúc khách quay lại không cách nào biết máy đó thuộc phiếu nào.
+      const imei = item.unitImeis?.[i]?.trim() || null;
+
       warrantyRows.push({
         customer_name: sale.customer.name,
         customer_phone: sale.customer.phone || null,
         device_model: item.partName,
-        imei_serial: null,
+        imei_serial: imei,
         warranty_start_date: today.toISOString().slice(0, 10),
         warranty_end_date: end.toISOString().slice(0, 10),
         warranty_period_months: months,
@@ -131,6 +141,18 @@ export function useFinanceActions(
   } = deps;
 
   const clearCart = useCallback(() => setCartItems([]), [setCartItems]);
+
+  /**
+   * Làm mới cache `part_units` sau khi bán / xóa / trả đơn.
+   *
+   * AppContext nằm trong QueryClientProvider nên dùng được hook này. Đặt ở đây
+   * thay vì ở từng màn hình vì trạng thái máy đổi ở LỚP NÀY — màn nào cũng phải
+   * thấy đúng, không riêng màn Bán hàng.
+   */
+  const queryClient = useQueryClient();
+  const invalidatePartUnits = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["partUnits"] });
+  }, [queryClient]);
 
   const finalizeSale = useCallback(
     (data: {
@@ -279,7 +301,44 @@ export function useFinanceActions(
         setCartItems(data.items);
       };
 
+      // Máy có IMEI được bán trong đơn này (rỗng nếu bán hàng thường).
+      const soldUnitIds = data.items.flatMap((it) => it.unitIds || []);
+
       const persistence = (async (): Promise<{ ok: boolean }> => {
+        // ── Giữ máy TRƯỚC khi tạo đơn ────────────────────────────────────
+        // `part_units_mark_sold` khóa hàng bằng FOR UPDATE, nên hai người bán
+        // cùng một chiếc thì người thua báo lỗi ở đây — trước khi tiền động
+        // đậy. Nếu tạo đơn xong mới đánh dấu thì đã thu tiền rồi mới phát hiện
+        // máy không còn, hỏng hơn nhiều.
+        if (soldUnitIds.length > 0) {
+          const markRes = await markUnitsSold(soldUnitIds, saleId);
+          invalidatePartUnits();
+          if (!markRes.ok) {
+            rollbackOptimistic();
+            showToast.error(markRes.error.message);
+            return { ok: false };
+          }
+        }
+
+        /** Nhả máy về kho khi tạo đơn thất bại (giao dịch bù trừ). */
+        const releaseUnitsOnFailure = async () => {
+          if (soldUnitIds.length === 0) return;
+          const rel = await releaseUnits(
+            soldUnitIds,
+            `Hoàn máy do tạo đơn ${saleId} thất bại`
+          );
+          invalidatePartUnits();
+          if (!rel.ok) {
+            // Máy sẽ mắc ở trạng thái 'sold' của một đơn không tồn tại. Không
+            // tự sửa được ở client — phải nói rõ để người dùng gọi kỹ thuật.
+            console.error("[finalizeSale] Không nhả được máy:", rel.error);
+            showToast.error(
+              `Đơn không tạo được nhưng ${soldUnitIds.length} máy vẫn đang bị giữ. ` +
+                `Vui lòng báo kỹ thuật (mã đơn ${saleId}).`
+            );
+          }
+        };
+
         const { data: userData } = await supabase.auth.getUser();
         const currentUser = userData?.user;
         // Ưu tiên nhân viên do client truyền (từ bảng profiles — chuẩn, không tự
@@ -345,6 +404,7 @@ export function useFinanceActions(
         // production). Không còn nhánh fallback từng-bước (không atomic) trước đây.
         if (rpcError) {
           rollbackOptimistic();
+          await releaseUnitsOnFailure();
           const isRpcMissing =
             rpcError.code === "PGRST202" ||
             rpcError.message?.includes("could not find") ||
@@ -364,6 +424,7 @@ export function useFinanceActions(
 
         if (!result || !result.success) {
           rollbackOptimistic();
+          await releaseUnitsOnFailure();
           // Hiển thị chi tiết sản phẩm thiếu kho nếu có.
           if (result?.insufficient && Array.isArray(result.insufficient)) {
             const details = result.insufficient
@@ -476,6 +537,7 @@ export function useFinanceActions(
     [
       clearCart,
       currentBranchId,
+      invalidatePartUnits,
       parts,
       setCartItems,
       setCashTransactions,
@@ -547,6 +609,25 @@ export function useFinanceActions(
         }
       };
 
+      /**
+       * Hoàn máy có IMEI về kho. Xóa đơn = coi như chưa từng bán, nên mọi máy gắn
+       * với đơn phải bán được lại; nếu không, máy vẫn mang trạng thái 'sold' và
+       * biến mất khỏi kho dù `parts.stock` đã được cộng lại.
+       *
+       * Gọi vô điều kiện (RPC trả 0 khi đơn không có máy nào): state cục bộ có thể
+       * đã cũ, không đáng để đánh cược mất dữ liệu chỉ để tiết kiệm một round-trip
+       * trong một thao tác hiếm như xóa đơn.
+       */
+      const releaseSaleUnits = async () => {
+        const rel = await releaseUnitsBySale(saleId, `Xóa đơn bán ${saleId}`);
+        invalidatePartUnits();
+        if (!rel.ok) {
+          showToast.warning(
+            `Đã xóa đơn nhưng chưa hoàn được máy có IMEI về kho: ${rel.error.message}`
+          );
+        }
+      };
+
       void (async () => {
         // ── Thử RPC nguyên tử trước (hoàn kho + hoàn tiền + xóa nợ trong 1 TX) ──
         const { data: rpcResult, error: rpcError } = await supabase.rpc(
@@ -572,6 +653,7 @@ export function useFinanceActions(
           const branch = result.branchId || saleBranchId;
           const refunds: Record<string, number> = result.refunds || {};
           applyLocalDelete(branch, refunds, true);
+          await releaseSaleUnits();
           showToast.success(
             "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
           );
@@ -734,6 +816,8 @@ export function useFinanceActions(
           );
         }
 
+        await releaseSaleUnits();
+
         showToast.success(
           "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
         );
@@ -741,6 +825,7 @@ export function useFinanceActions(
     },
     [
       currentBranchId,
+      invalidatePartUnits,
       sales,
       setCashTransactions,
       setCustomerDebts,
@@ -806,6 +891,47 @@ export function useFinanceActions(
             );
           }
           return { ok: false, message: result?.message };
+        }
+
+        // 0) Hoàn máy có IMEI về kho.
+        //
+        // Chỉ hoàn khi trả HẾT một dòng: trả 1 trong 2 chiếc giống nhau thì không
+        // cách nào biết khách mang chiếc NÀO về. Đoán bừa sẽ cho một IMEI sai
+        // thành hàng bán được trong khi chiếc thật vẫn ở nhà khách — sai dữ liệu
+        // tệ hơn là bắt người dùng sửa tay. `part_units_release` bỏ qua máy đã ở
+        // 'in_stock' nên gửi cả dòng là an toàn.
+        const unitIdsToRelease: string[] = [];
+        const ambiguousLines: string[] = [];
+        for (const line of items) {
+          const saleItem = sale?.items.find((it) => it.partId === line.partId);
+          const unitIds = saleItem?.unitIds || [];
+          if (unitIds.length === 0) continue;
+          const totalReturned = (saleItem?.returnedQty || 0) + line.quantity;
+          if (totalReturned >= unitIds.length) {
+            unitIdsToRelease.push(...unitIds);
+          } else {
+            ambiguousLines.push(saleItem?.partName || line.partId);
+          }
+        }
+
+        if (unitIdsToRelease.length > 0) {
+          const rel = await releaseUnits(
+            unitIdsToRelease,
+            `Khách trả hàng (HĐ ${input.saleId})`
+          );
+          invalidatePartUnits();
+          if (!rel.ok) {
+            showToast.warning(
+              `Đã trả hàng nhưng chưa hoàn được máy có IMEI về kho: ${rel.error.message}`
+            );
+          }
+        }
+
+        if (ambiguousLines.length > 0) {
+          showToast.warning(
+            `Trả một phần ${ambiguousLines.join(", ")}: hãy vào Kho để đánh dấu ` +
+              `đúng IMEI của máy khách mang về.`
+          );
         }
 
         // 1) Hoàn kho cục bộ.
@@ -882,6 +1008,7 @@ export function useFinanceActions(
     [
       sales,
       currentBranchId,
+      invalidatePartUnits,
       setParts,
       setSales,
       setCashTransactions,

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
 import { useSuppliers } from "../../../hooks/useSuppliers";
+import { usePartUnits, useUpdatePartUnit } from "../../../hooks/usePartUnitsRepository";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import type { Part } from "../../../types";
@@ -33,6 +34,24 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
   const { data: suppliers = [] } = useSuppliers();
   const hideLaborCost = isPhoneBranch(currentBranchId, branches);
 
+  const { data: units = [] } = usePartUnits(part.id, currentBranchId);
+  const updateUnitMutation = useUpdatePartUnit();
+
+  const [unitEdits, setUnitEdits] = useState<Record<string, { imei: string; color: string }>>({});
+
+  useEffect(() => {
+    if (units.length > 0) {
+      const initial: Record<string, { imei: string; color: string }> = {};
+      units.forEach((u) => {
+        initial[u.id] = {
+          imei: u.isPlaceholder ? "" : u.imei || "",
+          color: u.color || "",
+        };
+      });
+      setUnitEdits(initial);
+    }
+  }, [units]);
+
   const [formData, setFormData] = useState({
     name: part.name,
     category: part.category || "",
@@ -56,12 +75,41 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
   const [showInlineCat, setShowInlineCat] = useState(false);
   const [inlineCatName, setInlineCatName] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
       showToast.warning("Vui lòng nhập tên sản phẩm");
       return;
+    }
+
+    // Save individual units if any were edited
+    if (units.length > 0) {
+      for (const unit of units) {
+        const edited = unitEdits[unit.id];
+        if (edited) {
+          const newImei = edited.imei.trim();
+          const newColor = edited.color.trim();
+          const origImei = unit.isPlaceholder ? "" : unit.imei || "";
+          const origColor = unit.color || "";
+
+          if (newImei !== origImei || newColor !== origColor) {
+            if (newImei) {
+              try {
+                await updateUnitMutation.mutateAsync({
+                  id: unit.id,
+                  patch: {
+                    imei: newImei,
+                    color: newColor || undefined,
+                  },
+                });
+              } catch (err: any) {
+                console.error("Lỗi cập nhật IMEI máy:", err);
+              }
+            }
+          }
+        }
+      }
     }
 
     onSave({
@@ -208,37 +256,92 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
           </div>
         </div>
 
-        {/* IMEI / Seri & Màu sắc */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              📱 Số IMEI / Seri máy (Riêng biệt)
-            </label>
-            <input
-              type="text"
-              value={formData.imei}
-              onChange={(e) =>
-                setFormData({ ...formData, imei: e.target.value })
-              }
-              placeholder="Nhập IMEI hoặc số Seri..."
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+        {/* IMEI / Seri & Màu sắc (Từng máy hoặc mặc định) */}
+        {units.length > 0 ? (
+          <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                📱 Danh sách IMEI & Màu sắc ({units.length} máy tại chi nhánh {currentBranchName})
+              </label>
+            </div>
+            <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {units.map((unit, idx) => {
+                const currentEdit = unitEdits[unit.id] || { imei: unit.imei || "", color: unit.color || "" };
+                return (
+                  <div key={unit.id} className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                    <span className="font-bold text-slate-400 w-5 text-center shrink-0">#{idx + 1}</span>
+                    <div className="flex-1 min-w-[130px]">
+                      <input
+                        type="text"
+                        value={currentEdit.imei}
+                        onChange={(e) =>
+                          setUnitEdits((prev) => ({
+                            ...prev,
+                            [unit.id]: { ...currentEdit, imei: e.target.value },
+                          }))
+                        }
+                        placeholder="Nhập số IMEI..."
+                        className="w-full px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-800 font-mono text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <input
+                        type="text"
+                        value={currentEdit.color}
+                        onChange={(e) =>
+                          setUnitEdits((prev) => ({
+                            ...prev,
+                            [unit.id]: { ...currentEdit, color: e.target.value },
+                          }))
+                        }
+                        placeholder="Màu sắc..."
+                        className="w-full px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                      unit.status === 'in_stock'
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {unit.status === 'in_stock' ? 'Còn kho' : unit.status}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              🎨 Màu sắc sản phẩm
-            </label>
-            <input
-              type="text"
-              value={formData.color}
-              onChange={(e) =>
-                setFormData({ ...formData, color: e.target.value })
-              }
-              placeholder="Ví dụ: Đen, Trắng, Titanium..."
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                📱 Số IMEI / Seri máy (Riêng biệt)
+              </label>
+              <input
+                type="text"
+                value={formData.imei}
+                onChange={(e) =>
+                  setFormData({ ...formData, imei: e.target.value })
+                }
+                placeholder="Nhập IMEI hoặc số Seri..."
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                🎨 Màu sắc sản phẩm
+              </label>
+              <input
+                type="text"
+                value={formData.color}
+                onChange={(e) =>
+                  setFormData({ ...formData, color: e.target.value })
+                }
+                placeholder="Ví dụ: Đen, Trắng, Titanium..."
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className={`grid ${hideLaborCost ? "grid-cols-2" : "grid-cols-3"} gap-4`}>
           <div>

@@ -152,6 +152,49 @@ export async function fetchUnitCountsByParts(
 }
 
 /**
+ * Danh sách sản phẩm CÓ máy ghi IMEI còn trong kho tại một chi nhánh.
+ *
+ * Màn Bán hàng cần biết "bấm vào món này thì phải chọn máy hay không" cho MỌI
+ * món đang hiện — mà lưới sản phẩm lọc ở client nên số món có thể lên vài trăm.
+ * Một query cho cả chi nhánh rẻ hơn nhiều so với truyền danh sách id vào `.in()`
+ * mỗi lần người bán gõ tìm kiếm.
+ */
+export async function fetchSerializedPartIds(
+  branchId: string
+): Promise<RepoResult<string[]>> {
+  try {
+    if (!branchId) return success([]);
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("part_id")
+      .eq("branch_id", branchId)
+      .eq("status", "in_stock");
+
+    if (error) {
+      return failure({
+        code: "supabase",
+        message: `Không tải được danh sách sản phẩm có IMEI: ${error.message}`,
+        cause: error,
+      });
+    }
+
+    const ids = new Set<string>();
+    for (const row of data || []) {
+      const pid = String((row as any)?.part_id || "");
+      if (pid) ids.add(pid);
+    }
+    return success(Array.from(ids));
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi tải danh sách sản phẩm có IMEI",
+      cause: e,
+    });
+  }
+}
+
+/**
  * Tìm máy theo IMEI (khớp một phần, không phân biệt hoa thường).
  * Dùng cho ô tìm kiếm kho và tra bảo hành.
  *

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useFinanceActions } from "../../src/contexts/app/useFinanceActions";
+import { createQueryWrapper } from "../helpers/queryWrapper";
 import { showToast } from "../../src/utils/toast";
 
 const mockFrom = vi.hoisted(() => vi.fn());
@@ -219,7 +220,9 @@ describe("salesRepository.createSaleAtomic compatibility", () => {
 
   it("finalizeSale updates local state atomically and persists sale payload", async () => {
     const { state, deps } = createDeps();
-    const { result } = renderHook(() => useFinanceActions(deps as any));
+    const { result } = renderHook(() => useFinanceActions(deps as any), {
+      wrapper: createQueryWrapper(),
+    });
 
     act(() => {
       result.current.finalizeSale({
@@ -284,7 +287,9 @@ describe("salesRepository.createSaleAtomic compatibility", () => {
       return Promise.resolve({ data: null, error: null });
     });
 
-    const { result } = renderHook(() => useFinanceActions(deps as any));
+    const { result } = renderHook(() => useFinanceActions(deps as any), {
+      wrapper: createQueryWrapper(),
+    });
 
     act(() => {
       result.current.finalizeSale({

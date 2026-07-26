@@ -57,6 +57,11 @@ vi.mock("../../src/hooks/usePartsRepository", () => ({
   usePartsRepoPaged: () => ({ data: { ok: true, data: mockParts } }),
 }));
 
+// Không có máy IMEI nào -> mọi sản phẩm vẫn thêm vào giỏ theo số lượng như cũ.
+vi.mock("../../src/hooks/usePartUnitsRepository", () => ({
+  useSerializedPartIds: () => ({ serializedIds: new Set<string>() }),
+}));
+
 vi.mock("../../src/hooks/usePrinter", () => ({
   usePrinter: () => ({ isNative: false, printViaWiFi: vi.fn(), printViaBluetooth: vi.fn() }),
 }));

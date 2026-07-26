@@ -38,7 +38,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { canDo } from "../../utils/permissions";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
-import type { CartItem, Part, Sale } from "../../types";
+import type { CartItem, Part, PartUnit, Sale } from "../../types";
+import ImeiPickerModal from "./modals/ImeiPickerModal";
+import { useSerializedPartIds } from "../../hooks/usePartUnitsRepository";
 import { useCustomers, useSales, useCreateCustomer } from "../../hooks/useSupabase";
 import BarcodeScannerModal from "../common/BarcodeScannerModal";
 import { ReturnSaleModal } from "./ReturnSaleModal";
@@ -163,6 +165,10 @@ const SalesManager: React.FC = () => {
     isFetching: syncingInventory,
     refetch: refetchParts,
   } = usePartsRepo();
+
+  // Sản phẩm nào bán theo IMEI thì phải mở modal chọn máy thay vì thêm thẳng.
+  const { serializedIds } = useSerializedPartIds(currentBranchId);
+  const [imeiPickerPart, setImeiPickerPart] = useState<Part | null>(null);
 
   const [search, setSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -705,9 +711,69 @@ Cam on quy khach da tin tuong!
     showToast.warning("Không lấy được dữ liệu kho để đồng bộ.");
   };
 
+  /**
+   * Thêm các máy đã chọn ở modal IMEI vào giỏ.
+   *
+   * Gộp theo DANH SÁCH MÁY chứ không cộng số lượng: chọn lại đúng chiếc đã có
+   * trong giỏ thì phải không đổi gì, còn cộng dồn sẽ tạo ra "2 chiếc" trong khi
+   * chỉ có một máy thật. `quantity` luôn bằng `unitIds.length`.
+   */
+  const addUnitsToCart = (part: Part, units: PartUnit[]) => {
+    if (units.length === 0) return;
+    const branchStock = getBranchStock(part, currentBranchId);
+
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.partId === part.id);
+      const pickedIds = units.map((u) => u.id);
+      const pickedImeis = units.map((u) => (u.isPlaceholder ? "" : u.imei));
+
+      if (existing) {
+        return prev.map((item) =>
+          item.partId === part.id
+            ? {
+                ...item,
+                unitIds: pickedIds,
+                unitImeis: pickedImeis,
+                quantity: pickedIds.length,
+                stockSnapshot: branchStock,
+                discount: Math.min(
+                  item.discount || 0,
+                  item.sellingPrice * pickedIds.length
+                ),
+              }
+            : item
+        );
+      }
+
+      const newItem: CartItem = {
+        partId: part.id,
+        partName: part.name,
+        sku: part.sku,
+        category: part.category,
+        quantity: pickedIds.length,
+        sellingPrice: getBranchRetailPrice(part, currentBranchId),
+        stockSnapshot: branchStock,
+        isService: false,
+        unitIds: pickedIds,
+        unitImeis: pickedImeis,
+      };
+      return [...prev, newItem];
+    });
+
+    setImeiPickerPart(null);
+    showToast.success(`Đã chọn ${units.length} máy cho ${part.name}.`);
+  };
+
   const addPartToCart = (part: Part) => {
     const branchStock = getBranchStock(part, currentBranchId);
     const isService = ["dịch vụ", "công thợ"].includes((part.category || "").trim().toLowerCase());
+
+    // Hàng có IMEI: không tự thêm mà bắt chọn ĐÚNG chiếc nào rời kho — phiếu bảo
+    // hành cần IMEI thật và `part_units` phải khớp với `parts.stock`.
+    if (!isService && serializedIds.has(part.id)) {
+      setImeiPickerPart(part);
+      return;
+    }
 
     setCartItems((prev) => {
       const existing = prev.find((item) => item.partId === part.id);
@@ -760,6 +826,25 @@ Cam on quy khach da tin tuong!
     setCartItems((prev) =>
       prev.map((item) => {
         if (item.partId !== partId) return item;
+
+        // Hàng có IMEI: giảm = bỏ bớt máy ở cuối danh sách. TĂNG thì không thể ở
+        // đây vì phải biết thêm CHIẾC NÀO — người bán chọn lại trong modal.
+        if (item.unitIds?.length) {
+          if (nextQty > item.unitIds.length) {
+            showToast.warning(
+              "Hàng có IMEI: bấm vào sản phẩm để chọn thêm máy cụ thể."
+            );
+            return item;
+          }
+          return {
+            ...item,
+            quantity: nextQty,
+            unitIds: item.unitIds.slice(0, nextQty),
+            unitImeis: item.unitImeis?.slice(0, nextQty),
+            discount: Math.min(item.discount || 0, item.sellingPrice * nextQty),
+          };
+        }
+
         const liveStock = livePart
           ? getBranchStock(livePart, currentBranchId)
           : item.stockSnapshot;
@@ -1906,6 +1991,20 @@ Cam on quy khach da tin tuong!
                       {item.partName}
                     </p>
                     <p className="text-[11px] font-medium text-slate-500 mt-0.5">{item.sku || "N/A"}</p>
+                    {/* IMEI của đúng những chiếc đang bán — người bán phải đối chiếu
+                        được với máy trên tay trước khi thu tiền. */}
+                    {item.unitImeis?.length ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.unitImeis.map((imei, idx) => (
+                          <span
+                            key={item.unitIds?.[idx] || `${imei}-${idx}`}
+                            className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
+                          >
+                            📱 {imei || "chưa có IMEI"}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <button
                     onClick={() => removeItem(item.partId)}
@@ -2984,6 +3083,18 @@ Cam on quy khach da tin tuong!
         <ReturnSaleModal
           sale={returnSale}
           onClose={() => setReturnSale(null)}
+        />
+      )}
+
+      {imeiPickerPart && (
+        <ImeiPickerModal
+          part={imeiPickerPart}
+          branchId={currentBranchId}
+          preselectedUnitIds={
+            cartItems.find((i) => i.partId === imeiPickerPart.id)?.unitIds || []
+          }
+          onClose={() => setImeiPickerPart(null)}
+          onConfirm={(units) => addUnitsToCart(imeiPickerPart, units)}
         />
       )}
 

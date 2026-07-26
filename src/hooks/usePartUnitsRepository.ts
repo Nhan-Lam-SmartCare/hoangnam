@@ -3,6 +3,7 @@ import {
   fetchUnitsByPart,
   fetchAvailableUnits,
   fetchUnitCountsByParts,
+  fetchSerializedPartIds,
   searchUnitsByImei,
   checkImeis,
   markUnitsSold,
@@ -84,6 +85,29 @@ export const usePartUnitCounts = (
     enabled: Boolean(branchId && sortedIds.length > 0),
     staleTime: 30_000,
   });
+};
+
+/**
+ * Set id sản phẩm có máy ghi IMEI còn kho ở chi nhánh hiện tại.
+ *
+ * Trả `Set` chứ không phải mảng vì bên gọi (lưới bán hàng) chỉ hỏi "có hay không"
+ * cho từng món trong vòng lặp render.
+ */
+export const useSerializedPartIds = (branchId: string | undefined) => {
+  const query = useQuery({
+    queryKey: ["partUnits", "serializedParts", branchId],
+    queryFn: async () => {
+      const res = await fetchSerializedPartIds(branchId!);
+      if (!res.ok) throw res.error;
+      return res.data;
+    },
+    enabled: Boolean(branchId),
+    staleTime: 30_000,
+  });
+  return {
+    ...query,
+    serializedIds: new Set(query.data || []),
+  };
 };
 
 export const useSearchUnitsByImei = (keyword: string, branchId?: string) =>

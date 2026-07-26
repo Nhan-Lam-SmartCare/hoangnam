@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useFinanceActions } from "../../src/contexts/app/useFinanceActions";
+import { createQueryWrapper } from "../helpers/queryWrapper";
 
 const mockRpc = vi.hoisted(() => vi.fn());
 const mockGetUser = vi.hoisted(() => vi.fn());
@@ -107,7 +108,9 @@ describe("returnSaleItems (đổi/trả một phần)", () => {
 
   it("hoàn kho, hoàn tiền và cập nhật returnedQty", async () => {
     const { state, deps } = createDeps();
-    const { result } = renderHook(() => useFinanceActions(deps as any));
+    const { result } = renderHook(() => useFinanceActions(deps as any), {
+      wrapper: createQueryWrapper(),
+    });
 
     act(() => {
       result.current.returnSaleItems({
@@ -152,7 +155,9 @@ describe("returnSaleItems (đổi/trả một phần)", () => {
       return Promise.resolve({ data: null, error: null });
     });
 
-    const { result } = renderHook(() => useFinanceActions(deps as any));
+    const { result } = renderHook(() => useFinanceActions(deps as any), {
+      wrapper: createQueryWrapper(),
+    });
     act(() => {
       result.current.returnSaleItems({
         saleId: "SALE-1",

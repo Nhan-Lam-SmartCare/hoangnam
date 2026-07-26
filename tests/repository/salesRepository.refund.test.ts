@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useFinanceActions } from "../../src/contexts/app/useFinanceActions";
+import { createQueryWrapper } from "../helpers/queryWrapper";
 import { showToast } from "../../src/utils/toast";
 
 const mockFrom = vi.hoisted(() => vi.fn());
@@ -157,7 +158,9 @@ describe("salesRepository.refundSale compatibility", () => {
 
   it("deleteSale restores stock, reverts payment balance and clears sale-linked cash tx", async () => {
     const { state, deps } = createDeps();
-    const { result } = renderHook(() => useFinanceActions(deps as any));
+    const { result } = renderHook(() => useFinanceActions(deps as any), {
+      wrapper: createQueryWrapper(),
+    });
 
     act(() => {
       result.current.deleteSale("SALE-1");
@@ -195,7 +198,9 @@ describe("salesRepository.refundSale compatibility", () => {
       return Promise.resolve({ data: null, error: null });
     });
 
-    const { result } = renderHook(() => useFinanceActions(deps as any));
+    const { result } = renderHook(() => useFinanceActions(deps as any), {
+      wrapper: createQueryWrapper(),
+    });
 
     act(() => {
       result.current.deleteSale("SALE-1");
