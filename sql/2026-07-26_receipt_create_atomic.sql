@@ -32,7 +32,9 @@
 -- PHỤ THUỘC: sql/2026-07-26_create_part_units.sql phải chạy TRƯỚC.
 --
 -- Idempotent (CREATE OR REPLACE).
--- Apply: node scripts/setup/apply-sql.mjs sql/2026-07-26_receipt_create_atomic.sql
+-- ⚠️ APPLY bằng Supabase SQL Editor (dán nguyên nội dung file). KHÔNG dùng
+--    scripts/setup/apply-sql.mjs: script đó chạy qua RPC exec_sql, mà DB này
+--    không có (xem ghi chú ở sql/2026-07-13_sale_delete_atomic.sql).
 -- ============================================================================
 
 BEGIN;

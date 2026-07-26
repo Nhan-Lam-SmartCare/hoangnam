@@ -98,7 +98,7 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
       ? "bg-orange-500/10 border-l-4 border-l-orange-500"
       : "";
 
-  const canExpand = unitCount > 0 && Boolean(onToggleExpand);
+  const canExpand = Boolean(onToggleExpand);
   // Cùng công thức với ô rỗng ở InventoryManager: checkbox + tên + tồn + giá bán
   // + giá trị + hành động, cộng giá nhập / tiền công nếu cột đó đang hiện.
   const colSpan = 6 + (canViewImportPrice ? 1 : 0) + (hideLaborCost ? 0 : 1);
@@ -116,7 +116,15 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
             className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
         </td>
-        <td className="px-3 py-2">
+        <td
+          className={`px-3 py-2 ${canExpand ? "cursor-pointer group/cell" : ""}`}
+          onClick={(e) => {
+            if (canExpand && onToggleExpand) {
+              onToggleExpand(part.id);
+            }
+          }}
+          title={canExpand ? (isExpanded ? "Bấm để thu gọn chi tiết" : "Bấm để xem chi tiết danh sách máy & IMEI") : undefined}
+        >
           <div className="flex items-center gap-2">
             <PartUnitsChevron
               partId={part.id}
@@ -143,7 +151,7 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
               )}
             </div>
             <div className="flex flex-col gap-0.5 min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-snug max-w-[350px] lg:max-w-[480px]">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-snug max-w-[350px] lg:max-w-[480px] group-hover/cell:text-blue-600 dark:group-hover/cell:text-blue-400 transition-colors">
                 {part.name}
                 {isDuplicate && (
                   <span
@@ -183,7 +191,10 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
                 </span>
               )}
               {(part.imei || (part as any).imeis?.length > 0) && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/70 transition-all cursor-pointer shadow-2xs"
+                  title="Bấm để xem chi tiết danh sách máy & IMEI"
+                >
                   📱 IMEI: {part.imei || (part as any).imeis?.join(", ")}
                 </span>
               )}
@@ -330,6 +341,7 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
               branchId={branchId}
               expectedStock={available}
               canViewImportPrice={canViewImportPrice}
+              part={part}
             />
           </td>
         </tr>

@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
-import type { PartUnitStatus, PartUnit } from "../../../types";
+import type { PartUnitStatus, PartUnit, Part } from "../../../types";
 import { formatCurrency, formatDate } from "../../../utils/format";
-import { usePartUnits, useUpdatePartUnit } from "../../../hooks/usePartUnitsRepository";
+import { usePartUnits, useUpdatePartUnit, useCreatePartUnit } from "../../../hooks/usePartUnitsRepository";
 import { useSuppliers } from "../../../hooks/useSuppliers";
-import { Edit2, Check, X, Loader2 } from "lucide-react";
+import { Edit2, Check, X, Loader2, Plus, Sparkles } from "lucide-react";
+import { showToast } from "../../../utils/toast";
 
 export interface PartUnitsPanelProps {
   partId: string;
@@ -13,6 +14,7 @@ export interface PartUnitsPanelProps {
   canViewImportPrice: boolean;
   /** `false` cho mobile: thẻ hẹp, bỏ cột giá nhập & ngày cho đỡ vỡ layout. */
   dense?: boolean;
+  part?: Part;
 }
 
 const STATUS_LABEL: Record<PartUnitStatus, string> = {
@@ -47,10 +49,15 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
   expectedStock,
   canViewImportPrice,
   dense = false,
+  part,
 }) => {
   const { data: units = [], isLoading, error } = usePartUnits(partId, branchId);
   const { data: suppliers = [] } = useSuppliers();
   const updateUnitMutation = useUpdatePartUnit();
+  const createUnitMutation = useCreatePartUnit();
+
+  const [inputImei, setInputImei] = useState("");
+  const [inputColor, setInputColor] = useState("");
 
   const supplierNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -92,6 +99,30 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
     }
   };
 
+  const handleCreateUnit = async (imeiToUse?: string) => {
+    const targetImei = (imeiToUse || inputImei || part?.imei || "").trim();
+    if (!targetImei) {
+      showToast.warning("Vui lòng nhập IMEI để lưu");
+      return;
+    }
+    try {
+      await createUnitMutation.mutateAsync({
+        partId,
+        branchId,
+        imei: targetImei,
+        color: (inputColor || part?.color || "").trim() || undefined,
+        supplierId: (part as any)?.supplierId || (part as any)?.supplier_id || undefined,
+        // Bảng bên dưới hiện giá nhập của sản phẩm, nên phải lưu đúng con số đó.
+        // Bỏ trống thì DB nhận 0 và máy này báo lãi bằng cả giá bán.
+        importPrice: Number(part?.costPrice?.[branchId] || 0),
+      });
+      setInputImei("");
+      setInputColor("");
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">
@@ -108,12 +139,111 @@ const PartUnitsPanel: React.FC<PartUnitsPanelProps> = ({
     );
   }
 
+  // Fallback table view when part_units table has no records for this part yet
   if (units.length === 0) {
+    const legacyImei = part?.imei || (part as any)?.imeis?.join(", ") || "";
+    const legacyColor = part?.color || "";
+    const importPrice = part?.costPrice?.[branchId] || 0;
+    const suppId = (part as any)?.supplierId || (part as any)?.supplier_id;
+    const suppName = suppId ? supplierNameById.get(suppId) : undefined;
+
     return (
-      <div className="py-3 text-center text-xs text-slate-400 dark:text-slate-500">
-        Sản phẩm này chưa có máy nào được ghi IMEI.
-        <div className="mt-0.5 text-[10px]">
-          IMEI được tạo lúc nhập kho — phiếu nhập cũ sẽ không có.
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+          <span>
+            ⚠️ Sản phẩm ghi nhận tồn kho <b>{expectedStock} máy</b> nhưng chưa có bản ghi IMEI từng máy trong CSDL.
+          </span>
+          {legacyImei && (
+            <button
+              type="button"
+              onClick={() => handleCreateUnit(legacyImei)}
+              disabled={createUnitMutation.isPending}
+              className="px-2 py-0.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded shrink-0 flex items-center gap-1 shadow-2xs"
+            >
+              {createUnitMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              ⚡ Lưu IMEI ({legacyImei}) vào CSDL
+            </button>
+          )}
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-600">
+          <table className="w-full text-[11px]">
+            <thead className="bg-slate-100 dark:bg-slate-700/60">
+              <tr className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                <th className="px-2 py-1.5 text-left w-8">#</th>
+                <th className="px-2 py-1.5 text-left min-w-[140px]">IMEI</th>
+                <th className="px-2 py-1.5 text-left min-w-[100px]">Màu</th>
+                {canViewImportPrice && !dense && (
+                  <th className="px-2 py-1.5 text-right">Giá nhập</th>
+                )}
+                <th className="px-2 py-1.5 text-center">Trạng thái</th>
+                {!dense && <th className="px-2 py-1.5 text-left">Phiếu nhập & NCC</th>}
+                {!dense && <th className="px-2 py-1.5 text-right">Ngày nhập</th>}
+                <th className="px-2 py-1.5 text-center w-24">Lưu CSDL</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
+              <tr>
+                <td className="px-2 py-1.5 text-slate-400">1</td>
+                <td className="px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={inputImei || legacyImei}
+                    onChange={(e) => setInputImei(e.target.value)}
+                    placeholder="Gõ IMEI máy..."
+                    className="w-full px-2 py-0.5 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-900 font-mono text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </td>
+                <td className="px-2 py-1.5">
+                  <input
+                    type="text"
+                    value={inputColor || legacyColor}
+                    onChange={(e) => setInputColor(e.target.value)}
+                    placeholder="Màu..."
+                    className="w-full px-2 py-0.5 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </td>
+                {canViewImportPrice && !dense && (
+                  <td className="px-2 py-1.5 text-right text-slate-600 dark:text-slate-300 font-medium">
+                    {formatCurrency(importPrice)}
+                  </td>
+                )}
+                <td className="px-2 py-1.5 text-center">
+                  <span className="inline-flex items-center rounded-full border px-1.5 py-0 text-[9px] font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800">
+                    Còn kho
+                  </span>
+                </td>
+                {!dense && (
+                  <td className="px-2 py-1.5 text-[10px]">
+                    <div className="font-mono text-slate-500 dark:text-slate-400">
+                      Mặc định từ sp
+                    </div>
+                    {suppName && (
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold truncate max-w-[150px]">
+                        🏢 {suppName}
+                      </div>
+                    )}
+                  </td>
+                )}
+                {!dense && (
+                  <td className="px-2 py-1.5 text-right text-slate-400">
+                    —
+                  </td>
+                )}
+                <td className="px-2 py-1.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateUnit(inputImei || legacyImei)}
+                    disabled={createUnitMutation.isPending}
+                    className="px-2 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded transition shadow-2xs flex items-center gap-1 justify-center w-full"
+                  >
+                    {createUnitMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                    Lưu máy
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     );

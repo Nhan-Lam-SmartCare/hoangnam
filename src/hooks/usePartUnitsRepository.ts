@@ -207,6 +207,7 @@ export const useCreatePartUnit = () => {
       imei: string;
       color?: string;
       supplierId?: string;
+      importPrice?: number;
     }) => {
       const res = await createPartUnit(params);
       if (!res.ok) throw res.error;

@@ -16,7 +16,7 @@ export const PartUnitsChevron: React.FC<PartUnitsChevronProps> = ({
   isExpanded,
   onToggle,
 }) => {
-  if (unitCount <= 0 || !onToggle) {
+  if (!onToggle) {
     return <span className="w-5 flex-shrink-0" aria-hidden="true" />;
   }
 
@@ -27,10 +27,10 @@ export const PartUnitsChevron: React.FC<PartUnitsChevronProps> = ({
         e.stopPropagation();
         onToggle(partId);
       }}
-      className="flex-shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-600 dark:hover:text-slate-200"
+      className="flex-shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-600 dark:hover:text-slate-200 transition-colors"
       aria-expanded={isExpanded}
       aria-label={isExpanded ? "Thu gọn danh sách máy" : "Xem từng máy"}
-      title={`${unitCount} máy có IMEI`}
+      title={unitCount > 0 ? `${unitCount} máy có IMEI` : "Xem chi tiết máy"}
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -62,7 +62,7 @@ export const PartUnitsBadge: React.FC<PartUnitsBadgeProps> = ({
   onToggle,
   variant = "table",
 }) => {
-  if (unitCount <= 0 || !onToggle) return null;
+  if (!onToggle || (unitCount <= 0 && expectedStock <= 0)) return null;
 
   const mismatch = unitCount !== expectedStock;
   const isCard = variant === "card";

@@ -488,6 +488,13 @@ export async function createPartUnit(params: {
   imei: string;
   color?: string;
   supplierId?: string;
+  /**
+   * Giá vốn THẬT của chiếc máy này. Bỏ trống thì cột `import_price` nhận
+   * DEFAULT 0 — mà giá vốn theo từng máy chính là lý do bảng này tồn tại, để 0
+   * là báo cáo lãi/lỗ của máy đó sai bằng đúng toàn bộ giá nhập. Bên gọi backfill
+   * nên truyền `part.costPrice[branchId]`.
+   */
+  importPrice?: number;
 }): Promise<RepoResult<PartUnit>> {
   try {
     if (!params.partId) return failure({ code: "validation", message: "Thiếu mã sản phẩm" });
@@ -505,6 +512,7 @@ export async function createPartUnit(params: {
       imei: imei,
       color: (params.color || "").trim() || null,
       supplier_id: params.supplierId || null,
+      import_price: Math.max(0, Number(params.importPrice || 0)),
       status: "in_stock",
       is_placeholder: false,
     };

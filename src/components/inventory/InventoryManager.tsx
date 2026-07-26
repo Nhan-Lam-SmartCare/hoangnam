@@ -237,10 +237,10 @@ const InventoryManagerNew: React.FC = () => {
 
   // Đổi trang/bộ lọc thì dòng đang bung có thể không còn trên màn -> đóng lại.
   useEffect(() => {
-    if (expandedPartId && !unitCounts[expandedPartId]) {
+    if (expandedPartId && !displayedPartIds.includes(expandedPartId)) {
       setExpandedPartId(null);
     }
-  }, [expandedPartId, unitCounts]);
+  }, [expandedPartId, displayedPartIds]);
 
   const queryClient = useQueryClient();
   const updatePartMutation = useUpdatePartRepo();

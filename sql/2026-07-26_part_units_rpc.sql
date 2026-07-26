@@ -19,7 +19,10 @@
 --   quyền owner để kiểm tra xuyên chi nhánh, và CHỈ trả về thông tin tối thiểu
 --   (imei, trạng thái, tên sản phẩm) — không rò rỉ giá vốn hay chi nhánh nào.
 --
--- Idempotent. Apply: node scripts/setup/apply-sql.mjs sql/2026-07-26_part_units_rpc.sql
+-- Idempotent.
+-- ⚠️ APPLY bằng Supabase SQL Editor (dán nguyên nội dung file). KHÔNG dùng
+--    scripts/setup/apply-sql.mjs: script đó chạy qua RPC exec_sql, mà DB này
+--    không có (xem ghi chú ở sql/2026-07-13_sale_delete_atomic.sql).
 -- ============================================================================
 
 BEGIN;

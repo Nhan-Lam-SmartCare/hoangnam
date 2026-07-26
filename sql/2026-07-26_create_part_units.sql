@@ -24,7 +24,10 @@
 --     migrate dữ liệu cũ. Hai cột này sẽ DROP ở Phase 8 sau khi ổn định.
 --   - current_user_role() và current_user_branch_id() đã deploy -> RLS dùng được.
 --
--- Idempotent. Apply: node scripts/setup/apply-sql.mjs sql/2026-07-26_create_part_units.sql
+-- Idempotent.
+-- ⚠️ APPLY bằng Supabase SQL Editor (dán nguyên nội dung file). KHÔNG dùng
+--    scripts/setup/apply-sql.mjs: script đó chạy qua RPC exec_sql, mà DB này
+--    không có (xem ghi chú ở sql/2026-07-13_sale_delete_atomic.sql).
 -- ============================================================================
 
 BEGIN;

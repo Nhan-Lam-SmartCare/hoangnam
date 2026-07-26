@@ -135,11 +135,27 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
               imei: trimmedImei,
               color: nu.color.trim() || undefined,
               supplierId: formData.supplierId || undefined,
+              // Giá vốn từng máy — bỏ trống thì DB nhận 0 và báo cáo lãi sai.
+              importPrice: Number(formData.costPrice || 0),
             });
           } catch (err: any) {
             console.error("Lỗi tạo mới máy:", err);
           }
         }
+      }
+    } else if (units.length === 0 && formData.imei.trim()) {
+      // Tự động tạo bản ghi CSDL chi tiết nếu sản phẩm có gõ IMEI lúc sửa
+      try {
+        await createUnitMutation.mutateAsync({
+          partId: part.id,
+          branchId: currentBranchId,
+          imei: formData.imei.trim(),
+          color: formData.color.trim() || undefined,
+          supplierId: formData.supplierId || undefined,
+          importPrice: Number(formData.costPrice || 0),
+        });
+      } catch (err: any) {
+        console.error("Lỗi tự động tạo máy:", err);
       }
     }
 

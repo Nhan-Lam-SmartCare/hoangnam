@@ -221,3 +221,108 @@ describe("finalizeSale — hàng bán theo IMEI", () => {
     expect(rpcCalls.filter((n) => n.startsWith("part_units_"))).toEqual([]);
   });
 });
+
+/**
+ * Sau `sql/2026-07-26_sale_rpc_release_units.sql`, việc nhả máy nằm TRONG chính
+ * transaction xóa/trả đơn. Client nhận biết qua khóa `unitsReleased`:
+ *   - có khóa  -> DB đã lo, client gọi thêm là thừa một round-trip
+ *   - thiếu khóa -> DB còn RPC bản cũ, client PHẢI tự nhả, không thì máy kẹt 'sold'
+ *
+ * Hai nhánh này dễ hỏng âm thầm khi ai đó dọn code, nên khóa lại bằng test.
+ */
+describe("deleteSale — nhả máy theo bản RPC trên DB", () => {
+  const saleWithUnits = {
+    id: "SALE-9",
+    branchId: "CN1",
+    items: [
+      {
+        partId: "P-PHONE",
+        partName: "Reame Note 70",
+        quantity: 1,
+        sellingPrice: 3_000_000,
+        unitIds: ["unit-a"],
+      },
+    ],
+    paymentMethod: "cash",
+    total: 3_000_000,
+  };
+
+  function depsWithSale() {
+    const deps: any = createDeps();
+    deps.sales = [saleWithUnits];
+    deps.paymentSources = [{ id: "cash", balance: { CN1: 5_000_000 } }];
+    return deps;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    rpcCalls = [];
+    mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+  });
+
+  it("RPC bản mới báo unitsReleased -> client KHÔNG gọi lại part_units_release_by_sale", async () => {
+    mockRpc.mockImplementation((name: string) => {
+      rpcCalls.push(name);
+      if (name === "sale_delete_atomic") {
+        return Promise.resolve({
+          data: {
+            success: true,
+            branchId: "CN1",
+            refunds: {},
+            removedCashTxIds: [],
+            unitsReleased: 1,
+          },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: { success: true }, error: null });
+    });
+
+    const { result } = renderHook(() => useFinanceActions(depsWithSale()), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await act(async () => {
+      result.current.deleteSale("SALE-9");
+    });
+
+    await waitFor(() => expect(rpcCalls).toContain("sale_delete_atomic"));
+    expect(rpcCalls).not.toContain("part_units_release_by_sale");
+  });
+
+  it("RPC bản cũ (không có unitsReleased) -> client tự nhả máy", async () => {
+    let releaseSaleId: string | null = null;
+    mockRpc.mockImplementation((name: string, params: any) => {
+      rpcCalls.push(name);
+      if (name === "sale_delete_atomic") {
+        return Promise.resolve({
+          data: {
+            success: true,
+            branchId: "CN1",
+            refunds: {},
+            removedCashTxIds: [],
+          },
+          error: null,
+        });
+      }
+      if (name === "part_units_release_by_sale") {
+        releaseSaleId = params?.p_sale_id;
+        return Promise.resolve({
+          data: { success: true, updated: 1 },
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: { success: true }, error: null });
+    });
+
+    const { result } = renderHook(() => useFinanceActions(depsWithSale()), {
+      wrapper: createQueryWrapper(),
+    });
+
+    await act(async () => {
+      result.current.deleteSale("SALE-9");
+    });
+
+    await waitFor(() => expect(releaseSaleId).toBe("SALE-9"));
+  });
+});

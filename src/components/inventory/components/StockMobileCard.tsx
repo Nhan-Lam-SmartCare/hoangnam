@@ -53,7 +53,7 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
   const stock = part.stock[branchId] || 0;
   const retailPrice = part.retailPrice[branchId] || 0;
   const laborCost = Number((part as any).laborCost?.[branchId] || 0);
-  const canExpand = unitCount > 0 && Boolean(onToggleExpand);
+  const canExpand = Boolean(onToggleExpand);
 
   return (
     <div
@@ -63,9 +63,16 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
+          <div
+            className={`flex-1 min-w-0 ${canExpand ? "cursor-pointer group/card" : ""}`}
+            onClick={() => {
+              if (canExpand && onToggleExpand) {
+                onToggleExpand(part.id);
+              }
+            }}
+          >
             {/* Tên sản phẩm: hiển thị đầy đủ */}
-            <div className="text-[15px] font-medium text-white leading-tight">
+            <div className="text-[15px] font-medium text-white leading-tight group-hover/card:text-blue-300 transition-colors">
               {part.name}
             </div>
             <div className="text-[11px] text-blue-400 mt-1 truncate font-mono">
@@ -89,7 +96,14 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
               </span>
             )}
             {(part.imei || (part as any).imeis?.length > 0) && (
-              <div className="mt-1 text-[11px] font-mono font-semibold text-blue-300">
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand?.(part.id);
+                }}
+                className="mt-1 text-[11px] font-mono font-semibold text-blue-300 bg-blue-950/60 border border-blue-800 rounded px-1.5 py-0.5 w-fit cursor-pointer hover:bg-blue-900/80 transition-colors"
+                title="Bấm để xem chi tiết danh sách máy & IMEI"
+              >
                 📱 IMEI: {part.imei || (part as any).imeis?.join(", ")}
               </div>
             )}
@@ -195,6 +209,7 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
               expectedStock={stock}
               canViewImportPrice={false}
               dense
+              part={part}
             />
           </div>
         )}

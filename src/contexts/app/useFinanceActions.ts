@@ -614,6 +614,12 @@ export function useFinanceActions(
        * với đơn phải bán được lại; nếu không, máy vẫn mang trạng thái 'sold' và
        * biến mất khỏi kho dù `parts.stock` đã được cộng lại.
        *
+       * CHỈ DÙNG KHI RPC CHƯA BIẾT TỚI part_units. Bản
+       * `sql/2026-07-26_sale_rpc_release_units.sql` nhả máy ngay trong transaction
+       * xóa đơn — an toàn hơn hẳn vì mất mạng giữa chừng không thể để lại máy kẹt
+       * 'sold'. Nhận biết bằng khóa `unitsReleased` trong kết quả trả về: thiếu
+       * khóa = DB còn bản cũ, phải tự nhả từ client như trước.
+       *
        * Gọi vô điều kiện (RPC trả 0 khi đơn không có máy nào): state cục bộ có thể
        * đã cũ, không đáng để đánh cược mất dữ liệu chỉ để tiết kiệm một round-trip
        * trong một thao tác hiếm như xóa đơn.
@@ -653,7 +659,11 @@ export function useFinanceActions(
           const branch = result.branchId || saleBranchId;
           const refunds: Record<string, number> = result.refunds || {};
           applyLocalDelete(branch, refunds, true);
-          await releaseSaleUnits();
+          if (result.unitsReleased === undefined) {
+            await releaseSaleUnits();
+          } else {
+            invalidatePartUnits();
+          }
           showToast.success(
             "Đã xóa phiếu bán hàng, hoàn kho và hoàn tiền thành công."
           );
@@ -900,30 +910,46 @@ export function useFinanceActions(
         // thành hàng bán được trong khi chiếc thật vẫn ở nhà khách — sai dữ liệu
         // tệ hơn là bắt người dùng sửa tay. `part_units_release` bỏ qua máy đã ở
         // 'in_stock' nên gửi cả dòng là an toàn.
-        const unitIdsToRelease: string[] = [];
+        //
+        // Từ `sql/2026-07-26_sale_rpc_release_units.sql`, RPC tự làm việc này
+        // trong cùng transaction và trả về `unitsReleased` + `unitsPartial`. Server
+        // tính chuẩn hơn client vì nó cộng được cả các lần trả TRƯỚC từ bảng
+        // `sale_returns`, còn `returnedQty` phía client có thể đã cũ. Thiếu khóa
+        // `unitsReleased` = DB còn RPC bản cũ -> tự nhả như trước.
         const ambiguousLines: string[] = [];
-        for (const line of items) {
-          const saleItem = sale?.items.find((it) => it.partId === line.partId);
-          const unitIds = saleItem?.unitIds || [];
-          if (unitIds.length === 0) continue;
-          const totalReturned = (saleItem?.returnedQty || 0) + line.quantity;
-          if (totalReturned >= unitIds.length) {
-            unitIdsToRelease.push(...unitIds);
-          } else {
-            ambiguousLines.push(saleItem?.partName || line.partId);
-          }
-        }
+        const partName = (partId: string) =>
+          sale?.items.find((it) => it.partId === partId)?.partName || partId;
 
-        if (unitIdsToRelease.length > 0) {
-          const rel = await releaseUnits(
-            unitIdsToRelease,
-            `Khách trả hàng (HĐ ${input.saleId})`
-          );
-          invalidatePartUnits();
-          if (!rel.ok) {
-            showToast.warning(
-              `Đã trả hàng nhưng chưa hoàn được máy có IMEI về kho: ${rel.error.message}`
+        if (result.unitsReleased === undefined) {
+          const unitIdsToRelease: string[] = [];
+          for (const line of items) {
+            const saleItem = sale?.items.find((it) => it.partId === line.partId);
+            const unitIds = saleItem?.unitIds || [];
+            if (unitIds.length === 0) continue;
+            const totalReturned = (saleItem?.returnedQty || 0) + line.quantity;
+            if (totalReturned >= unitIds.length) {
+              unitIdsToRelease.push(...unitIds);
+            } else {
+              ambiguousLines.push(saleItem?.partName || line.partId);
+            }
+          }
+
+          if (unitIdsToRelease.length > 0) {
+            const rel = await releaseUnits(
+              unitIdsToRelease,
+              `Khách trả hàng (HĐ ${input.saleId})`
             );
+            invalidatePartUnits();
+            if (!rel.ok) {
+              showToast.warning(
+                `Đã trả hàng nhưng chưa hoàn được máy có IMEI về kho: ${rel.error.message}`
+              );
+            }
+          }
+        } else {
+          invalidatePartUnits();
+          for (const partId of (result.unitsPartial || []) as string[]) {
+            ambiguousLines.push(partName(partId));
           }
         }
 
