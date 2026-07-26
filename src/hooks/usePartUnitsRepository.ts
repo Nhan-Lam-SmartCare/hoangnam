@@ -10,6 +10,7 @@ import {
   releaseUnits,
   releaseUnitsBySale,
   updateUnit,
+  createPartUnit,
 } from "../lib/repository/partUnitsRepository";
 import type { PartUnit } from "../types";
 import { showToast } from "../utils/toast";
@@ -194,5 +195,27 @@ export const useUpdatePartUnit = () => {
       showToast.success("Đã cập nhật thông tin máy");
     },
     onError: (e: any) => showToast.error(e?.message || "Lỗi cập nhật máy"),
+  });
+};
+
+export const useCreatePartUnit = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      partId: string;
+      branchId: string;
+      imei: string;
+      color?: string;
+      supplierId?: string;
+    }) => {
+      const res = await createPartUnit(params);
+      if (!res.ok) throw res.error;
+      return res.data;
+    },
+    onSuccess: () => {
+      invalidateUnitQueries(qc);
+      showToast.success("Đã thêm máy mới thành công");
+    },
+    onError: (e: any) => showToast.error(e?.message || "Lỗi thêm máy mới"),
   });
 };

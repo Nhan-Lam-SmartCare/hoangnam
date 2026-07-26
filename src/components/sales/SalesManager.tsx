@@ -30,6 +30,7 @@ import {
   Calendar,
   BookOpen,
   CreditCard,
+  Smartphone,
 } from "lucide-react";
 import FormattedNumberInput from "../common/FormattedNumberInput";
 import PrintSalesPreviewModal, { PrintSalesPayload } from "./modals/PrintSalesPreviewModal";
@@ -41,6 +42,7 @@ import { showToast } from "../../utils/toast";
 import type { CartItem, Part, PartUnit, Sale } from "../../types";
 import ImeiPickerModal from "./modals/ImeiPickerModal";
 import { useSerializedPartIds } from "../../hooks/usePartUnitsRepository";
+import { searchUnitsByImei } from "../../lib/repository/partUnitsRepository";
 import { useCustomers, useSales, useCreateCustomer } from "../../hooks/useSupabase";
 import BarcodeScannerModal from "../common/BarcodeScannerModal";
 import { ReturnSaleModal } from "./ReturnSaleModal";
@@ -918,12 +920,33 @@ Cam on quy khach da tin tuong!
       })
     );
   };
-
-  // Quét mã vạch / nhấn Enter: tự thêm sản phẩm khớp barcode/SKU rồi xóa ô tìm
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
     const keyword = search.trim().toLowerCase();
     if (!keyword) return;
+
+    // 0. Ưu tiên tìm theo IMEI chiếc máy trong kho
+    if (keyword.length >= 3) {
+      try {
+        const res = await searchUnitsByImei(keyword, currentBranchId);
+        if (res.ok && res.data && res.data.length > 0) {
+          const inStockUnit = res.data.find((u) => u.status === "in_stock") || res.data[0];
+          if (inStockUnit && inStockUnit.status === "in_stock") {
+            const matchedPart =
+              parts.find((p) => p.id === inStockUnit.partId) ||
+              inventoryParts.find((p) => p.id === inStockUnit.partId);
+            if (matchedPart) {
+              e.preventDefault();
+              addUnitsToCart(matchedPart, [inStockUnit]);
+              setSearch("");
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi tra cứu IMEI trong bán hàng:", err);
+      }
+    }
 
     const cleanKeyword = keyword.replace(/[^a-z0-9]/g, "");
 
@@ -971,9 +994,33 @@ Cam on quy khach da tin tuong!
   };
 
   // C11: xử lý mã quét từ camera
-  const handleScannedBarcode = (code: string) => {
+  const handleScannedBarcode = async (code: string) => {
     const keyword = String(code || "").trim().toLowerCase();
     if (!keyword) return;
+
+    // 0. Ưu tiên tra cứu nếu mã quét là IMEI máy
+    if (keyword.length >= 3) {
+      try {
+        const res = await searchUnitsByImei(keyword, currentBranchId);
+        if (res.ok && res.data && res.data.length > 0) {
+          const inStockUnit = res.data.find((u) => u.status === "in_stock") || res.data[0];
+          if (inStockUnit && inStockUnit.status === "in_stock") {
+            const matchedPart =
+              parts.find((p) => p.id === inStockUnit.partId) ||
+              inventoryParts.find((p) => p.id === inStockUnit.partId);
+            if (matchedPart) {
+              addUnitsToCart(matchedPart, [inStockUnit]);
+              showToast.success(`Đã chọn máy IMEI: ${inStockUnit.imei}`);
+              setSearch("");
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi quét IMEI camera:", err);
+      }
+    }
+
     const cleanKeyword = keyword.replace(/[^a-z0-9]/g, "");
     const stockSourceParts = enablePartsPaging ? parts : inventoryParts;
     const match = stockSourceParts.find((p) => {
@@ -1681,7 +1728,15 @@ Cam on quy khach da tin tuong!
                             <div className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug break-words mb-1 line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {part.name}
                             </div>
-                            <div className="text-[11px] font-medium text-slate-400 truncate">{part.sku}</div>
+                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 truncate">
+                              <span>{part.sku}</span>
+                              {serializedIds.has(part.id) && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 rounded-md border border-blue-200 dark:border-blue-800">
+                                  <Smartphone className="w-3 h-3 text-blue-500" />
+                                  <span>IMEI</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 w-full space-y-1.5">
@@ -1732,7 +1787,15 @@ Cam on quy khach da tin tuong!
                                 }`}
                               >
                                 <td className="px-4 py-2.5">
-                                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">{part.name}</div>
+                                  <div className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                                    <span>{part.name}</span>
+                                    {serializedIds.has(part.id) && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800">
+                                        <Smartphone className="w-3 h-3 text-blue-500" />
+                                        <span>IMEI</span>
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="text-[11px] text-slate-400 font-medium mt-0.5">{part.sku}</div>
                                 </td>
                                 <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 font-medium">{warrantyText}</td>

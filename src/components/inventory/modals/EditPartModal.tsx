@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCategories, useCreateCategory } from "../../../hooks/useCategories";
 import { useSuppliers } from "../../../hooks/useSuppliers";
-import { usePartUnits, useUpdatePartUnit } from "../../../hooks/usePartUnitsRepository";
+import { usePartUnits, useUpdatePartUnit, useCreatePartUnit } from "../../../hooks/usePartUnitsRepository";
 import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import type { Part } from "../../../types";
@@ -36,8 +36,10 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
 
   const { data: units = [] } = usePartUnits(part.id, currentBranchId);
   const updateUnitMutation = useUpdatePartUnit();
+  const createUnitMutation = useCreatePartUnit();
 
   const [unitEdits, setUnitEdits] = useState<Record<string, { imei: string; color: string }>>({});
+  const [newUnits, setNewUnits] = useState<Array<{ id: string; imei: string; color: string }>>([]);
 
   useEffect(() => {
     if (units.length > 0) {
@@ -88,7 +90,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
       return;
     }
 
-    // Save individual units if any were edited or if supplier changed
+    // Save individual existing units if any were edited
     if (units.length > 0) {
       for (const unit of units) {
         const edited = unitEdits[unit.id];
@@ -116,6 +118,26 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
             });
           } catch (err: any) {
             console.error("Lỗi cập nhật máy:", err);
+          }
+        }
+      }
+    }
+
+    // Create newly added machine units
+    if (newUnits.length > 0) {
+      for (const nu of newUnits) {
+        const trimmedImei = nu.imei.trim();
+        if (trimmedImei) {
+          try {
+            await createUnitMutation.mutateAsync({
+              partId: part.id,
+              branchId: currentBranchId,
+              imei: trimmedImei,
+              color: nu.color.trim() || undefined,
+              supplierId: formData.supplierId || undefined,
+            });
+          } catch (err: any) {
+            console.error("Lỗi tạo mới máy:", err);
           }
         }
       }
@@ -265,15 +287,52 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
           </div>
         </div>
 
-        {/* IMEI / Seri & Màu sắc (Từng máy hoặc mặc định) */}
-        {units.length > 0 ? (
+        {/* IMEI / Seri & Màu sắc (Từng máy hoặc bổ sung máy thiếu) */}
+        {units.length > 0 || newUnits.length > 0 ? (
           <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
-                📱 Danh sách IMEI & Màu sắc ({units.length} máy tại chi nhánh {currentBranchName})
+                📱 Danh sách IMEI & Màu sắc ({units.length + newUnits.length} máy tại chi nhánh {currentBranchName})
               </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewUnits((prev) => [
+                    ...prev,
+                    { id: `new-${Date.now()}-${Math.random().toString(36).slice(2)}`, imei: "", color: "" },
+                  ]);
+                }}
+                className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 rounded-lg transition border border-blue-200 dark:border-blue-800 flex items-center gap-1"
+              >
+                + Thêm máy ghi IMEI
+              </button>
             </div>
-            <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+
+            {formData.stock > (units.length + newUnits.length) && (
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-2">
+                <span>
+                  ⚠️ Tồn kho ghi <b>{formData.stock} máy</b> nhưng mới chỉ có <b>{units.length + newUnits.length} máy</b> có IMEI.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const missingCount = formData.stock - (units.length + newUnits.length);
+                    const toAdd = Array.from({ length: missingCount }).map((_, i) => ({
+                      id: `new-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+                      imei: "",
+                      color: "",
+                    }));
+                    setNewUnits((prev) => [...prev, ...toAdd]);
+                  }}
+                  className="px-2 py-0.5 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white rounded shrink-0"
+                >
+                  Tạo nhanh {formData.stock - (units.length + newUnits.length)} ô IMEI
+                </button>
+              </div>
+            )}
+
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {/* Máy đã có sẵn trong kho */}
               {units.map((unit, idx) => {
                 const currentEdit = unitEdits[unit.id] || { imei: unit.imei || "", color: unit.color || "" };
                 return (
@@ -317,37 +376,101 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
                   </div>
                 );
               })}
+
+              {/* Máy mới vừa thêm chờ lưu */}
+              {newUnits.map((nu, idx) => {
+                const totalIndex = units.length + idx + 1;
+                return (
+                  <div key={nu.id} className="flex items-center gap-2 bg-blue-50/50 dark:bg-blue-950/30 p-2 rounded-lg border border-blue-200 dark:border-blue-800 text-xs">
+                    <span className="font-bold text-blue-500 w-5 text-center shrink-0">#{totalIndex}</span>
+                    <div className="flex-1 min-w-[130px]">
+                      <input
+                        type="text"
+                        value={nu.imei}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewUnits((prev) =>
+                            prev.map((item) => (item.id === nu.id ? { ...item, imei: val } : item))
+                          );
+                        }}
+                        placeholder="Gõ số IMEI máy mới..."
+                        className="w-full px-2 py-1 border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-slate-900 font-mono text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <input
+                        type="text"
+                        value={nu.color}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewUnits((prev) =>
+                            prev.map((item) => (item.id === nu.id ? { ...item, color: val } : item))
+                          );
+                        }}
+                        placeholder="Màu sắc..."
+                        className="w-full px-2 py-1 border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewUnits((prev) => prev.filter((item) => item.id !== nu.id))}
+                      className="text-rose-500 hover:text-rose-700 font-bold px-1.5 py-0.5"
+                      title="Xóa ô này"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                📱 Số IMEI / Seri máy (Riêng biệt)
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                📱 Số IMEI & Màu sắc máy
               </label>
-              <input
-                type="text"
-                value={formData.imei}
-                onChange={(e) =>
-                  setFormData({ ...formData, imei: e.target.value })
-                }
-                placeholder="Nhập IMEI hoặc số Seri..."
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <button
+                type="button"
+                onClick={() => {
+                  setNewUnits([
+                    { id: `new-${Date.now()}-${Math.random().toString(36).slice(2)}`, imei: formData.imei || "", color: formData.color || "" },
+                  ]);
+                }}
+                className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 rounded-lg transition border border-blue-200 dark:border-blue-800"
+              >
+                + Thêm máy ghi IMEI
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                🎨 Màu sắc sản phẩm
-              </label>
-              <input
-                type="text"
-                value={formData.color}
-                onChange={(e) =>
-                  setFormData({ ...formData, color: e.target.value })
-                }
-                placeholder="Ví dụ: Đen, Trắng, Titanium..."
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  📱 Số IMEI / Seri máy (Riêng biệt)
+                </label>
+                <input
+                  type="text"
+                  value={formData.imei}
+                  onChange={(e) =>
+                    setFormData({ ...formData, imei: e.target.value })
+                  }
+                  placeholder="Nhập IMEI hoặc số Seri..."
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  🎨 Màu sắc sản phẩm
+                </label>
+                <input
+                  type="text"
+                  value={formData.color}
+                  onChange={(e) =>
+                    setFormData({ ...formData, color: e.target.value })
+                  }
+                  placeholder="Ví dụ: Đen, Trắng, Titanium..."
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
         )}

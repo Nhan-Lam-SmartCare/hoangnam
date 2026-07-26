@@ -478,3 +478,60 @@ export async function updateUnit(
     });
   }
 }
+
+/**
+ * Tạo mới 1 chiếc máy vật lý trong part_units (dùng khi bổ sung máy thiếu IMEI).
+ */
+export async function createPartUnit(params: {
+  partId: string;
+  branchId: string;
+  imei: string;
+  color?: string;
+  supplierId?: string;
+}): Promise<RepoResult<PartUnit>> {
+  try {
+    if (!params.partId) return failure({ code: "validation", message: "Thiếu mã sản phẩm" });
+    if (!params.branchId) return failure({ code: "validation", message: "Thiếu chi nhánh" });
+    const imei = (params.imei || "").trim();
+    if (!imei) return failure({ code: "validation", message: "IMEI không được để trống" });
+
+    const payload: Record<string, any> = {
+      id:
+        typeof crypto !== "undefined" && (crypto as any).randomUUID
+          ? (crypto as any).randomUUID()
+          : `unit-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      part_id: params.partId,
+      branch_id: params.branchId,
+      imei: imei,
+      color: (params.color || "").trim() || null,
+      supplier_id: params.supplierId || null,
+      status: "in_stock",
+      is_placeholder: false,
+    };
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert([payload])
+      .select(SELECT_COLS)
+      .single();
+
+    if (error || !data) {
+      const isDuplicate = String(error?.code) === "23505";
+      return failure({
+        code: isDuplicate ? "validation" : "supabase",
+        message: isDuplicate
+          ? `IMEI ${imei} đã tồn tại trong hệ thống`
+          : `Thêm máy thất bại: ${error?.message || "Lỗi không xác định"}`,
+        cause: error,
+      });
+    }
+
+    return success(normalizeUnitRow(data));
+  } catch (e: any) {
+    return failure({
+      code: "network",
+      message: "Lỗi kết nối khi thêm máy",
+      cause: e,
+    });
+  }
+}
