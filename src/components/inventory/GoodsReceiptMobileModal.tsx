@@ -55,6 +55,11 @@ interface ReceiptItem {
 
 const DEFAULT_MARKUP_PERCENT = 50;
 
+const calcMarkupPercent = (importPrice: number, sellingPrice: number) => {
+  if (importPrice <= 0 || sellingPrice <= 0) return DEFAULT_MARKUP_PERCENT;
+  return Math.max(0, Math.round(((sellingPrice / importPrice) - 1) * 100));
+};
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -167,6 +172,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
       const importPrice = canViewImportPrice
         ? part.costPrice?.[currentBranchId] || 0
         : 0;
+      const existingRetail = part.retailPrice?.[currentBranchId] || 0;
       setReceiptItems((items) => [
         ...items,
         {
@@ -175,13 +181,13 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
           sku: part.sku,
           quantity: 1,
           importPrice,
-          sellingPrice: calcSellingFromRule(
-            importPrice,
-            rule.markupPercent,
-            rule.roundingRule
-          ),
+          sellingPrice: existingRetail > 0
+            ? existingRetail
+            : calcSellingFromRule(importPrice, rule.markupPercent, rule.roundingRule),
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
-          markupPercent: rule.markupPercent,
+          markupPercent: existingRetail > 0 && importPrice > 0
+            ? calcMarkupPercent(importPrice, existingRetail)
+            : rule.markupPercent,
           roundingRule: rule.roundingRule,
         },
       ]);
@@ -279,6 +285,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
         const importPrice = canViewImportPrice
           ? foundPart.costPrice?.[currentBranchId] || 0
           : 0;
+        const existingRetail = foundPart.retailPrice?.[currentBranchId] || 0;
         setReceiptItems((items) => [
           ...items,
           {
@@ -287,13 +294,13 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
             sku: foundPart.sku,
             quantity: 1,
             importPrice,
-            sellingPrice: calcSellingFromRule(
-              importPrice,
-              rule.markupPercent,
-              rule.roundingRule
-            ),
+            sellingPrice: existingRetail > 0
+              ? existingRetail
+              : calcSellingFromRule(importPrice, rule.markupPercent, rule.roundingRule),
             wholesalePrice: foundPart.wholesalePrice?.[currentBranchId] || 0,
-            markupPercent: rule.markupPercent,
+            markupPercent: existingRetail > 0 && importPrice > 0
+              ? calcMarkupPercent(importPrice, existingRetail)
+              : rule.markupPercent,
             roundingRule: rule.roundingRule,
           },
         ]);
@@ -711,14 +718,18 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                               onChange={(val) => {
                                 const updated = [...receiptItems];
                                 updated[index].importPrice = val;
-                                updated[index].sellingPrice = calcSellingFromRule(
-                                  val,
-                                  Number(
-                                    updated[index].markupPercent ||
-                                      DEFAULT_MARKUP_PERCENT
-                                  ),
-                                  updated[index].roundingRule || "integer"
-                                );
+                                if (updated[index].sellingPrice > 0) {
+                                  updated[index].markupPercent = calcMarkupPercent(val, updated[index].sellingPrice);
+                                } else {
+                                  updated[index].sellingPrice = calcSellingFromRule(
+                                    val,
+                                    Number(
+                                      updated[index].markupPercent ||
+                                        DEFAULT_MARKUP_PERCENT
+                                    ),
+                                    updated[index].roundingRule || "integer"
+                                  );
+                                }
                                 setReceiptItems(updated);
                               }}
                               className="w-20 px-1 py-0.5 text-right text-sm font-semibold border-b border-dashed border-slate-350 dark:border-slate-600 bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"

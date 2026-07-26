@@ -324,8 +324,18 @@ export const LoginPage = () => {
       navigate("/");
     } catch (err: unknown) {
       console.error("Login error:", err);
-      const errorMessage =
+      let errorMessage =
         err instanceof Error ? err.message : "Đăng nhập thất bại";
+
+      if (errorMessage.includes("Invalid login credentials")) {
+        errorMessage = "Email hoặc mật khẩu không chính xác";
+      } else if (errorMessage.includes("Email not confirmed")) {
+        errorMessage = "Email chưa được xác nhận. Vui lòng kiểm tra hộp thư";
+      } else if (errorMessage.includes("User not found")) {
+        errorMessage = "Tài khoản không tồn tại";
+      } else if (errorMessage.includes("Too many requests")) {
+        errorMessage = "Quá nhiều yêu cầu. Vui lòng thử lại sau";
+      }
 
       // Check remaining attempts
       const remainingCheck = checkRateLimit(rateLimitKey);

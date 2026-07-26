@@ -292,6 +292,37 @@ export async function bulkUpdatePartStock(
   }
 }
 
+export function matchesSearchTerm(part: Part, rawSearch: string): boolean {
+  if (!rawSearch || !rawSearch.trim()) return true;
+
+  const searchClean = rawSearch.trim().toLowerCase();
+  const searchNormalized = searchClean.replace(/[\s\-_]+/g, "");
+
+  const textToSearch = [
+    part.name,
+    part.sku,
+    part.barcode,
+    part.category,
+    part.description,
+    part.imei,
+    part.color,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const textNormalized = textToSearch.replace(/[\s\-_]+/g, "");
+
+  if (textToSearch.includes(searchClean)) return true;
+  if (textNormalized.includes(searchNormalized)) return true;
+
+  const words = searchClean.split(/\s+/).filter(Boolean);
+  return words.every((w) => {
+    const wNorm = w.replace(/[\s\-_]+/g, "");
+    return textToSearch.includes(w) || textNormalized.includes(wNorm);
+  });
+}
+
 // Fetch parts with pagination & optional filters
 export async function fetchPartsPaged(params?: {
   page?: number; // 1-based
@@ -304,45 +335,67 @@ export async function fetchPartsPaged(params?: {
     const pageSize =
       params?.pageSize && params.pageSize > 0 ? params.pageSize : 50;
     const page = params?.page && params.page > 0 ? params.page : 1;
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+    const searchStr = params?.search?.trim() || "";
+
+    if (!searchStr) {
+      // Direct paginated query in DB when no search string
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      let query = supabase
+        .from(PARTS_TABLE)
+        .select("*", { count: "exact" })
+        .order("name")
+        .range(from, to);
+
+      if (params?.category && params.category !== "all") {
+        query = query.eq("category", params.category);
+      }
+      if (params?.branchId) {
+        query = query.or(`branch_id.eq.${params.branchId},branch_id.is.null`);
+      }
+      const { data, error, count } = await query;
+      if (error)
+        return failure({
+          code: "supabase",
+          message: "Không thể tải danh sách phụ tùng (phân trang)",
+          cause: error,
+        });
+
+      return success(
+        (data || []).map((row: any) => normalizePartRow(row)),
+        { total: count ?? 0, page, pageSize }
+      );
+    }
+
+    // When searching, fetch candidate rows for this branch/category & apply smart space-agnostic matching
     let query = supabase
       .from(PARTS_TABLE)
-      .select("*", { count: "exact" })
-      .order("name")
-      .range(from, to);
+      .select("*")
+      .order("name");
+
     if (params?.category && params.category !== "all") {
       query = query.eq("category", params.category);
     }
     if (params?.branchId) {
-      // Show products assigned to this branch, or legacy global products without a branch assigned
       query = query.or(`branch_id.eq.${params.branchId},branch_id.is.null`);
     }
-    if (params?.search && params.search.trim()) {
-      const term = params.search.trim().toLowerCase();
 
-      // Loại bỏ ký tự đặc biệt để tìm kiếm tốt hơn
-      // VD: Tìm "NHB35P" sẽ tìm thấy 'Bộ nắp trước tay lái "NHB35P"'
-      const cleanTerm = term.replace(/['"]/g, ""); // Xóa dấu ngoặc kép/đơn
-
-      // Tìm kiếm trong name, sku, category, description
-      // Supabase chỉ hỗ trợ OR, không hỗ trợ AND cho nhiều điều kiện phức tạp
-      // Giải pháp: Tìm với OR, sau đó filter ở client nếu cần
-      query = query.or(
-        `name.ilike.%${cleanTerm}%,sku.ilike.%${cleanTerm}%,category.ilike.%${cleanTerm}%,description.ilike.%${cleanTerm}%`
-      );
-    }
-    const { data, error, count } = await query;
+    const { data, error } = await query;
     if (error)
       return failure({
         code: "supabase",
-        message: "Không thể tải danh sách phụ tùng (phân trang)",
+        message: "Không thể tải danh sách phụ tùng khi tìm kiếm",
         cause: error,
       });
-    return success(
-      (data || []).map((row: any) => normalizePartRow(row)),
-      { total: count, page, pageSize }
-    );
+
+    const normalizedParts = (data || []).map((row: any) => normalizePartRow(row));
+    const matchedParts = normalizedParts.filter((part) => matchesSearchTerm(part, searchStr));
+
+    const total = matchedParts.length;
+    const from = (page - 1) * pageSize;
+    const pagedSlice = matchedParts.slice(from, from + pageSize);
+
+    return success(pagedSlice, { total, page, pageSize });
   } catch (e: any) {
     return failure({
       code: "network",

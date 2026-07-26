@@ -70,13 +70,78 @@ export interface Part {
   laborCost?: { [branchId: string]: number };
   category?: string;
   description?: string;
+  /**
+   * @deprecated Một sản phẩm chỉ chứa được 1 IMEI nên không mô tả nổi "tồn 2 =
+   * hai chiếc máy khác IMEI". Dùng bảng `part_units` (xem {@link PartUnit}).
+   * Hai cột này sẽ bị DROP sau khi màn tồn kho chuyển hẳn sang part_units.
+   */
   imei?: string;
+  /** @deprecated Xem ghi chú ở {@link Part.imei}. */
   color?: string;
+  /** true = quản lý theo từng máy có IMEI (part_units), không theo con số tồn. */
+  isSerialized?: boolean;
   warrantyPeriod?: string;
   // Tax & costing extensions (for future real data integration)
   costPrice?: { [branchId: string]: number };
   vatRate?: number; // e.g. 0.1 for 10%
   created_at?: string;
+}
+
+/**
+ * Một MÁY VẬT LÝ có IMEI — bảng `part_units`.
+ *
+ * Vì sao cần: `Part.stock` chỉ là con số. "Note 70 tồn 2" không cho biết máy nào
+ * còn, máy nào đã bán, giá vốn từng máy, hay hạn bảo hành theo IMEI. Mỗi bản ghi
+ * ở đây là một chiếc máy có thật trong tủ kính.
+ *
+ * `Part.stock` vẫn là nguồn sự thật cho CON SỐ tồn; bảng này là sổ chi tiết.
+ * View `v_part_units_reconcile` phát hiện khi hai bên lệch nhau.
+ */
+export interface PartUnit {
+  id: string;
+  partId: string;
+  branchId: string;
+  imei: string;
+  color?: string;
+  /** Giá vốn thật của ĐÚNG máy này — dùng tính lãi thực, không phải bình quân. */
+  importPrice: number;
+  sellingPrice?: number;
+  status: PartUnitStatus;
+  /** true = dòng sinh từ backfill, IMEI là mã tạm, cần kiểm kê tay. */
+  isPlaceholder: boolean;
+  receiptCode?: string;
+  supplierId?: string;
+  receivedAt: string;
+  soldAt?: string;
+  saleId?: string;
+  workOrderId?: string;
+  warrantyCardId?: string;
+  note?: string;
+}
+
+export type PartUnitStatus =
+  | "in_stock"
+  | "reserved"
+  | "sold"
+  | "returned"
+  | "warranty"
+  | "lost";
+
+/**
+ * Máy kèm tên sản phẩm. Dùng cho kết quả tra IMEI: chỉ có IMEI thì không biết
+ * đó là máy gì.
+ */
+export interface PartUnitWithPart extends PartUnit {
+  partName: string;
+  partSku?: string;
+}
+
+/** Kết quả tiền kiểm IMEI trước khi lưu phiếu nhập (RPC part_units_check_imeis). */
+export interface PartUnitImeiConflict {
+  imei: string;
+  status: PartUnitStatus;
+  partName: string;
+  soldAt?: string;
 }
 
 /** Thông tin cảnh báo tồn kho khi tạo/cập nhật phiếu sửa chữa */
@@ -111,6 +176,16 @@ export interface CartItem {
   discount?: number; // Per-line discount (absolute)
   isService?: boolean; // Mark as service item to skip stock validation
   returnedQty?: number; // Số lượng đã trả (đổi/trả một phần)
+  /**
+   * `part_units.id` của TỪNG máy được chọn bán (hàng có IMEI).
+   *
+   * Khi có mảng này thì `quantity` PHẢI bằng `unitIds.length` — bán hàng có IMEI
+   * là bán những chiếc máy cụ thể, không phải bán "2 cái bất kỳ". CartContext
+   * giữ bất biến đó; xem [[CartContext.updateCartItemQuantity]].
+   */
+  unitIds?: string[];
+  /** IMEI tương ứng `unitIds`, chỉ để hiển thị & in phiếu bảo hành. */
+  unitImeis?: string[];
 }
 
 export interface Sale {

@@ -20,9 +20,77 @@ import SupplierModal from '../../inventory/components/SupplierModal';
 import AddProductModal from './AddProductModal';
 import { isPhoneBranch } from '../../../utils/branchUtils';
 import { useBranchesRepo } from '../../../hooks/useBranchesRepository';
+import { checkImeis } from '../../../lib/repository/partUnitsRepository';
 import type { Part } from '../../../types';
 
 const DEFAULT_MARKUP_PERCENT = 50;
+
+/** Gom IMEI của một dòng về mảng sạch (bỏ ô trống, cắt khoảng trắng). */
+const collectImeis = (item: { imeis?: string[]; imei?: string }): string[] => {
+  const raw =
+    item.imeis && item.imeis.length > 0 ? item.imeis : item.imei ? [item.imei] : [];
+  return raw.map((s) => (s || "").trim()).filter((s) => s.length > 0);
+};
+
+type ImeiProblem = {
+  message: string;
+  severity: "warning" | "error";
+  /** IMEI cần tô đỏ trên form (chữ HOA). */
+  conflicts: Set<string>;
+};
+
+/**
+ * Thẩm định IMEI trước khi lưu phiếu. Ba tầng, dừng ở tầng đầu tiên phát hiện lỗi:
+ *   1. Đủ số lượng — nhập 5 máy phải có 5 IMEI.
+ *   2. Không lặp trong cùng phiếu.
+ *   3. Không trùng máy đã có trong hệ thống (hỏi DB, xuyên chi nhánh).
+ *
+ * Trả `null` khi hợp lệ. Đây là cảnh báo phía client cho thông báo dễ hiểu;
+ * chốt chặn thật vẫn nằm ở RPC `receipt_create_atomic`.
+ */
+async function validateReceiptImeis(
+  items: Array<{ partName: string; quantity: number; imeis?: string[]; imei?: string }>,
+  allImeis: string[]
+): Promise<ImeiProblem | null> {
+  for (const item of items) {
+    const imeis = collectImeis(item);
+    if (imeis.length !== item.quantity) {
+      return {
+        message: `«${item.partName}» nhập ${item.quantity} máy nhưng mới có ${imeis.length} số IMEI. Vui lòng điền đủ.`,
+        severity: "warning",
+        conflicts: new Set(),
+      };
+    }
+  }
+
+  const seen = new Set<string>();
+  for (const imei of allImeis) {
+    const key = imei.toUpperCase();
+    if (seen.has(key)) {
+      return {
+        message: `IMEI bị nhập lặp trong cùng phiếu: ${imei}`,
+        severity: "error",
+        conflicts: new Set([key]),
+      };
+    }
+    seen.add(key);
+  }
+
+  // Hỏi lại DB ngay trước khi lưu: bảng tô đỏ có thể đã cũ 500ms, hoặc chi
+  // nhánh khác vừa nhập đúng chiếc máy này trong lúc nhân viên đang gõ.
+  const res = await checkImeis(allImeis);
+  if (res.ok && res.data.length > 0) {
+    return {
+      message: `IMEI đã tồn tại trong hệ thống: ${res.data
+        .map((c) => `${c.imei} (${c.partName})`)
+        .join(", ")}`,
+      severity: "error",
+      conflicts: new Set(res.data.map((c) => c.imei.trim().toUpperCase())),
+    };
+  }
+
+  return null;
+}
 
 const calcMarkupPercent = (importPrice: number, sellingPrice: number) => {
   if (importPrice <= 0 || sellingPrice <= 0) return DEFAULT_MARKUP_PERCENT;
@@ -44,6 +112,10 @@ const GoodsReceiptModal: React.FC<{
       importPrice: number;
       laborCost?: number;
       sellingPrice: number;
+      /** IMEI từng máy — độ dài phải bằng `quantity` với hàng quản lý theo máy. */
+      imeis?: string[];
+      imei?: string;
+      color?: string;
     }>,
     supplierId: string,
     totalAmount: number,
@@ -102,6 +174,12 @@ const GoodsReceiptModal: React.FC<{
   );
   const [discountPercent, setDiscountPercent] = useState(0);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  /**
+   * IMEI đã tồn tại trong hệ thống (chữ HOA để so sánh). Dùng tô đỏ ô nhập ngay
+   * lúc gõ, thay vì để nhân viên điền xong cả phiếu mới báo lỗi. Đây chỉ là
+   * cảnh báo sớm — chốt chặn thật nằm ở RPC receipt_create_atomic.
+   */
+  const [conflictImeis, setConflictImeis] = useState<Set<string>>(new Set());
 
   // Auto-save key cho localStorage
   const DRAFT_KEY = `goods_receipt_draft_${currentBranchId}`;
@@ -249,6 +327,7 @@ const GoodsReceiptModal: React.FC<{
       const rule = getCategoryPricingRule(part.category || "");
       const importPrice =
         canViewImportPrice ? part.costPrice?.[currentBranchId] || 0 : 0;
+      const existingRetail = part.retailPrice?.[currentBranchId] || 0;
       setReceiptItems([
         ...receiptItems,
         {
@@ -258,13 +337,13 @@ const GoodsReceiptModal: React.FC<{
           quantity: 1,
           importPrice,
           laborCost: Number((part as any).laborCost?.[currentBranchId] || 0),
-          sellingPrice: calcSellingFromRule(
-            importPrice,
-            rule.markupPercent,
-            rule.roundingRule
-          ),
+          sellingPrice: existingRetail > 0
+            ? existingRetail
+            : calcSellingFromRule(importPrice, rule.markupPercent, rule.roundingRule),
           wholesalePrice: part.wholesalePrice?.[currentBranchId] || 0,
-          markupPercent: rule.markupPercent,
+          markupPercent: existingRetail > 0 && importPrice > 0
+            ? calcMarkupPercent(importPrice, existingRetail)
+            : rule.markupPercent,
           roundingRule: rule.roundingRule,
         },
       ]);
@@ -344,6 +423,7 @@ const GoodsReceiptModal: React.FC<{
         const rule = getCategoryPricingRule(foundPart.category || "");
         const importPrice =
           canViewImportPrice ? foundPart.costPrice?.[currentBranchId] || 0 : 0;
+        const existingRetail = foundPart.retailPrice?.[currentBranchId] || 0;
         setReceiptItems((items) => [
           ...items,
           {
@@ -353,13 +433,13 @@ const GoodsReceiptModal: React.FC<{
             quantity: 1,
             importPrice,
             laborCost: Number((foundPart as any).laborCost?.[currentBranchId] || 0),
-            sellingPrice: calcSellingFromRule(
-              importPrice,
-              rule.markupPercent,
-              rule.roundingRule
-            ),
+            sellingPrice: existingRetail > 0
+              ? existingRetail
+              : calcSellingFromRule(importPrice, rule.markupPercent, rule.roundingRule),
             wholesalePrice: foundPart.wholesalePrice?.[currentBranchId] || 0,
-            markupPercent: rule.markupPercent,
+            markupPercent: existingRetail > 0 && importPrice > 0
+              ? calcMarkupPercent(importPrice, existingRetail)
+              : rule.markupPercent,
             roundingRule: rule.roundingRule,
           },
         ]);
@@ -401,6 +481,40 @@ const GoodsReceiptModal: React.FC<{
     setReceiptItems((items) => items.filter((item) => item.partId !== partId));
   };
 
+  /** Mọi IMEI đang có trong phiếu, đã làm sạch. */
+  const allImeisInReceipt = useMemo(
+    () => receiptItems.flatMap((item) => collectImeis(item)),
+    [receiptItems]
+  );
+
+  /**
+   * Hỏi DB xem IMEI nào đã tồn tại. Chờ 500ms sau lần gõ cuối để không bắn một
+   * request mỗi ký tự. `cancelled` chặn phản hồi cũ ghi đè kết quả mới khi
+   * người dùng gõ nhanh hơn tốc độ mạng.
+   */
+  useEffect(() => {
+    if (!isOpen || allImeisInReceipt.length === 0) {
+      setConflictImeis(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const res = await checkImeis(allImeisInReceipt);
+      if (cancelled) return;
+      setConflictImeis(
+        res.ok
+          ? new Set(res.data.map((c) => c.imei.trim().toUpperCase()))
+          : new Set()
+      );
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, allImeisInReceipt]);
+
   const subtotal = useMemo(() => {
     // Payment amount for goods receipt must follow import value only.
     return receiptItems.reduce(
@@ -409,7 +523,7 @@ const GoodsReceiptModal: React.FC<{
     );
   }, [receiptItems]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canDo(profile, "part.update_price")) {
       showToast.error("Bạn không có quyền cập nhật giá");
       return;
@@ -419,9 +533,21 @@ const GoodsReceiptModal: React.FC<{
       return;
     }
 
-    if (totalAmount <= 0) {
-      showToast.warning("Tổng tiền nhập kho phải lớn hơn 0đ. Vui lòng kiểm tra lại giá nhập!");
+    if (totalAmount < 0) {
+      showToast.warning("Tổng tiền nhập kho không được âm. Vui lòng kiểm tra lại!");
       return;
+    }
+
+    // ── Kiểm tra IMEI cho chi nhánh điện thoại ────────────────────────────
+    // Không có IMEI thì máy vào kho là một con số vô danh: không biết máy nào
+    // còn, không tra được bảo hành, không tính được lãi thực từng chiếc.
+    if (hideLaborCost) {
+      const problem = await validateReceiptImeis(receiptItems, allImeisInReceipt);
+      if (problem) {
+        if (problem.conflicts.size > 0) setConflictImeis(problem.conflicts);
+        showToast[problem.severity](problem.message);
+        return;
+      }
     }
 
     const effectivePaymentType = paymentType || "full";
@@ -460,7 +586,10 @@ const GoodsReceiptModal: React.FC<{
     setDiscount(0);
     setDiscountPercent(0);
     setDiscountType("amount");
-    showToast.success("Nhập kho thành công!");
+    setConflictImeis(new Set());
+    // Cố ý KHÔNG báo "Nhập kho thành công" ở đây: onSave chạy bất đồng bộ và
+    // RPC vẫn có thể từ chối (IMEI trùng, không đủ quyền...). Kết quả thật do
+    // useGoodsReceiptActions thông báo, kèm mã phiếu.
   };
 
   const handleCancelReceipt = () => {
@@ -820,17 +949,21 @@ const GoodsReceiptModal: React.FC<{
                                     value={item.importPrice}
                                     onValue={(val) => {
                                       const newImport = Math.max(0, Math.round(val));
-                                      const autoPrice = calcSellingFromRule(
-                                        newImport,
-                                        Number(item.markupPercent || DEFAULT_MARKUP_PERCENT),
-                                        item.roundingRule || "integer"
-                                      );
                                       setReceiptItems((items) =>
-                                        items.map((it) =>
-                                          it.partId === item.partId
-                                            ? { ...it, importPrice: newImport, sellingPrice: autoPrice }
-                                            : it
-                                        )
+                                        items.map((it) => {
+                                          if (it.partId !== item.partId) return it;
+                                          if (it.sellingPrice > 0) {
+                                            const newMarkup = calcMarkupPercent(newImport, it.sellingPrice);
+                                            return { ...it, importPrice: newImport, markupPercent: newMarkup };
+                                          } else {
+                                            const autoPrice = calcSellingFromRule(
+                                              newImport,
+                                              Number(it.markupPercent || DEFAULT_MARKUP_PERCENT),
+                                              it.roundingRule || "integer"
+                                            );
+                                            return { ...it, importPrice: newImport, sellingPrice: autoPrice };
+                                          }
+                                        })
                                       );
                                     }}
                                     className="w-full px-1.5 py-1 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-orange-600 dark:text-orange-400 text-right text-xs font-bold"
@@ -876,14 +1009,18 @@ const GoodsReceiptModal: React.FC<{
                                         <Smartphone className="w-3 h-3" />
                                         <span>IMEI/Seri ({item.quantity} máy):</span>
                                       </span>
-                                      {Array.from({ length: Math.min(10, item.quantity) }).map((_, imeiIndex) => {
+                                      {/* Một ô cho MỖI máy. Trước đây bị chặn ở 10 ô nên
+                                          nhập 15 máy thì 5 máy cuối không có chỗ điền IMEI. */}
+                                      {Array.from({ length: item.quantity }).map((_, imeiIndex) => {
                                         const currentImeis = item.imeis || (item.imei ? [item.imei] : []);
+                                        const value = currentImeis[imeiIndex] || "";
+                                        const isConflict = conflictImeis.has(value.trim().toUpperCase());
                                         return (
                                           <div key={imeiIndex} className="flex items-center gap-1">
                                             <span className="text-[10px] text-slate-400 font-mono">#{imeiIndex + 1}:</span>
                                             <input
                                               type="text"
-                                              value={currentImeis[imeiIndex] || ""}
+                                              value={value}
                                               onChange={(e) => {
                                                 const newImeis = [...currentImeis];
                                                 newImeis[imeiIndex] = e.target.value;
@@ -896,7 +1033,11 @@ const GoodsReceiptModal: React.FC<{
                                                 );
                                               }}
                                               placeholder={`IMEI ${imeiIndex + 1}...`}
-                                              className="w-28 px-2 py-0.5 text-xs font-mono border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none"
+                                              title={isConflict ? "IMEI này đã tồn tại trong hệ thống" : undefined}
+                                              className={`w-28 px-2 py-0.5 text-xs font-mono border rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 outline-none ${isConflict
+                                                ? "border-red-500 ring-1 ring-red-500/40"
+                                                : "border-slate-300 dark:border-slate-700"
+                                                }`}
                                             />
                                           </div>
                                         );

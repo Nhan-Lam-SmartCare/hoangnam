@@ -10,6 +10,10 @@ export interface StockMobileListProps {
   canUpdatePart: boolean;
   canDeletePart: boolean;
   hideLaborCost?: boolean;
+  /** partId -> số máy có IMEI còn trong kho. */
+  unitCounts?: Record<string, number>;
+  expandedPartId?: string | null;
+  onToggleExpand?: (id: string) => void;
   isDuplicateSku: (sku: string) => boolean;
   onToggleMenu: (index: number) => void;
   onEdit: (part: Part) => void;
@@ -26,6 +30,9 @@ const StockMobileList: React.FC<StockMobileListProps> = ({
   canUpdatePart,
   canDeletePart,
   hideLaborCost = false,
+  unitCounts = {},
+  expandedPartId = null,
+  onToggleExpand,
   isDuplicateSku,
   onToggleMenu,
   onEdit,
@@ -47,6 +54,9 @@ const StockMobileList: React.FC<StockMobileListProps> = ({
             canUpdatePart={canUpdatePart}
             canDeletePart={canDeletePart}
             hideLaborCost={hideLaborCost}
+            unitCount={unitCounts[part.id] || 0}
+            isExpanded={expandedPartId === part.id}
+            onToggleExpand={onToggleExpand}
             onToggleMenu={onToggleMenu}
             onEdit={onEdit}
             onQuickWarranty={onQuickWarranty}

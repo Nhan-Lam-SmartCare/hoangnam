@@ -43,6 +43,16 @@ export interface GoodsReceiptItem {
   laborCost?: number;
   sellingPrice: number;
   wholesalePrice?: number;
+  /**
+   * IMEI của TỪNG máy trong dòng này — độ dài phải bằng `quantity` với sản phẩm
+   * `is_serialized`. `receipt_create_atomic` sẽ tạo một bản ghi `part_units`
+   * cho mỗi phần tử.
+   */
+  imeis?: string[];
+  /** Giữ tương thích với ô IMEI đơn cũ; luôn bằng `imeis[0]`. */
+  imei?: string;
+  /** Màu áp cho mọi máy trong dòng (thường cả lô nhập cùng màu). */
+  color?: string;
   _isNewProduct?: boolean;
   _productData?: {
     name: string;
@@ -56,6 +66,28 @@ export interface GoodsReceiptItem {
     retailPrice: number;
     wholesalePrice: number;
   };
+}
+
+/**
+ * Gom IMEI của một dòng phiếu về một mảng sạch.
+ *
+ * Modal có hai đường nhập IMEI cùng tồn tại: mảng `imeis` (nhiều máy, dùng cho
+ * chi nhánh điện thoại) và ô đơn `imei` cũ (AddProductModal). Hàm này hợp nhất,
+ * cắt khoảng trắng và bỏ ô trống — nhân viên bỏ trống ô #3 giữa chừng không
+ * được sinh ra một `part_units` rỗng.
+ *
+ * Trả `undefined` khi không có IMEI nào, để không gửi mảng rỗng xuống RPC.
+ */
+function normalizeImeis(item: GoodsReceiptItem): string[] | undefined {
+  const raw =
+    item.imeis && item.imeis.length > 0
+      ? item.imeis
+      : item.imei
+        ? [item.imei]
+        : [];
+
+  const clean = raw.map((s) => (s || "").trim()).filter((s) => s.length > 0);
+  return clean.length > 0 ? clean : undefined;
 }
 
 export interface GoodsReceiptPaymentInfo {
@@ -119,12 +151,17 @@ export function useGoodsReceiptActions({
       const paidAmount = paymentInfo?.paidAmount || 0;
       const debtAmount = totalAmount - paidAmount;
 
-      // ⚠️ IMPORTANT: Stock is now auto-updated by trigger (trg_inventory_tx_after_insert)
-      // We only need to:
-      // 1. Create new products if any (for temp items)
-      // 2. Create inventory_transaction (trigger will update stock)
-      // 3. Update prices (retailPrice, wholesalePrice) - not handled by trigger
-      // 4. Create supplier debt if needed
+      // Không có trigger nào trên inventory_transactions (đã xác minh trên DB
+      // 2026-07-26 — pg_trigger trả 0 dòng; xem tests/integration/
+      // inventory_trigger_correctness.test.ts). Toàn bộ việc cộng tồn kho do RPC
+      // receipt_create_atomic làm bên trong MỘT transaction, kèm khóa hàng
+      // SELECT ... FOR UPDATE. Cùng transaction đó ghi luôn part_units (IMEI).
+      //
+      // Ở đây chỉ còn:
+      // 1. Tạo sản phẩm mới nếu có (item tạm)
+      // 2. Gọi RPC (stock + inventory_transactions + part_units, nguyên tử)
+      // 3. Đồng bộ giá về bảng parts — RPC cố ý không đụng tới giá
+      // 4. Ghi sổ quỹ / công nợ NCC
 
       try {
         // First, create any new products that were added temporarily
@@ -190,6 +227,8 @@ export function useGoodsReceiptActions({
                   laborCost: Number(item.laborCost || item._productData.laborCost || 0),
                   sellingPrice: item.sellingPrice,
                   wholesalePrice: item.wholesalePrice || 0,
+                  imeis: normalizeImeis(item),
+                  color: (item.color || "").trim() || undefined,
                 };
               } catch (error) {
                 console.error("❌ Lỗi khi tạo sản phẩm:", error);
@@ -207,6 +246,8 @@ export function useGoodsReceiptActions({
               laborCost: Number(item.laborCost || 0),
               sellingPrice: item.sellingPrice,
               wholesalePrice: item.wholesalePrice || 0,
+              imeis: normalizeImeis(item),
+              color: (item.color || "").trim() || undefined,
             };
           })
         );

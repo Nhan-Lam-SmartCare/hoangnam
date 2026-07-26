@@ -7,6 +7,7 @@
 import React, {
   useState,
   useEffect,
+  useMemo,
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -57,6 +58,8 @@ import { LOW_STOCK_THRESHOLD } from "./constants";
 import StockTableRow from "./components/StockTableRow";
 import StockMobileList from "./components/StockMobileList";
 import StockTableHeader from "./components/StockTableHeader";
+import ImeiSearchResults from "./components/ImeiSearchResults";
+import { usePartUnitCounts } from "../../hooks/usePartUnitsRepository";
 import InventoryPagination from "./components/InventoryPagination";
 import InventoryTabs from "./components/InventoryTabs";
 import InventoryBottomNav from "./components/InventoryBottomNav";
@@ -121,6 +124,9 @@ const InventoryManagerNew: React.FC = () => {
     null
   );
   const [openActionRow, setOpenActionRow] = useState<string | null>(null);
+  // Chỉ bung MỘT dòng: mở nhiều dòng cùng lúc sẽ đẩy bảng dài ra và mỗi dòng
+  // lại là một query riêng.
+  const [expandedPartId, setExpandedPartId] = useState<string | null>(null);
   const [inventoryDropdownPos, setInventoryDropdownPos] = useState({
     top: 0,
     right: 0,
@@ -218,6 +224,23 @@ const InventoryManagerNew: React.FC = () => {
       setShowDuplicatesOnly(false);
     }
   }, [showDuplicatesOnly, duplicateSkus.size, setShowDuplicatesOnly]);
+
+  // Số máy có IMEI của cả trang, gộp một query — dòng nào có máy thì mới cho bung.
+  const displayedPartIds = useMemo(
+    () => displayedParts.map((p: Part) => p.id),
+    [displayedParts]
+  );
+  const { data: unitCounts = {} } = usePartUnitCounts(
+    displayedPartIds,
+    currentBranchId
+  );
+
+  // Đổi trang/bộ lọc thì dòng đang bung có thể không còn trên màn -> đóng lại.
+  useEffect(() => {
+    if (expandedPartId && !unitCounts[expandedPartId]) {
+      setExpandedPartId(null);
+    }
+  }, [expandedPartId, unitCounts]);
 
   const queryClient = useQueryClient();
   const updatePartMutation = useUpdatePartRepo();
@@ -623,6 +646,9 @@ const InventoryManagerNew: React.FC = () => {
                 </div>
               )}
 
+              {/* Tra IMEI: dùng chung ô tìm kiếm, hiện trên cả 2 layout */}
+              <ImeiSearchResults keyword={search} branchId={currentBranchId} />
+
               {/* Mobile: stacked cards (visible on small screens) */}
               <StockMobileList
                 parts={displayedParts}
@@ -632,6 +658,11 @@ const InventoryManagerNew: React.FC = () => {
                 canUpdatePart={canUpdatePart}
                 canDeletePart={canDeletePart}
                 hideLaborCost={hideLaborCost}
+                unitCounts={unitCounts}
+                expandedPartId={expandedPartId}
+                onToggleExpand={(id) =>
+                  setExpandedPartId((prev) => (prev === id ? null : id))
+                }
                 isDuplicateSku={hasDuplicateSku}
                 onToggleMenu={(index) =>
                   setMobileMenuOpenIndex((prev) =>
@@ -694,6 +725,11 @@ const InventoryManagerNew: React.FC = () => {
                           canUpdatePart={canUpdatePart}
                           canDeletePart={canDeletePart}
                           hideLaborCost={hideLaborCost}
+                          unitCount={unitCounts[part.id] || 0}
+                          isExpanded={expandedPartId === part.id}
+                          onToggleExpand={(id) =>
+                            setExpandedPartId((prev) => (prev === id ? null : id))
+                          }
                           onToggleSelect={handleSelectItem}
                           onShowReservedInfo={setReservedInfoPartId}
                           onToggleActions={(id, pos) => {

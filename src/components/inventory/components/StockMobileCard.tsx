@@ -4,6 +4,8 @@ import type { Part } from "../../../types";
 import { formatCurrency } from "../../../utils/format";
 import { getCategoryColor } from "../../../utils/categoryColors";
 import { getPartWarrantyText } from "../../../utils/partWarranty";
+import PartUnitsPanel from "./PartUnitsPanel";
+import { PartUnitsBadge } from "./PartUnitsToggle";
 
 export interface StockMobileCardProps {
   part: Part;
@@ -15,6 +17,10 @@ export interface StockMobileCardProps {
   canUpdatePart: boolean;
   canDeletePart: boolean;
   hideLaborCost?: boolean;
+  /** Số máy có IMEI còn trong kho. 0 = không có gì để bung. */
+  unitCount?: number;
+  isExpanded?: boolean;
+  onToggleExpand?: (id: string) => void;
   onToggleMenu: (index: number) => void;
   onEdit: (part: Part) => void;
   onQuickWarranty: (part: Part) => void;
@@ -35,6 +41,9 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
   canUpdatePart,
   canDeletePart,
   hideLaborCost = false,
+  unitCount = 0,
+  isExpanded = false,
+  onToggleExpand,
   onToggleMenu,
   onEdit,
   onQuickWarranty,
@@ -44,6 +53,7 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
   const stock = part.stock[branchId] || 0;
   const retailPrice = part.retailPrice[branchId] || 0;
   const laborCost = Number((part as any).laborCost?.[branchId] || 0);
+  const canExpand = unitCount > 0 && Boolean(onToggleExpand);
 
   return (
     <div
@@ -119,6 +129,14 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
             <span className="text-xs opacity-80">SL:</span>
             {stock}
           </span>
+          <PartUnitsBadge
+            partId={part.id}
+            unitCount={unitCount}
+            expectedStock={stock}
+            isExpanded={isExpanded}
+            onToggle={onToggleExpand}
+            variant="card"
+          />
           {hasPartActions && (
             <div className="relative">
               {/* Tăng vùng tap cho menu 3 chấm */}
@@ -169,6 +187,17 @@ const StockMobileCard: React.FC<StockMobileCardProps> = ({
             </div>
           )}
         </div>
+        {isExpanded && canExpand && (
+          <div className="mt-2 border-t border-slate-600 pt-2">
+            <PartUnitsPanel
+              partId={part.id}
+              branchId={branchId}
+              expectedStock={stock}
+              canViewImportPrice={false}
+              dense
+            />
+          </div>
+        )}
       </div>
     </div>
   );
