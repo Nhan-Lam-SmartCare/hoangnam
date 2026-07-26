@@ -1,3 +1,4 @@
+import { X, Smartphone, Palette } from 'lucide-react';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canDo } from '../../../utils/permissions';
@@ -1002,212 +1003,217 @@ const GoodsReceiptModal: React.FC<{
                     return (
                       <div
                         key={item.partId}
-                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 hover:shadow-md transition-shadow"
+                        className="bg-slate-900/90 dark:bg-slate-800/90 border border-slate-700/80 rounded-xl p-3 shadow-sm hover:border-blue-500/50 transition-all space-y-2.5"
                       >
                         {/* Header: #, Name, SKU, Category, Delete */}
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center flex-shrink-0">
-                            <span className="text-[10px] font-bold text-white">
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="px-2 py-0.5 rounded-lg bg-blue-600/20 text-blue-400 font-extrabold text-xs border border-blue-500/30">
                               #{index + 1}
                             </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-xs text-slate-900 dark:text-slate-100 truncate">
+                            <h4 className="font-bold text-sm text-slate-100 truncate">
                               {item.partName}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className="text-[9px] text-blue-600 dark:text-blue-400 font-mono">
-                                {item.sku}
+                            </h4>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              {item.sku}
+                            </span>
+                            {originalPart?.category && (
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${getCategoryColor(originalPart.category).bg
+                                  } ${getCategoryColor(originalPart.category).text
+                                  }`}
+                              >
+                                {originalPart.category}
                               </span>
-                              {originalPart?.category && (
-                                <span
-                                  className={`inline-flex items-center px-1 py-0 rounded text-[8px] font-medium ${getCategoryColor(originalPart.category).bg
-                                    } ${getCategoryColor(originalPart.category).text
-                                    }`}
-                                >
-                                  {originalPart.category}
-                                </span>
-                              )}
-                            </div>
+                            )}
                           </div>
                           <button
                             onClick={() => removeReceiptItem(item.partId)}
-                            className="w-5 h-5 flex items-center justify-center bg-red-100 dark:bg-red-900/30 rounded text-red-600 dark:text-red-400 hover:bg-red-200 flex-shrink-0 text-sm"
-                            title="Xóa"
+                            className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Xóa khỏi giỏ"
                           >
-                            ×
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
 
-                        {/* All inputs in ONE row: Quantity | Import Price | Selling Price | Total */}
-                        <div className="flex items-center gap-1.5">
-                          {/* Quantity controls */}
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              onClick={() =>
-                                updateReceiptItem(
-                                  item.partId,
-                                  "quantity",
-                                  Math.max(1, item.quantity - 1)
-                                )
-                              }
-                              className="w-6 h-6 flex items-center justify-center bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-blue-50 text-sm"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 1;
-                                updateReceiptItem(
-                                  item.partId,
-                                  "quantity",
-                                  Math.max(1, val)
-                                );
-                              }}
-                              className="w-10 px-1 py-1 text-center border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-xs font-semibold"
-                              min="1"
-                            />
-                            <button
-                              onClick={() =>
-                                updateReceiptItem(
-                                  item.partId,
-                                  "quantity",
-                                  item.quantity + 1
-                                )
-                              }
-                              className="w-6 h-6 flex items-center justify-center bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-blue-50 text-sm"
-                            >
-                              +
-                            </button>
+                        {/* Row 1: Quantity | Import Price | Profit % | Selling Price | Total */}
+                        <div className="grid grid-cols-12 gap-2 items-end bg-slate-950/40 p-2.5 rounded-lg border border-slate-800">
+                          {/* Col 1: Quantity (3 cols) */}
+                          <div className="col-span-3">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                              Số lượng
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateReceiptItem(
+                                    item.partId,
+                                    "quantity",
+                                    Math.max(1, item.quantity - 1)
+                                  )
+                                }
+                                className="w-7 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-sm border border-slate-700"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 1;
+                                  updateReceiptItem(item.partId, "quantity", Math.max(1, val));
+                                }}
+                                className="w-10 h-8 text-center border border-slate-700 rounded-lg bg-slate-900 text-white text-xs font-bold"
+                                min="1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateReceiptItem(item.partId, "quantity", item.quantity + 1)
+                                }
+                                className="w-7 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 font-bold text-sm border border-slate-700"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
 
-                          {/* Import price */}
-                          <FormattedNumberInput
-                            value={item.importPrice}
-                            onValue={(val) => {
-                              const { clean } = validatePriceAndQty(
-                                val,
-                                item.quantity
-                              );
-                              const newImport = clean.importPrice;
-                              const autoPrice = calcSellingFromRule(
-                                newImport,
-                                Number(item.markupPercent || DEFAULT_MARKUP_PERCENT),
-                                item.roundingRule || "integer"
-                              );
-                              setReceiptItems((items) =>
-                                items.map((it) =>
-                                  it.partId === item.partId
-                                    ? {
-                                      ...it,
-                                      importPrice: newImport,
-                                      sellingPrice: autoPrice,
-                                    }
-                                    : it
-                                )
-                              );
-                            }}
-                            className="min-w-[70px] max-w-[110px] flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-blue-500"
-                            placeholder="Giá nhập"
-                          />
+                          {/* Col 2: Giá nhập (3 cols) */}
+                          <div className="col-span-3">
+                            <label className="block text-[10px] font-bold text-orange-400 uppercase mb-1">
+                              Giá nhập (đ)
+                            </label>
+                            <FormattedNumberInput
+                              value={item.importPrice}
+                              onValue={(val) => {
+                                const { clean } = validatePriceAndQty(val, item.quantity);
+                                const newImport = clean.importPrice;
+                                const autoPrice = calcSellingFromRule(
+                                  newImport,
+                                  Number(item.markupPercent || DEFAULT_MARKUP_PERCENT),
+                                  item.roundingRule || "integer"
+                                );
+                                setReceiptItems((items) =>
+                                  items.map((it) =>
+                                    it.partId === item.partId
+                                      ? {
+                                          ...it,
+                                          importPrice: newImport,
+                                          sellingPrice: autoPrice,
+                                        }
+                                      : it
+                                  )
+                                );
+                              }}
+                              className="w-full h-8 px-2 border border-slate-700 rounded-lg bg-slate-900 text-orange-300 text-right text-xs font-bold focus:border-orange-500"
+                              placeholder="Giá nhập"
+                            />
+                          </div>
 
-                          {/* Markup percent */}
-                          <FormattedNumberInput
-                            value={item.markupPercent}
-                            onValue={(val) => {
-                              const markupPercent = Math.max(0, Math.round(val));
-                              const targetCategory = originalPart?.category || "";
-                              setReceiptItems((items) =>
-                                items.map((it) =>
-                                  (() => {
-                                    if (it.partId === item.partId) return true;
-                                    if (!targetCategory) return false;
-                                    const itPart = parts.find((p) => p.id === it.partId);
-                                    return (itPart?.category || "") === targetCategory;
-                                  })()
-                                    ? {
-                                      ...it,
-                                      markupPercent,
-                                      sellingPrice: calcSellingFromRule(
-                                        Number(it.importPrice || 0),
-                                        markupPercent,
-                                        it.roundingRule || "integer"
-                                      ),
-                                    }
-                                    : it
-                                )
-                              );
-                            }}
-                            className="w-16 flex-shrink-0 px-2 py-1 border border-violet-300 dark:border-violet-700 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-violet-500"
-                            placeholder="%"
-                          />
+                          {/* Col 3: Lợi nhuận % (2 cols) */}
+                          <div className="col-span-2">
+                            <label className="block text-[10px] font-bold text-purple-400 uppercase mb-1">
+                              % Lãi
+                            </label>
+                            <FormattedNumberInput
+                              value={item.markupPercent}
+                              onValue={(val) => {
+                                const markupPercent = Math.max(0, Math.round(val));
+                                const targetCategory = originalPart?.category || "";
+                                setReceiptItems((items) =>
+                                  items.map((it) =>
+                                    (() => {
+                                      if (it.partId === item.partId) return true;
+                                      if (!targetCategory) return false;
+                                      const itPart = parts.find((p) => p.id === it.partId);
+                                      return (itPart?.category || "") === targetCategory;
+                                    })()
+                                      ? {
+                                          ...it,
+                                          markupPercent,
+                                          sellingPrice: calcSellingFromRule(
+                                            Number(it.importPrice || 0),
+                                            markupPercent,
+                                            it.roundingRule || "integer"
+                                          ),
+                                        }
+                                      : it
+                                  )
+                                );
+                              }}
+                              className="w-full h-8 px-2 border border-purple-500/30 rounded-lg bg-slate-900 text-purple-300 text-right text-xs font-bold focus:border-purple-500"
+                              placeholder="%"
+                            />
+                          </div>
 
-                          {/* Selling price */}
-                          <FormattedNumberInput
-                            value={item.sellingPrice}
-                            onValue={(val) => {
-                              const sellingPrice = Math.max(0, Math.round(val));
-                              const markupPercent = calcMarkupPercent(
-                                Number(item.importPrice || 0),
-                                sellingPrice
-                              );
-                              setReceiptItems((items) =>
-                                items.map((it) =>
-                                  it.partId === item.partId
-                                    ? { ...it, sellingPrice, markupPercent }
-                                    : it
-                                )
-                              );
-                            }}
-                            className="min-w-[70px] max-w-[110px] flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-right text-xs font-medium focus:border-emerald-500"
-                            placeholder="Giá bán"
-                          />
+                          {/* Col 4: Giá bán (2 cols) */}
+                          <div className="col-span-2">
+                            <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">
+                              Giá bán (đ)
+                            </label>
+                            <FormattedNumberInput
+                              value={item.sellingPrice}
+                              onValue={(val) => {
+                                const sellingPrice = Math.max(0, Math.round(val));
+                                const markupPercent = calcMarkupPercent(
+                                  Number(item.importPrice || 0),
+                                  sellingPrice
+                                );
+                                setReceiptItems((items) =>
+                                  items.map((it) =>
+                                    it.partId === item.partId
+                                      ? { ...it, sellingPrice, markupPercent }
+                                      : it
+                                  )
+                                );
+                              }}
+                              className="w-full h-8 px-2 border border-slate-700 rounded-lg bg-slate-900 text-emerald-300 text-right text-xs font-bold focus:border-emerald-500"
+                              placeholder="Giá bán"
+                            />
+                          </div>
 
-                          {/* Total amount */}
-                          <div className="min-w-[70px] text-right flex-shrink-0">
-                            {!hideLaborCost && (
-                              <div className="text-[10px] text-cyan-600 dark:text-cyan-400 whitespace-nowrap mb-0.5">
-                                Công: {formatCurrency(item.laborCost || 0)}
-                              </div>
-                            )}
-                            <div className="text-xs font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                              {formatCurrency(
-                                item.importPrice * item.quantity
-                              )}
+                          {/* Col 5: Thành tiền (2 cols) */}
+                          <div className="col-span-2 text-right">
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+                              Thành tiền
+                            </label>
+                            <div className="text-xs font-black text-blue-400">
+                              {formatCurrency(item.importPrice * item.quantity)}
                             </div>
                           </div>
                         </div>
 
-                        {/* Sub row: IMEI / Seri & Màu sắc */}
-                        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                              IMEI / Seri:
-                            </span>
+                        {/* Row 2: IMEI / Seri & Màu sắc (Inputs with labels & icons) */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                              <Smartphone className="w-3 h-3 text-blue-400" />
+                              <span>Số IMEI / Seri máy (Cấu hình)</span>
+                            </label>
                             <input
                               type="text"
                               value={item.imei || ""}
                               onChange={(e) =>
                                 updateReceiptItem(item.partId, "imei", e.target.value)
                               }
-                              placeholder="Nhập số IMEI / Seri..."
-                              className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/60 text-slate-900 dark:text-slate-100 text-xs focus:border-blue-500 font-mono"
+                              placeholder="Nhập số IMEI hoặc Seri máy..."
+                              className="w-full h-8 px-2.5 border border-slate-700 rounded-lg bg-slate-900 text-slate-100 text-xs font-mono focus:border-blue-500"
                             />
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                              Màu sắc:
-                            </span>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                              <Palette className="w-3 h-3 text-purple-400" />
+                              <span>Màu sắc máy</span>
+                            </label>
                             <input
                               type="text"
                               value={item.color || ""}
                               onChange={(e) =>
                                 updateReceiptItem(item.partId, "color", e.target.value)
                               }
-                              placeholder="Màu sắc (VD: Đen, Titanium...)"
-                              className="flex-1 px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700/60 text-slate-900 dark:text-slate-100 text-xs focus:border-blue-500"
+                              placeholder="VD: Titanium, Đen, Trắng..."
+                              className="w-full h-8 px-2.5 border border-slate-700 rounded-lg bg-slate-900 text-slate-100 text-xs focus:border-blue-500"
                             />
                           </div>
                         </div>
