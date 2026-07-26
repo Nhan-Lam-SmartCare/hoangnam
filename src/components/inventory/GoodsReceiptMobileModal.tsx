@@ -344,7 +344,7 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
 
   const handleContinue = () => {
     if (!selectedSupplier) {
-      alert("Vui lòng chọn nhà cung cấp");
+      showToast.warning("⚠️ Vui lòng chọn Nhà cung cấp trước khi tiếp tục!");
       return;
     }
     setStep(2);

@@ -550,12 +550,12 @@ const GoodsReceiptModal: React.FC<{
       }
     }
 
-    const effectivePaymentType = paymentType || "full";
-    if ((effectivePaymentType === "note" || effectivePaymentType === "partial") && !selectedSupplier) {
-      showToast.warning("Vui lòng chọn Nhà cung cấp để ghi nợ / theo dõi công nợ!");
+    if (!selectedSupplier) {
+      showToast.warning("⚠️ Vui lòng chọn Nhà cung cấp trước khi thực hiện nhập kho!");
       return;
     }
 
+    const effectivePaymentType = paymentType || "full";
     if (!paymentMethod) {
       showToast.warning("Vui lòng chọn phương thức thanh toán (Tiền mặt hoặc Chuyển khoản)");
       return;
@@ -746,14 +746,25 @@ const GoodsReceiptModal: React.FC<{
             {/* Top Right Header Controls: Supplier & Close */}
             <div className="flex items-center gap-3">
               {/* Supplier Selector */}
-              <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
-                <span className="text-xs font-bold text-slate-300 whitespace-nowrap">Nhà cung cấp:</span>
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+                !selectedSupplier
+                  ? "bg-amber-500/10 border-amber-500/80 ring-2 ring-amber-500/30"
+                  : "bg-slate-800/80 border-slate-700"
+              }`}>
+                <span className="text-xs font-bold whitespace-nowrap flex items-center gap-1 text-slate-300">
+                  {!selectedSupplier && <span className="animate-pulse text-amber-400">⚠️</span>}
+                  Nhà cung cấp <span className="text-red-400 font-bold">*</span>:
+                </span>
                 <select
                   value={selectedSupplier}
                   onChange={(e) => setSelectedSupplier(e.target.value)}
-                  className="bg-slate-900 text-white text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-700 outline-none max-w-[220px]"
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border outline-none max-w-[220px] transition-colors ${
+                    !selectedSupplier
+                      ? "bg-slate-900 border-amber-500/80 text-amber-300 font-bold"
+                      : "bg-slate-900 text-white border-slate-700"
+                  }`}
                 >
-                  <option value="">-- Chọn Nhà Cung Cấp --</option>
+                  <option value="">-- BẮT BUỘC CHỌN NCC --</option>
                   {currentBranchSuppliers.length > 0 && (
                     <optgroup label={`📍 Chi nhánh ${currentBranchName}`}>
                       {currentBranchSuppliers.map((s: any) => (

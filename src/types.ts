@@ -180,8 +180,11 @@ export interface CartItem {
    * `part_units.id` của TỪNG máy được chọn bán (hàng có IMEI).
    *
    * Khi có mảng này thì `quantity` PHẢI bằng `unitIds.length` — bán hàng có IMEI
-   * là bán những chiếc máy cụ thể, không phải bán "2 cái bất kỳ". CartContext
-   * giữ bất biến đó; xem [[CartContext.updateCartItemQuantity]].
+   * là bán những chiếc máy cụ thể, không phải bán "2 cái bất kỳ".
+   *
+   * Giỏ hàng THẬT nằm ở AppContext (`cartItems`), nên bất biến trên do
+   * `SalesManager.addUnitsToCart` / `updateQty` giữ. `CartContext` cũng giữ cùng
+   * bất biến nhưng hiện KHÔNG được component nào dùng.
    */
   unitIds?: string[];
   /** IMEI tương ứng `unitIds`, chỉ để hiển thị & in phiếu bảo hành. */
