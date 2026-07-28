@@ -134,8 +134,8 @@ export function useInventoryImport({
               partId: existingPart.id,
               partName: item.name,
               quantity: item.quantity,
-              unitPrice: item.retailPrice,
-              totalPrice: item.quantity * item.retailPrice,
+              unitPrice: item.costPrice,
+              totalPrice: item.quantity * item.costPrice,
               notes: `Nhập kho từ file Excel`,
             });
           } else {
@@ -173,8 +173,8 @@ export function useInventoryImport({
               partId: newPartId,
               partName: item.name,
               quantity: item.quantity,
-              unitPrice: item.retailPrice,
-              totalPrice: item.quantity * item.retailPrice,
+              unitPrice: item.costPrice,
+              totalPrice: item.quantity * item.costPrice,
               notes: `Nhập kho từ file Excel`,
             });
           }

@@ -171,7 +171,7 @@ const InventoryManagerNew: React.FC = () => {
       newParams.delete("category");
       setSearchParams(newParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]); // Re-run when URL changes
+  }, [searchParams, setSearchParams, setStockFilter, setCategoryFilter]); // Re-run when URL changes
 
   // Read tab parameter from URL query params
   useEffect(() => {
@@ -244,7 +244,6 @@ const InventoryManagerNew: React.FC = () => {
 
   const queryClient = useQueryClient();
   const updatePartMutation = useUpdatePartRepo();
-  useCreatePartRepo();
   const deletePartMutation = useDeletePartRepo();
   const { data: allCategories = [] } = useCategories();
 
@@ -699,7 +698,7 @@ const InventoryManagerNew: React.FC = () => {
                     {filteredParts.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={canViewImportPrice ? (hideLaborCost ? 7 : 8) : (hideLaborCost ? 6 : 7)}
+                          colSpan={6 + (canViewImportPrice ? 1 : 0) + (hideLaborCost ? 0 : 1)}
                           className="px-4 py-6 text-center text-slate-400 dark:text-slate-500"
                         >
                           <div className="text-4xl mb-2">🗂️</div>
@@ -916,8 +915,15 @@ const InventoryManagerNew: React.FC = () => {
 
                 // const { mutate: updateWorkOrderAtomic } = useUpdateWorkOrderAtomicRepo(); // Moved to top level
 
-                const handleQuickPay = (orderId: string) => {
-                  if (window.confirm("Xác nhận đánh dấu phiếu này là ĐÃ THANH TOÁN? Việc này sẽ giải phóng tồn kho đang giữ.")) {
+                const handleQuickPay = async (orderId: string) => {
+                  const confirmed = await confirm({
+                    title: "Xác nhận thanh toán",
+                    message: "Xác nhận đánh dấu phiếu này là ĐÃ THANH TOÁN? Việc này sẽ giải phóng tồn kho đang giữ.",
+                    confirmText: "Xác nhận",
+                    cancelText: "Hủy",
+                    confirmColor: "green",
+                  });
+                  if (confirmed) {
                     updateWorkOrderAtomic({
                       id: orderId,
                       paymentStatus: "paid",

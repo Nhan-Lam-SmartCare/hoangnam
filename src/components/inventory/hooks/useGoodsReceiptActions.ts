@@ -53,6 +53,11 @@ export interface GoodsReceiptItem {
   imei?: string;
   /** Màu áp cho mọi máy trong dòng (thường cả lô nhập cùng màu). */
   color?: string;
+  /**
+   * Màu RIÊNG của từng máy, khớp chỉ số với `imeis`. Ô nào bỏ trống thì máy đó
+   * lấy `color` chung. Cùng lô nhập vẫn có thể mỗi chiếc một màu.
+   */
+  colors?: string[];
   _isNewProduct?: boolean;
   _productData?: {
     name: string;
@@ -69,25 +74,110 @@ export interface GoodsReceiptItem {
 }
 
 /**
- * Gom IMEI của một dòng phiếu về một mảng sạch.
+ * Gom IMEI **kèm màu** của một dòng phiếu, giữ hai mảng LUÔN KHỚP CHỈ SỐ.
  *
  * Modal có hai đường nhập IMEI cùng tồn tại: mảng `imeis` (nhiều máy, dùng cho
  * chi nhánh điện thoại) và ô đơn `imei` cũ (AddProductModal). Hàm này hợp nhất,
  * cắt khoảng trắng và bỏ ô trống — nhân viên bỏ trống ô #3 giữa chừng không
- * được sinh ra một `part_units` rỗng.
+ * được sinh ra một `part_units` rỗng. Trả `imeis: undefined` khi không có IMEI
+ * nào, để không gửi mảng rỗng xuống RPC.
  *
- * Trả `undefined` khi không có IMEI nào, để không gửi mảng rỗng xuống RPC.
+ * Phải cắt cặp chứ không lọc riêng từng mảng: RPC `receipt_create_atomic` duyệt
+ * danh sách IMEI đã lọc rỗng và lấy màu theo `colors ->> v_idx`. Nhân viên bỏ
+ * trống ô #1 rồi điền #2, #3 thì `imeis` co lại còn 2 phần tử trong khi `colors`
+ * vẫn 3 — máy #2 nhận màu của ô trống, máy #3 nhận màu của máy #2. Màu gán sai
+ * chiếc còn tệ hơn không gán, vì không ai biết mà đi sửa.
+ *
+ * `colors` trả `undefined` khi không ô nào có màu, để RPC rơi về màu chung.
  */
-function normalizeImeis(item: GoodsReceiptItem): string[] | undefined {
-  const raw =
+function normalizeUnits(item: GoodsReceiptItem): {
+  imeis?: string[];
+  colors?: string[];
+} {
+  const rawImeis =
     item.imeis && item.imeis.length > 0
       ? item.imeis
       : item.imei
         ? [item.imei]
         : [];
+  const rawColors = item.colors || [];
 
-  const clean = raw.map((s) => (s || "").trim()).filter((s) => s.length > 0);
-  return clean.length > 0 ? clean : undefined;
+  const pairs = rawImeis
+    .map((imei, i) => ({
+      imei: (imei || "").trim(),
+      color: (rawColors[i] || "").trim(),
+    }))
+    .filter((p) => p.imei.length > 0);
+
+  if (pairs.length === 0) return {};
+
+  const colors = pairs.map((p) => p.color);
+  return {
+    imeis: pairs.map((p) => p.imei),
+    colors: colors.some((c) => c.length > 0) ? colors : undefined,
+  };
+}
+
+async function resolvePaymentSourceCandidates(
+  paymentMethod: "cash" | "bank"
+): Promise<string[]> {
+  const preferred = paymentMethod === "bank" ? "bank" : "cash";
+  const candidates: string[] = [];
+
+  const pushCandidate = (value: unknown) => {
+    const id = String(value || "").trim();
+    if (!id) return;
+    if (!candidates.includes(id)) {
+      candidates.push(id);
+    }
+  };
+
+  const rowsRes = await fetchPaymentSourceRows();
+  const rows = rowsRes.ok ? rowsRes.data : [];
+
+  if (rows.length > 0) {
+    const normalized = rows.map((row: any) => ({
+      id: String(
+        row?.id ||
+        row?.paymentSourceId ||
+        row?.paymentsourceid ||
+        row?.payment_source_id ||
+        ""
+      ),
+      type: String(row?.type || "").toLowerCase(),
+      name: String(row?.name || "").toLowerCase(),
+    }));
+
+    const exactById = normalized.find((row) => row.id === preferred);
+    if (exactById?.id) pushCandidate(exactById.id);
+
+    const byType = normalized.find((row) => row.type === preferred);
+    if (byType?.id) pushCandidate(byType.id);
+
+    const byName = normalized.find((row) =>
+      preferred === "bank"
+        ? row.name.includes("ngan hang") || row.name.includes("bank")
+        : row.name.includes("tien mat") || row.name.includes("cash")
+    );
+    if (byName?.id) pushCandidate(byName.id);
+
+    if (normalized[0]?.id) pushCandidate(normalized[0].id);
+  }
+
+  if (candidates.length === 0) {
+    candidates.push(preferred);
+  }
+  return candidates;
+}
+
+function isLikelyPaymentSourceError(err: any): boolean {
+  const text = `${err?.message || ""} ${err?.details || ""}`.toLowerCase();
+  return (
+    text.includes("paymentsource") ||
+    text.includes("payment source") ||
+    text.includes("foreign key") ||
+    text.includes("violates")
+  );
 }
 
 export interface GoodsReceiptPaymentInfo {
@@ -192,7 +282,7 @@ export function useGoodsReceiptActions({
                   },
                   wholesalePrice: {
                     [currentBranchId]:
-                      Number(item._productData.laborCost || 0),
+                      Number(item._productData.wholesalePrice || item.wholesalePrice || 0),
                   },
                 });
 
@@ -227,9 +317,8 @@ export function useGoodsReceiptActions({
                   laborCost: Number(item.laborCost || item._productData.laborCost || 0),
                   sellingPrice: item.sellingPrice,
                   wholesalePrice: item.wholesalePrice || 0,
-                  imeis: normalizeImeis(item),
+                  ...normalizeUnits(item),
                   color: (item.color || "").trim() || undefined,
-                  colors: item.colors ? item.colors.map((c) => (c || "").trim()) : undefined,
                 };
               } catch (error) {
                 console.error("❌ Lỗi khi tạo sản phẩm:", error);
@@ -247,9 +336,8 @@ export function useGoodsReceiptActions({
               laborCost: Number(item.laborCost || 0),
               sellingPrice: item.sellingPrice,
               wholesalePrice: item.wholesalePrice || 0,
-              imeis: normalizeImeis(item),
+              ...normalizeUnits(item),
               color: (item.color || "").trim() || undefined,
-              colors: item.colors ? item.colors.map((c) => (c || "").trim()) : undefined,
             };
           })
         );
@@ -278,11 +366,9 @@ export function useGoodsReceiptActions({
             const nextCost = Number(item.importPrice || 0) > 0 ? Number(item.importPrice) : currentCost;
             const nextRetail = Number(item.sellingPrice || 0) > 0 ? Number(item.sellingPrice) : currentRetail;
             const nextWholesale =
-              Number(item.laborCost || 0) > 0
-                ? Number(item.laborCost)
-                : Number(item.wholesalePrice || 0) > 0
-                  ? Number(item.wholesalePrice)
-                  : currentWholesale;
+              Number(item.wholesalePrice || 0) > 0
+                ? Number(item.wholesalePrice)
+                : currentWholesale;
             const nextLabor = Number(item.laborCost || 0) > 0 ? Number(item.laborCost) : currentLabor;
 
             const updateRes = await updatePart(item.partId, {
@@ -327,68 +413,6 @@ export function useGoodsReceiptActions({
           // 1. Ghi chi tiền vào sổ quỹ
           (async () => {
             if (paidAmount > 0 && paymentInfo) {
-              const resolvePaymentSourceCandidates = async (
-                paymentMethod: "cash" | "bank"
-              ): Promise<string[]> => {
-                const preferred = paymentMethod === "bank" ? "bank" : "cash";
-                const candidates: string[] = [];
-
-                const pushCandidate = (value: unknown) => {
-                  const id = String(value || "").trim();
-                  if (!id) return;
-                  if (!candidates.includes(id)) {
-                    candidates.push(id);
-                  }
-                };
-
-                const rowsRes = await fetchPaymentSourceRows();
-                const rows = rowsRes.ok ? rowsRes.data : [];
-
-                if (rows.length > 0) {
-                  const normalized = rows.map((row: any) => ({
-                    id: String(
-                      row?.id ||
-                      row?.paymentSourceId ||
-                      row?.paymentsourceid ||
-                      row?.payment_source_id ||
-                      ""
-                    ),
-                    type: String(row?.type || "").toLowerCase(),
-                    name: String(row?.name || "").toLowerCase(),
-                  }));
-
-                  const exactById = normalized.find((row) => row.id === preferred);
-                  if (exactById?.id) pushCandidate(exactById.id);
-
-                  const byType = normalized.find((row) => row.type === preferred);
-                  if (byType?.id) pushCandidate(byType.id);
-
-                  const byName = normalized.find((row) =>
-                    preferred === "bank"
-                      ? row.name.includes("ngan hang") || row.name.includes("bank")
-                      : row.name.includes("tien mat") || row.name.includes("cash")
-                  );
-                  if (byName?.id) pushCandidate(byName.id);
-
-                  if (normalized[0]?.id) pushCandidate(normalized[0].id);
-                }
-
-                if (candidates.length === 0) {
-                  candidates.push(preferred);
-                }
-                return candidates;
-              };
-
-              const isLikelyPaymentSourceError = (err: any): boolean => {
-                const text = `${err?.message || ""} ${err?.details || ""}`.toLowerCase();
-                return (
-                  text.includes("paymentsource") ||
-                  text.includes("payment source") ||
-                  text.includes("foreign key") ||
-                  text.includes("violates")
-                );
-              };
-
               const paymentSourceCandidates = await resolvePaymentSourceCandidates(
                 paymentInfo.paymentMethod
               );
@@ -568,17 +592,25 @@ export function useGoodsReceiptActions({
 
       // 7. Create cash transaction and supplier debt if needed
       if (paidAmount > 0) {
-        await createCashTransaction({
-          type: "expense",
-          amount: paidAmount,
-          branchId: currentBranchId,
-          paymentSourceId: "cash",
-          date: new Date().toISOString(),
-          notes: `Chi trả NCC ${supplierName} - Phiếu nhập ${receiptCode} (Đã sửa)`,
-          category: "inventory_purchase",
-          supplierId: supplierId,
-          recipient: supplierName,
-        });
+        const paymentSourceCandidates = await resolvePaymentSourceCandidates("cash");
+        let cashTxResult: any = null;
+
+        for (const candidateId of paymentSourceCandidates) {
+          cashTxResult = await createCashTransaction({
+            type: "expense",
+            amount: paidAmount,
+            branchId: currentBranchId,
+            paymentSourceId: candidateId,
+            date: new Date().toISOString(),
+            notes: `Chi trả NCC ${supplierName} - Phiếu nhập ${receiptCode} (Đã sửa)`,
+            category: "inventory_purchase",
+            supplierId: supplierId,
+            recipient: supplierName,
+          });
+
+          if (cashTxResult.ok) break;
+          if (!isLikelyPaymentSourceError(cashTxResult.error)) break;
+        }
       }
 
       if (debtAmount > 0) {

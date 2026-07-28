@@ -1,7 +1,20 @@
+import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = "https://xduimljokohsqslwbtja.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkdWltbGpva29oc3FzbHdidGphIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njc5NDE5NSwiZXhwIjoyMDgyMzcwMTk1fQ.Siq4iY2Q1hum1UdmxMUcdFsJxuEU4DctalGayxeKrYw";
+config();
+
+// Khoá đọc từ .env (đã nằm trong .gitignore), KHÔNG hardcode: file này được
+// commit lên GitHub, mà service_role bỏ qua toàn bộ RLS — lộ ra là mất sạch dữ
+// liệu mọi chi nhánh. Cùng cách đọc với scripts/setup/apply-sql.mjs.
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error(
+    "❌ Thiếu SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY. Khai báo trong file .env trước khi chạy."
+  );
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

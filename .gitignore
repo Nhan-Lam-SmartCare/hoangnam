@@ -63,3 +63,6 @@ vite.config.ts.timestamp-*
 # Backups
 backups/
 
+# Script nháp / debug tay. Hay chứa khoá service_role dán tạm -> không được commit.
+scratch/
+

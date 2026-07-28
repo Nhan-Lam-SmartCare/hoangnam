@@ -233,10 +233,10 @@ export function useInventoryData({
             ? (b as any).laborCost?.[branchKey] || 0
             : b.wholesalePrice?.[branchKey] || 0;
         } else if (sortField === "totalValue") {
-          const stockA = a.stock?.[branchKey] || 0;
-          const stockB = b.stock?.[branchKey] || 0;
-          const costA = a.costPrice?.[branchKey] || 0;
-          const costB = b.costPrice?.[branchKey] || 0;
+          const stockA = getAvailable(a, currentBranchId);
+          const stockB = getAvailable(b, currentBranchId);
+          const costA = Number(a.costPrice?.[branchKey] || 0) || Number(a.retailPrice?.[branchKey] || 0);
+          const costB = Number(b.costPrice?.[branchKey] || 0) || Number(b.retailPrice?.[branchKey] || 0);
           aVal = stockA * costA;
           bVal = stockB * costB;
         } else {

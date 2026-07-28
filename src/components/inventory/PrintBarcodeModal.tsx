@@ -31,23 +31,23 @@ const LABEL_PRESETS: Record<
     width: 35,
     height: 22,
     name: "22x35mm (giay doi)",
-    barcodeHeight: 24,
-    fontSize: 10,
+    barcodeHeight: 18,
+    fontSize: 8,
     columns: 2,
   },
   "30x20": {
     width: 30,
     height: 20,
     name: "30×20mm (nhỏ)",
-    barcodeHeight: 25,
-    fontSize: 7,
+    barcodeHeight: 16,
+    fontSize: 8,
   },
   "40x30": {
     width: 40,
     height: 30,
     name: "40×30mm (phổ biến)",
-    barcodeHeight: 35,
-    fontSize: 8,
+    barcodeHeight: 32,
+    fontSize: 10,
   },
   "50x30": {
     width: 50,
@@ -267,11 +267,12 @@ const PrintBarcodeModal: React.FC<PrintBarcodeModalProps> = ({
             }
             
             .product-name {
-              font-size: ${Math.max(10, currentSize.fontSize + 1)}px;
+              font-size: ${currentSize.height <= 22 ? Math.min(9, currentSize.fontSize) : currentSize.fontSize}px;
               font-weight: bold;
               text-align: center;
               line-height: 1.1;
               max-width: 100%;
+              max-height: ${currentSize.height <= 22 ? "3.2mm" : "6mm"};
               overflow: hidden;
               white-space: nowrap;
               text-overflow: ellipsis;

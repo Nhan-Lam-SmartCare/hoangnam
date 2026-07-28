@@ -21,7 +21,7 @@ export const exportPartsToExcel = (
     "Giá bán sỉ": part.wholesalePrice?.[currentBranchId] || 0,
     "Giá trị tồn":
       (part.stock[currentBranchId] || 0) *
-      (part.retailPrice[currentBranchId] || 0),
+      (Number(part.costPrice?.[currentBranchId] || 0) || Number(part.retailPrice[currentBranchId] || 0)),
     "Mô tả": part.description || "",
   }));
 
@@ -403,8 +403,8 @@ export const importPartsFromExcelDetailed = (
             const name = String(get("name", "")).trim();
             let sku = String(get("sku", "")).trim().toUpperCase();
 
-            // Auto-generate 8-char SKU if missing or invalid
-            if (!sku || !isValidSKU(sku)) {
+            // Only auto-generate SKU if completely missing or too short
+            if (!sku || (sku.length < 3 && !isValidSKU(sku))) {
               sku = generateSKU();
             }
 

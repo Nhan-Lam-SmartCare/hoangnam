@@ -779,34 +779,71 @@ export const GoodsReceiptMobileModal: React.FC<Props> = ({
                         </div>
 
                         {/* Sub row: IMEI & Color */}
-                        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-semibold block mb-0.5">IMEI / Seri:</span>
-                            <input
-                              type="text"
-                              value={item.imei || ""}
-                              onChange={(e) => {
-                                const updated = [...receiptItems];
-                                updated[index].imei = e.target.value;
-                                setReceiptItems(updated);
-                              }}
-                              placeholder="Nhập IMEI / Seri..."
-                              className="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-mono"
-                            />
+                        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-blue-500">
+                              📱 IMEI &amp; Màu sắc ({item.quantity} máy):
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-purple-400 font-medium">Màu chung:</span>
+                              <input
+                                type="text"
+                                value={item.color || ""}
+                                onChange={(e) => {
+                                  const globalColor = e.target.value;
+                                  const newColors = Array(item.quantity).fill(globalColor);
+                                  const updated = [...receiptItems];
+                                  updated[index].color = globalColor;
+                                  (updated[index] as any).colors = newColors;
+                                  setReceiptItems(updated);
+                                }}
+                                placeholder="Tất cả..."
+                                className="w-24 px-1.5 py-0.5 text-xs border border-purple-300 dark:border-purple-800 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-semibold block mb-0.5">Màu sắc:</span>
-                            <input
-                              type="text"
-                              value={item.color || ""}
-                              onChange={(e) => {
-                                const updated = [...receiptItems];
-                                updated[index].color = e.target.value;
-                                setReceiptItems(updated);
-                              }}
-                              placeholder="Nhập màu sắc..."
-                              className="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-                            />
+
+                          <div className="space-y-1.5">
+                            {Array.from({ length: item.quantity }).map((_, imeiIndex) => {
+                              const currentImeis = (item as any).imeis || (item.imei ? [item.imei] : []);
+                              const imeiVal = currentImeis[imeiIndex] || "";
+                              const currentColors = (item as any).colors || (item.color ? Array(item.quantity).fill(item.color) : []);
+                              const colorVal = currentColors[imeiIndex] || "";
+
+                              return (
+                                <div key={imeiIndex} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                                  <span className="text-[10px] font-bold text-slate-400 font-mono w-6">#{imeiIndex + 1}:</span>
+                                  <input
+                                    type="text"
+                                    value={imeiVal}
+                                    onChange={(e) => {
+                                      const newImeis = [...currentImeis];
+                                      newImeis[imeiIndex] = e.target.value;
+                                      const updated = [...receiptItems];
+                                      (updated[index] as any).imeis = newImeis;
+                                      updated[index].imei = newImeis[0] || "";
+                                      setReceiptItems(updated);
+                                    }}
+                                    placeholder={`IMEI ${imeiIndex + 1}...`}
+                                    className="flex-1 px-2 py-0.5 text-xs font-mono border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 outline-none"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={colorVal}
+                                    onChange={(e) => {
+                                      const newColors = [...currentColors];
+                                      newColors[imeiIndex] = e.target.value;
+                                      const updated = [...receiptItems];
+                                      (updated[index] as any).colors = newColors;
+                                      updated[index].color = newColors[0] || e.target.value;
+                                      setReceiptItems(updated);
+                                    }}
+                                    placeholder="Màu..."
+                                    className="w-20 px-1.5 py-0.5 text-xs border border-purple-200 dark:border-purple-900 rounded bg-purple-50/50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 outline-none"
+                                  />
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>

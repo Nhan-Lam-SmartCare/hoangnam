@@ -71,7 +71,8 @@ const StockTableRow: React.FC<StockTableRowProps> = ({
   const laborCost = Number((part as any).laborCost?.[branchKey] || 0);
   const costPrice =
     Number(part.costPrice?.[branchKey] || 0) || Number(latestImportPrice || 0);
-  const value = available * retailPrice;
+  const unitValue = costPrice || retailPrice;
+  const value = available * unitValue;
   const productInitial = part.name?.charAt(0)?.toUpperCase() || "?";
 
   const stockStatusClass =

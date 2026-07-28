@@ -3,18 +3,25 @@ echo ===================================================
 echo   KHOI DONG MOTOCARE PRO - PHIEN BAN DIEN TU
 echo ===================================================
 echo.
-echo Dang thiet lap ket noi toi Supabase moi...
 
-:: Thiet lap bien moi truong cho phien lam viec nay
-set "VITE_SUPABASE_URL=https://xduimljokohsqslwbtja.supabase.co"
-set "VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkdWltbGpva29oc3FzbHdidGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY3OTQxOTUsImV4cCI6MjA4MjM3MDE5NX0.rYkJU57EkwBKhJIiaaJdaRrprArrjvBe5UZCpP4yDDo"
-set "SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhkdWltbGpva29oc3FzbHdidGphIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njc5NDE5NSwiZXhwIjoyMDgyMzcwMTk1fQ.Siq4iY2Q1hum1UdmxMUcdFsJxuEU4DctalGayxeKrYw"
+:: Cau hinh Supabase doc tu file .env (da nam trong .gitignore).
+:: KHONG dat khoa truc tiep trong file .bat nay: file .bat duoc commit len
+:: GitHub, ma SUPABASE_SERVICE_ROLE_KEY bo qua toan bo RLS - lo ra la mat sach
+:: du lieu moi chi nhanh, ke ca bang luong.
+if not exist ".env" (
+    echo [LOI] Khong tim thay file .env
+    echo.
+    echo Tao file .env o thu muc goc voi noi dung:
+    echo    VITE_SUPABASE_URL=https://^<project^>.supabase.co
+    echo    VITE_SUPABASE_ANON_KEY=^<anon key^>
+    echo    SUPABASE_URL=https://^<project^>.supabase.co
+    echo    SUPABASE_SERVICE_ROLE_KEY=^<service role key^>
+    echo.
+    pause
+    exit /b 1
+)
 
-echo.
-echo URL: %VITE_SUPABASE_URL%
-echo Key: [Da duoc thiet lap an toan]
-echo.
-echo Dang khoi dong server...
+echo Dang khoi dong server... (Vite tu doc .env)
 echo.
 
 npm run dev

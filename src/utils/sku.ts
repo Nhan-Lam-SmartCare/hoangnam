@@ -30,7 +30,7 @@ export function isValidSKU(sku: string): boolean {
   const clean = sku.trim().toUpperCase();
   return (
     /^[A-Z][0-9]{2}$/.test(clean) ||
-    /^[A-Z0-9]{3,12}$/.test(clean) ||
+    /^[A-Z0-9.\-_\/]{3,30}$/.test(clean) ||
     /^PT-[A-Z0-9]{6}$/.test(clean)
   );
 }

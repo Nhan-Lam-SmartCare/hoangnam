@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, Package, Coins, Camera } from 'lucide-react';
 import { showToast } from '../../../utils/toast';
 import { validatePriceAndQty } from '../../../utils/validation';
+import { generateSKU } from '../../../utils/sku';
 import FormattedNumberInput from '../../common/FormattedNumberInput';
 import { useCategories, useCreateCategory } from '../../../hooks/useCategories';
 import { calcSellingFromRule, getCategoryPricingRule } from '../../../utils/categoryPricingRules';
@@ -81,10 +82,12 @@ const AddProductModal: React.FC<{
       return;
     }
 
+    const finalBarcode = barcode.trim() || generateSKU();
+
     onSave({
       name: name.trim(),
       description: description.trim(),
-      barcode: barcode.trim(),
+      barcode: finalBarcode,
       imei: imei.trim(),
       color: color.trim(),
       category: category || "Chưa phân loại",

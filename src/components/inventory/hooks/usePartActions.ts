@@ -96,9 +96,9 @@ export function usePartActions({
           await refetchAllParts();
           showToast.success(`Đã xóa phụ tùng "${part.name}"`);
         },
-        onError: (error) => {
+        onError: (error: any) => {
           console.error("Delete error:", error);
-          showToast.error(`Không thể xóa: ${error.message}`);
+          showToast.error(error?.message || "Xóa sản phẩm thất bại");
         },
       }
     );
@@ -111,10 +111,17 @@ export function usePartActions({
     }
 
     const currentWarranty = getPartWarrantyText(part);
-    const input = window.prompt(
-      `Nhập bảo hành cho "${part.name}"\nVí dụ: 12 tháng, 1 năm\nĐể trống để xóa bảo hành`,
-      currentWarranty
-    );
+    let input: string | null = null;
+    try {
+      input = window.prompt(
+        `Nhập bảo hành cho "${part.name}"\nVí dụ: 12 tháng, 1 năm\nĐể trống để xóa bảo hành`,
+        currentWarranty
+      );
+    } catch (e) {
+      console.warn("window.prompt not available", e);
+      showToast.error("Trình duyệt không hỗ trợ cửa sổ nhập nhanh");
+      return;
+    }
 
     if (input === null) return;
 

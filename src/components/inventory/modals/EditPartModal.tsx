@@ -182,7 +182,10 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
       } as any,
       wholesalePrice: {
         ...(part.wholesalePrice || {}),
-        [currentBranchId]: formData.laborCost,
+        [currentBranchId]:
+          part.wholesalePrice?.[currentBranchId] ??
+          Object.values(part.wholesalePrice || {})[0] ??
+          formData.retailPrice,
       },
       imei: formData.imei.trim(),
       color: formData.color.trim(),

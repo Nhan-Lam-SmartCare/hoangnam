@@ -42,23 +42,23 @@ const LABEL_PRESETS: Record<
     width: 35,
     height: 22,
     name: "22x35mm (giay doi)",
-    barcodeHeight: 24,
-    fontSize: 10,
+    barcodeHeight: 18,
+    fontSize: 8,
     columns: 2,
   },
   "30x20": {
     width: 30,
     height: 20,
     name: "30×20mm",
-    barcodeHeight: 22,
-    fontSize: 10, // Increased from 7
+    barcodeHeight: 16,
+    fontSize: 8,
   },
   "37x20": {
     width: 37,
     height: 20,
     name: "37×20mm",
-    barcodeHeight: 22,
-    fontSize: 10,
+    barcodeHeight: 16,
+    fontSize: 8.5,
   },
   "40x30": {
     width: 40,
@@ -519,14 +519,15 @@ const BatchPrintBarcodeModal: React.FC<BatchPrintBarcodeModalProps> = ({
               ${rotateLabel ? 'transform: rotate(-90deg); transform-origin: center center;' : ''}
             }
             .label-name {
-              font-size: ${Math.max(10, currentSize.fontSize + 1)}px;
+              font-size: ${currentSize.height <= 22 ? Math.min(9, currentSize.fontSize) : currentSize.fontSize}px;
               font-weight: bold;
               text-align: center;
               line-height: 1.1;
               max-width: 100%;
+              max-height: ${currentSize.height <= 22 ? "3.2mm" : "6mm"};
               overflow: hidden;
               display: -webkit-box;
-              -webkit-line-clamp: 2;
+              -webkit-line-clamp: ${currentSize.height <= 22 ? 1 : 2};
               -webkit-box-orient: vertical;
               word-break: break-word;
               margin-bottom: 1px;

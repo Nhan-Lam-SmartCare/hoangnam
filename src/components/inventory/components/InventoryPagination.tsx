@@ -38,24 +38,24 @@ const InventoryPagination: React.FC<InventoryPaginationProps> = ({
         <button
           disabled={page === 1 || isLoading}
           onClick={onPrev}
-          className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded disabled:opacity-40 hover:bg-slate-700/50 transition-colors"
+          className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
         >
           ←
         </button>
-        <span className="px-2 py-1 text-xs sm:text-sm font-medium text-slate-300 min-w-[2rem] text-center">
+        <span className="px-2 py-1 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 min-w-[2rem] text-center">
           {page}
         </span>
         <button
           disabled={page >= totalPages || isLoading}
           onClick={onNext}
-          className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded disabled:opacity-40 hover:bg-slate-700/50 transition-colors"
+          className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
         >
           →
         </button>
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value) || 20)}
-          className="px-1.5 sm:px-2 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded bg-slate-800 text-slate-200"
+          className="px-1.5 sm:px-2 py-1.5 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
         >
           {PAGE_SIZE_OPTIONS.map((s) => (
             <option key={s} value={s}>

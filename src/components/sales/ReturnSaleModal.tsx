@@ -19,7 +19,9 @@ export const ReturnSaleModal: React.FC<Props> = ({ sale, onClose, onDone }) => {
 
   const rows = useMemo(
     () =>
-      (sale.items || []).map((it) => ({
+      (sale.items || []).map((it, idx) => ({
+        index: idx,
+        partKey: `${it.partId}_${idx}`,
         partId: it.partId,
         partName: it.partName,
         sellingPrice: it.sellingPrice,
@@ -37,7 +39,7 @@ export const ReturnSaleModal: React.FC<Props> = ({ sale, onClose, onDone }) => {
   const selected = rows
     .map((r) => ({
       partId: r.partId,
-      quantity: Math.min(Math.max(0, qty[r.partId] || 0), r.remaining),
+      quantity: Math.min(Math.max(0, qty[r.partKey] || 0), r.remaining),
       sellingPrice: r.sellingPrice,
     }))
     .filter((i) => i.quantity > 0);
@@ -96,7 +98,7 @@ export const ReturnSaleModal: React.FC<Props> = ({ sale, onClose, onDone }) => {
             <div className="space-y-2">
               {rows.map((r) => (
                 <div
-                  key={r.partId}
+                  key={r.partKey}
                   className="flex items-center gap-3 p-2 rounded-xl border border-slate-200 dark:border-slate-700"
                 >
                   <div className="flex-1 min-w-0">
@@ -112,13 +114,13 @@ export const ReturnSaleModal: React.FC<Props> = ({ sale, onClose, onDone }) => {
                     min={0}
                     max={r.remaining}
                     disabled={r.remaining <= 0}
-                    value={qty[r.partId] || 0}
+                    value={qty[r.partKey] || 0}
                     onChange={(e) => {
                       const v = Math.min(
                         r.remaining,
                         Math.max(0, Number(e.target.value) || 0)
                       );
-                      setQty((prev) => ({ ...prev, [r.partId]: v }));
+                      setQty((prev) => ({ ...prev, [r.partKey]: v }));
                     }}
                     className="w-20 px-2 h-9 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-right disabled:opacity-40"
                   />

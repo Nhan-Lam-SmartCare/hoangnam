@@ -1266,6 +1266,10 @@ Cam on quy khach da tin tuong!
 
     const actualPaidAmount = splitPayment
       ? splitCash + splitBank
+      : transactionType === "installment"
+      ? Math.min(total, installmentDownPayment)
+      : transactionType === "debt"
+      ? 0
       : paidAmount === "full"
       ? total
       : paidAmount;
@@ -2640,7 +2644,7 @@ Cam on quy khach da tin tuong!
                       <div className="flex justify-between">
                         <span className="text-slate-400">Trả trước:</span>
                         <span className="font-bold text-emerald-400">
-                          {formatCurrency(splitPayment ? splitCash + splitBank : (paidAmount === "full" ? total : paidAmount))}
+                          {formatCurrency(splitPayment ? splitCash + splitBank : installmentDownPayment)}
                         </span>
                       </div>
                       <div className="flex justify-between">

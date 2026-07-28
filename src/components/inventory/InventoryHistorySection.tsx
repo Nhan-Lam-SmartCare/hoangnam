@@ -416,6 +416,16 @@ const InventoryHistorySection: React.FC<{
         if (cashError) {
           console.warn(`Could not delete cash transaction for ${receiptCode}:`, cashError);
         }
+
+        // Delete part_units associated with this receipt
+        const { error: unitError } = await supabase
+          .from("part_units")
+          .delete()
+          .ilike("receipt_code", `%${receiptCode}%`);
+
+        if (unitError) {
+          console.warn(`Could not delete part_units for ${receiptCode}:`, unitError);
+        }
       }
 
       showToast.success(`Đã xóa ${selectedReceipts.size} phiếu nhập kho, hoàn trả tồn kho và xóa giao dịch tài chính liên quan`);
@@ -428,6 +438,8 @@ const InventoryHistorySection: React.FC<{
       queryClient.invalidateQueries({ queryKey: ["cashTransactions"] });
       queryClient.invalidateQueries({ queryKey: ["partsRepo"] });
       queryClient.invalidateQueries({ queryKey: ["partsRepoPaged"] });
+      queryClient.invalidateQueries({ queryKey: ["part_units"] });
+      queryClient.invalidateQueries({ queryKey: ["partUnits"] });
       queryClient.invalidateQueries({ queryKey: ["allPartsForTotals"] });
     } catch (err: any) {
       console.error("❌ Lỗi xóa phiếu nhập kho:", err);
