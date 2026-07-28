@@ -11,7 +11,7 @@ import { useStoreSettings } from "../../hooks/useStoreSettings";
 import type { StoreSettings } from "../../hooks/useStoreSettings";
 import { useEmployeesDirectoryRepo } from "../../hooks/useEmployeesRepository";
 import type { Employee } from "../../types";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { formatCurrency, formatDate } from "../../utils/format";
 import { formatCashTxCategory } from "../../lib/finance/cashTxCategories";
 import { printElementById } from "../../utils/print";
@@ -738,6 +738,7 @@ const CashTxFormModal: React.FC<CashTxFormModalProps> = ({
 };
 
 const CashBookPage: React.FC = () => {
+  const supabase = useSupabaseClient();
   const { currentBranchId, paymentSources } = useAppContext();
   const { data: storeSettings } = useStoreSettings();
   const { data: employees = [] } = useEmployeesDirectoryRepo();

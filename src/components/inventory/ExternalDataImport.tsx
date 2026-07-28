@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Upload, Save, X, CheckCircle, RefreshCw } from "lucide-react";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { showToast } from "../../utils/toast";
 import { formatCurrency } from "../../utils/format";
 
@@ -171,6 +171,7 @@ export const ExternalDataImport: React.FC<ExternalDataImportProps> = ({
     onClose,
     onImported,
 }) => {
+    const supabase = useSupabaseClient();
     const [file, setFile] = useState<File | null>(null);
     const [previewData, setPreviewData] = useState<PreviewItem[]>([]);
     const [loading, setLoading] = useState(false);

@@ -4,7 +4,7 @@
  * Can be embedded directly in Settings page
  */
 import { useState, useEffect } from "react";
-import { supabase } from "../../supabaseClient";
+import { useAuthMfa } from "../../hooks/useAuthMfa";
 import { showToast } from "../../utils/toast";
 import { Copy, Check, Smartphone, Key, Loader2 } from "lucide-react";
 
@@ -218,6 +218,7 @@ export const MFASetup = () => {
   const [copied, setCopied] = useState(false);
   const [factors, setFactors] = useState<MFAFactor[]>([]);
   const [error, setError] = useState("");
+  const { listFactors: mfaListFactors, enroll: mfaEnroll, challengeAndVerify: mfaChallengeVerify, unenroll: mfaUnenroll } = useAuthMfa();
 
   // Load existing MFA factors on mount
   useEffect(() => {
@@ -227,9 +228,8 @@ export const MFASetup = () => {
   const loadFactors = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.mfa.listFactors();
-      if (error) throw error;
-      setFactors(data?.totp || []);
+      const factors = await mfaListFactors();
+      setFactors(factors);
       setStep("list");
     } catch (err) {
       console.error("Error loading MFA factors:", err);
@@ -243,12 +243,7 @@ export const MFASetup = () => {
     setIsLoading(true);
     setError("");
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({
-        factorType: "totp",
-        friendlyName: "Authenticator App",
-      });
-
-      if (error) throw error;
+      const data = await mfaEnroll();
 
       if (data) {
         setQrCode(data.totp.qr_code);
@@ -275,12 +270,7 @@ export const MFASetup = () => {
     setIsLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.mfa.challengeAndVerify({
-        factorId,
-        code: verifyCode,
-      });
-
-      if (error) throw error;
+      await mfaChallengeVerify(factorId, verifyCode);
 
       showToast.success("Bật 2FA thành công!");
       await loadFactors();
@@ -302,8 +292,7 @@ export const MFASetup = () => {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.mfa.unenroll({ factorId: id });
-      if (error) throw error;
+      await mfaUnenroll(id);
 
       showToast.success("Đã tắt 2FA");
       await loadFactors();

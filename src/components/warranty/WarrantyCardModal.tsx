@@ -3,7 +3,7 @@ import { X, Shield, Calendar, Package, Scan } from "lucide-react";
 import { useCreateWarrantyCard } from "../../hooks/useWarrantyRepository";
 import { showToast } from "../../utils/toast";
 import { ScannerModal } from "../common/ScannerModal";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 
 interface WarrantyCardModalProps {
     isOpen: boolean;
@@ -161,6 +161,7 @@ export const WarrantyCardModal: React.FC<WarrantyCardModalProps> = ({
     imeiSerial = "",
     workOrderId,
 }) => {
+    const supabase = useSupabaseClient();
     const [formData, setFormData] = useState<WarrantyFormData>({
         customerId: undefined,
         customerName,

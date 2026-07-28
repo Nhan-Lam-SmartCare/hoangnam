@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { showToast } from "../../utils/toast";
 import { MFAVerify } from "./MFAVerify";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { checkRateLimit, resetRateLimit } from "../../utils/security";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 
@@ -272,6 +272,7 @@ const LoginContent = ({
 export const LoginPage = () => {
   const navigate = useNavigate();
   const { signIn, completeMFAVerification, mfaRequired } = useAuth();
+  const supabase = useSupabaseClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);

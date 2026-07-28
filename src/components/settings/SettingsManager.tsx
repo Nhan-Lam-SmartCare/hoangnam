@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { useAuth } from "../../contexts/AuthContext";
 import { showToast } from "../../utils/toast";
 import LoadingSpinner from "../common/LoadingSpinner";
@@ -49,6 +49,7 @@ export const SettingsManager = ({
   initialTab = "general",
   standaloneStaffPage = false,
 }: SettingsManagerProps = {}) => {
+  const supabase = useSupabaseClient();
   const { profile, hasRole } = useAuth();
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);

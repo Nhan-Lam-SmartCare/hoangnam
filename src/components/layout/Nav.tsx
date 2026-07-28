@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useTheme } from "../../contexts/useTheme";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAppContext } from "../../contexts/AppContext";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import NotificationDropdown from "../common/NotificationDropdown";
 import { USER_ROLES, USER_ROLE_LABELS } from "../../constants";
 import { NavLink } from "./index";
@@ -64,6 +64,7 @@ function isMissingTableError(error: any): boolean {
 
 // eslint-disable-next-line max-lines-per-function, complexity
 export function Nav() {
+  const supabase = useSupabaseClient();
   const [showSettings, setShowSettings] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [branchOptions, setBranchOptions] = useState<

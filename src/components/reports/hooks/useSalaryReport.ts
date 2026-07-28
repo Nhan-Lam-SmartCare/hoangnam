@@ -7,7 +7,7 @@ import {
   upsertEmployeeBonusPenalty,
   type WorkerLaborDetailRow,
 } from "../../../lib/repository/repairLaborRepository";
-import { supabase } from "../../../supabaseClient";
+import { useSupabaseClient } from "../../../hooks/useSupabaseClient";
 
 export const useSalaryReport = (
   initialEmployees: any[], // Fallback, not strictly used
@@ -15,6 +15,7 @@ export const useSalaryReport = (
   salaryYear: number,
   activeTab: string
 ) => {
+  const supabase = useSupabaseClient();
   const [employees, setEmployees] = useState<any[]>([]);
   const [staffSalaryRows, setStaffSalaryRows] = useState<any[]>([]);
   const [loadingSalaryRows, setLoadingSalaryRows] = useState(false);

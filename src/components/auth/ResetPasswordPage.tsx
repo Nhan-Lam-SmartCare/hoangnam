@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { showToast } from "../../utils/toast";
 import { validatePassword } from "../../utils/validation";
 import { Lock, Eye, EyeOff, CheckCircle, Loader2 } from "lucide-react";
@@ -68,6 +68,7 @@ const InvalidResetLink: React.FC<{
 
 export const ResetPasswordPage = () => {
   const navigate = useNavigate();
+  const supabase = useSupabaseClient();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

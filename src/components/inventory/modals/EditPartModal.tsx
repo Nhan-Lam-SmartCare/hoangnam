@@ -7,7 +7,7 @@ import { showToast } from "../../../utils/toast";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
 import type { Part } from "../../../types";
 import UiModal from "../../ui/Modal";
-import { supabase } from "../../../supabaseClient";
+import { useSupabaseClient } from "../../../hooks/useSupabaseClient";
 import { isPhoneBranch } from "../../../utils/branchUtils";
 
 interface EditPartModalProps {
@@ -23,6 +23,7 @@ const EditPartModal: React.FC<EditPartModalProps> = ({
   onSave,
   currentBranchId,
 }) => {
+  const supabase = useSupabaseClient();
   const { data: branches = [] } = useQuery({
     queryKey: ["allBranchesForSelect"],
     queryFn: async () => {

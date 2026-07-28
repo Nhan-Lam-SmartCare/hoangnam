@@ -27,7 +27,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { canDo } from "../../utils/permissions";
 import type { PawnRecord } from "../../types";
 
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { formatCurrency } from "../../utils/format";
 import { showToast } from "../../utils/toast";
 import { printElementById } from "../../utils/print";
@@ -36,6 +36,7 @@ import { PawnReceiptTemplate } from "./PawnReceiptTemplate";
 import PrintPawnPreviewModal from "./modals/PrintPawnPreviewModal";
 
 export default function PawnManager() {
+  const supabase = useSupabaseClient();
   const { currentBranchId } = useAppContext();
   const { profile } = useAuth();
   const { data: pawnRecords = [], isLoading } = usePawnRecordsRepo(currentBranchId);

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'; // Refresh
 import { useQueryClient } from '@tanstack/react-query';
 import { showToast } from '../../../utils/toast';
-import { supabase } from '../../../supabaseClient';
+import { useSupabaseClient } from '../../../hooks/useSupabaseClient';
 import { formatCurrency, formatDate } from '../../../utils/format';
 import { InventoryTransaction } from '../../../types';
 // Inventory History Modal Component (Ảnh 3)
@@ -10,6 +10,7 @@ const InventoryHistoryModal: React.FC<{
   onClose: () => void;
   transactions: InventoryTransaction[];
 }> = ({ isOpen, onClose, transactions }) => {
+  const supabase = useSupabaseClient();
   const queryClient = useQueryClient();
   const [activeTimeFilter, setActiveTimeFilter] = useState("7days");
   const [customStartDate, setCustomStartDate] = useState(

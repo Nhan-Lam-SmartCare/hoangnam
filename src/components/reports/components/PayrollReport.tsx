@@ -7,7 +7,7 @@ import { useCreateCashTransaction } from "../../../hooks/useSupabase";
 import { showToast } from "../../../utils/toast";
 import type { PayrollRecord } from "../../../types";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "../../../supabaseClient";
+import { useSupabaseClient } from "../../../hooks/useSupabaseClient";
 
 interface PayrollReportProps {
   salaryReportProps: any;
@@ -39,6 +39,7 @@ export const PayrollReport: React.FC<PayrollReportProps> = ({
   salesData = [],
   currentBranchId = "CN1",
 }) => {
+  const supabase = useSupabaseClient();
   const {
     staffSalaryRows,
     loadingSalaryRows,

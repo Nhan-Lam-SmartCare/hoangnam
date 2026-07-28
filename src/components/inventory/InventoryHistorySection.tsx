@@ -8,7 +8,7 @@ import { useCashTxRepo } from '../../hooks/useCashTransactionsRepository';
 import { useSuppliers } from '../../hooks/useSuppliers';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { showToast } from '../../utils/toast';
-import { supabase } from '../../supabaseClient';
+import { useSupabaseClient } from '../../hooks/useSupabaseClient';
 import {
   Trash2,
   Printer,
@@ -32,6 +32,7 @@ const InventoryHistorySection: React.FC<{
   canPrintBarcode = false,
   onEdit,
 }) => {
+  const supabase = useSupabaseClient();
   const { currentBranchId: branchId } = useAppContext();
   const queryClient = useQueryClient();
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();

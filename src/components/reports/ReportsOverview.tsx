@@ -22,7 +22,7 @@ import {
   useCustomerDebtsRepo,
   useSupplierDebtsRepo,
 } from "../../hooks/useDebtsRepository";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import type { Sale, Part } from "../../types";
 import { showToast } from "../../utils/toast";
 import { formatCurrency } from "../../utils/format";
@@ -140,6 +140,7 @@ const REPORT_TAB_CONFIGS: Array<{
 
 
 export default function ReportsOverview() {
+  const supabase = useSupabaseClient();
   const { theme: _theme } = useTheme();
   const { payrollRecords, customers, suppliers, currentBranchId, employees } =
     useAppContext();

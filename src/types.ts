@@ -398,7 +398,13 @@ export type CashTransactionCategory =
   | "debt_collection"
   | "debt_payment"
   | "sale_refund"
-  | "other_expense";
+  | "other_expense"
+  // Cầm đồ
+  | "pawn_loan"
+  | "pawn_interest"
+  | "pawn_principal"
+  | "pawn_redeem"
+  | "pawn_liquidation";
 
 export interface CashTransaction {
   id: string;
@@ -781,6 +787,60 @@ export interface PawnRecord {
   status: "active" | "redeemed" | "liquidated";
   notes?: string;
   branchId?: string;
+  /** Gốc còn lại — giảm dần khi khách trả bớt gốc. Mặc định = loanAmount. */
+  principalOutstanding?: number;
+  /** Khách đã đóng lãi tới ngày này — mốc tính lãi kỳ kế tiếp. */
+  interestPaidUntil?: string;
+  totalInterestPaid?: number;
+  totalPrincipalPaid?: number;
+  lastPaymentDate?: string;
+  renewCount?: number;
+  disbursementCashTxId?: string;
+  closedAt?: string;
+  closedBy?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Loại giao dịch trên sổ cái cầm đồ. */
+export type PawnPaymentKind =
+  | "disbursement"
+  | "interest"
+  | "principal"
+  | "redeem"
+  | "additional_loan"
+  | "liquidation";
+
+/**
+ * Một dòng sổ cái cầm đồ (bảng pawn_payments) — bất biến, chỉ thêm.
+ * Huỷ phiếu ghi sai bằng cờ isVoided chứ không xoá.
+ */
+export interface PawnPayment {
+  id: string;
+  pawnId: string;
+  kind: PawnPaymentKind;
+  paymentDate: string;
+  /** Phần lãi — đây mới là doanh thu. */
+  interestAmount: number;
+  /** Phần gốc — thu hồi vốn, KHÔNG phải doanh thu. */
+  principalAmount: number;
+  /** Tổng tiền thực vào/ra quỹ. */
+  amount: number;
+  periodFrom?: string;
+  periodTo?: string;
+  days?: number;
+  principalBefore?: number;
+  principalAfter?: number;
+  interestPaidUntilBefore?: string;
+  endDateBefore?: string;
+  newEndDate?: string;
+  paymentSourceId?: string;
+  cashTransactionId?: string;
+  isVoided?: boolean;
+  voidedAt?: string;
+  voidedBy?: string;
+  notes?: string;
+  createdBy?: string;
+  branchId?: string;
+  created_at?: string;
 }

@@ -7,6 +7,10 @@ export const CASH_TX_CATEGORY_LABELS_VI: Record<string, string> = {
   service_deposit: "Đặt cọc dịch vụ",
   employee_advance_repayment: "Hoàn ứng/Thu hồi tạm ứng",
   general_income: "Thu chung",
+  pawn_interest: "Thu lãi cầm đồ",
+  pawn_principal: "Thu gốc cầm đồ",
+  pawn_redeem: "Khách chuộc tài sản cầm đồ",
+  pawn_liquidation: "Thanh lý tài sản cầm đồ",
 
   // Chi
   inventory_purchase: "Mua hàng",
@@ -22,6 +26,7 @@ export const CASH_TX_CATEGORY_LABELS_VI: Record<string, string> = {
   sale_refund: "Hoàn tiền/Hoàn trả",
   other_expense: "Chi khác",
   general_expense: "Chi chung",
+  pawn_loan: "Giải ngân cầm đồ",
 };
 
 function normalizeForLookup(input: string): string {
@@ -55,6 +60,12 @@ const CATEGORY_ALIASES_TO_CANONICAL: Record<string, string> = {
   sale_refund: "sale_refund",
   other_expense: "other_expense",
   general_expense: "general_expense",
+
+  pawn_loan: "pawn_loan",
+  pawn_interest: "pawn_interest",
+  pawn_principal: "pawn_principal",
+  pawn_redeem: "pawn_redeem",
+  pawn_liquidation: "pawn_liquidation",
 
   // Vietnamese common (no diacritics)
   banhang: "sale_income",

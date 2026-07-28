@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { supabase } from "../../supabaseClient";
+import { useSupabaseClient } from "../../hooks/useSupabaseClient";
 import { UiButton, UiCard } from "../ui";
 
 interface MigrationResults {
@@ -23,6 +23,7 @@ interface SupabaseCounts {
 }
 
 export const MigrationTool: React.FC = () => {
+  const supabase = useSupabaseClient();
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [results, setResults] = useState<MigrationResults | null>(null);

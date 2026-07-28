@@ -114,6 +114,10 @@ export async function fetchCashTransactions(params?: {
           "other_income",
           "debt_collection",
           "general_income",
+          "pawn_interest",
+          "pawn_principal",
+          "pawn_redeem",
+          "pawn_liquidation",
         ].includes(row.category)
           ? "income"
           : "expense"),

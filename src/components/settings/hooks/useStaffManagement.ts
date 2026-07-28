@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { supabase } from "../../../supabaseClient";
+import { useSupabaseClient } from "../../../hooks/useSupabaseClient";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../../contexts/AuthContext";
 import { showToast } from "../../../utils/toast";
@@ -56,6 +56,7 @@ function isMissingTableError(error: any): boolean {
 
 export const useStaffManagement = (activeTab: string) => {
   const { profile, hasRole } = useAuth();
+  const supabase = useSupabaseClient();
 
   // Staff management state
   const [staffList, setStaffList] = useState<StaffMember[]>([]);

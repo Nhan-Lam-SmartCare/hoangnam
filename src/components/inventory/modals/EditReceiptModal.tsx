@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 
 
-import { supabase } from "../../../supabaseClient";
+import { useSupabaseClient } from "../../../hooks/useSupabaseClient";
 import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
@@ -23,6 +23,7 @@ const EditReceiptModal: React.FC<{
   onSave: (data: any) => void;
   currentBranchId: string;
 }> = ({ receipt, onClose, onSave, currentBranchId }) => {
+  const supabase = useSupabaseClient();
   const [supplier, setSupplier] = useState(receipt.supplier);
   const [supplierPhone, setSupplierPhone] = useState("");
   const [supplierSearchTerm, setSupplierSearchTerm] = useState(

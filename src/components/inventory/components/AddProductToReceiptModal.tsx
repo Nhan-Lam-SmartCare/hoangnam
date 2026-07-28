@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "../../../supabaseClient";
+import { useSupabaseClient } from "../../../hooks/useSupabaseClient";
 import { showToast } from "../../../utils/toast";
 import { formatCurrency } from "../../../utils/format";
 import FormattedNumberInput from "../../common/FormattedNumberInput";
@@ -19,6 +19,7 @@ const AddProductToReceiptModal: React.FC<{
     }) => void;
     currentBranchId: string;
 }> = ({ isOpen, onClose, onAdd, currentBranchId }) => {
+    const supabase = useSupabaseClient();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedProduct, setSelectedProduct] = useState<Part | null>(null);
     const [quantity, setQuantity] = useState(1);

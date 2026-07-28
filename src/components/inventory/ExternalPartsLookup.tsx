@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, RefreshCw } from 'lucide-react';
-import { supabase } from '../../supabaseClient';
+import { useSupabaseClient } from '../../hooks/useSupabaseClient';
 import { ExternalPart } from '../../types';
 import { toast } from 'react-toastify';
 import { ExternalPartsDesktopTable } from './components/ExternalPartsDesktopTable';
 import { ExternalPartsMobileList } from './components/ExternalPartsMobileList';
 
 export default function ExternalPartsLookup() {
+  const supabase = useSupabaseClient();
   const [parts, setParts] = useState<ExternalPart[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

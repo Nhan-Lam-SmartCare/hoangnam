@@ -3,7 +3,7 @@
  * Shows when user with MFA enabled tries to login
  */
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "../../supabaseClient";
+import { useAuthMfa } from "../../hooks/useAuthMfa";
 import { showToast } from "../../utils/toast";
 import { Shield, ArrowLeft } from "lucide-react";
 
@@ -18,15 +18,13 @@ export const MFAVerify = ({ onSuccess, onCancel }: MFAVerifyProps) => {
   const [error, setError] = useState("");
   const [factorId, setFactorId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { listFactors, challenge: mfaChallenge, verify: mfaVerify } = useAuthMfa();
 
   useEffect(() => {
     // Get the TOTP factor for verification
     const getFactors = async () => {
       try {
-        const { data, error } = await supabase.auth.mfa.listFactors();
-        if (error) throw error;
-
-        const totpFactors = data?.totp || [];
+        const totpFactors = await listFactors();
         if (totpFactors.length > 0) {
           // Use the first verified factor
           const verifiedFactor = totpFactors.find(
@@ -60,20 +58,9 @@ export const MFAVerify = ({ onSuccess, onCancel }: MFAVerifyProps) => {
     setError("");
 
     try {
-      // Create a challenge first
-      const { data: challengeData, error: challengeError } =
-        await supabase.auth.mfa.challenge({ factorId });
+      const challengeData = await mfaChallenge(factorId);
 
-      if (challengeError) throw challengeError;
-
-      // Verify the challenge with the code
-      const { error } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: challengeData.id,
-        code,
-      });
-
-      if (error) throw error;
+      await mfaVerify(factorId, challengeData.id, code);
 
       showToast.success("Xác thực thành công!");
       onSuccess();
